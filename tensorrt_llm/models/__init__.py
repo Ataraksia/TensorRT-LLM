@@ -134,6 +134,7 @@ __all__ = [
     'SpeculativeDecodingMode',
     'CohereForCausalLM',
     'MLLaMAForCausalLM',
+    'HiggsAudioForCausalLM',
 ]
 
 MODEL_MAP = {
@@ -220,4 +221,7 @@ MODEL_MAP = {
     'RobertaModel': RobertaModel,
     'RobertaForQuestionAnswering': RobertaForQuestionAnswering,
     'RobertaForSequenceClassification': RobertaForSequenceClassification,
+    'HiggsAudioForCausalLM': HiggsAudioForCausalLM,
+    'HiggsAudioForConditionalGeneration': HiggsAudioForCausalLM,
+    'HiggsAudioModel': HiggsAudioForCausalLM,
 }

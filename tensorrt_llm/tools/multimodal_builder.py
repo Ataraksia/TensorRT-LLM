@@ -41,7 +41,8 @@ def add_multimodal_arguments(parser):
             'llava_onevision_lmms', 'vila', 'nougat', 'cogvlm', 'fuyu',
             'pix2struct', 'neva', 'kosmos-2', 'video-neva', 'phi-3-vision',
             'phi-4-multimodal', 'mllama', 'internvl', 'qwen2_vl',
-            'internlm-xcomposer2', 'qwen2_audio', 'pixtral', 'eclair'
+            'internlm-xcomposer2', 'qwen2_audio', 'pixtral', 'eclair',
+            'higgs_audio'
         ],
         help="Model type")
     parser.add_argument(
@@ -146,6 +147,8 @@ class MultimodalEngineBuilder:
             build_pixtral_engine(args)
         elif args.model_type == "eclair":
             build_eclair_engine(args)
+        elif args.model_type == "higgs_audio":
+            build_higgs_audio_engine(args)
         else:
             raise RuntimeError(f"Invalid model type {args.model_type}")
 
@@ -1824,3 +1827,14 @@ def build_eclair_engine(args):
         args.max_batch_size,
         dtype=torch.bfloat16,
         engine_name='visual_encoder.engine')
+def build_higgs_audio_engine(args):
+    """Placeholder for building Higgs-Audio audio encoder engine.
+    
+    TODO: Implement ONNX export and TRT build once the HF model and IO spec
+    are finalized. For now, raise a clear error to guide users.
+    """
+    raise NotImplementedError(
+        "Higgs-Audio engine builder is not implemented yet. "
+        "Please use a prebuilt audio encoder engine and pass --audio_engine_path "
+        "to the runtime example at examples/models/core/higgs_audio/run.py."
+    )

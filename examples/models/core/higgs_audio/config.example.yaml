@@ -1,0 +1,25 @@
+# Example config for Higgs-Audio runtime example
+# Copy to config.yaml and adjust paths
+
+engine_dir: ./engine_outputs
+audio_engine_path: ./audio_encoder/audio_encoder_fp16.plan
+
+# HuggingFace assets
+# Use either a local directory or repo id
+hf_model_or_dir: /path/to/hf-higgs-audio
+
+# Runtime
+gpu_id: 0
+max_new_tokens: 64
+temperature: 0.7
+top_p: 0.9
+top_k: 0
+repetition_penalty: 1.0
+
+# Input
+audio_url: ./audio/sample.wav
+input_text: "<|audio_bos|><|AUDIO|><|audio_eos|>Describe the audio in English:"
+
+# Advanced
+use_py_session: true
+use_cpp_runner: false
