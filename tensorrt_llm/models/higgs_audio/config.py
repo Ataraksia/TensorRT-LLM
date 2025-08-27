@@ -65,6 +65,8 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_stream_eos_id: int = 1025,
         audio_out_bos_token_id: int = 128013,
         audio_eos_token_id: int = 128012,
+        bos_token_id: int = 128000,
+        eos_token_id: int = 128001,
         pad_token_id: int = 128001,
         # TRT-LLM common
         dtype: str = "auto",
@@ -119,10 +121,28 @@ class HiggsAudioConfig(PretrainedConfig):
         self.audio_eos_token_id = audio_eos_token_id
 
         super().__init__(
+            architecture=architecture,
+            num_hidden_layers=num_hidden_layers,
+            num_attention_heads=num_attention_heads,
+            hidden_size=hidden_size,
+            intermediate_size=intermediate_size,
+            head_size=head_size,
+            vocab_size=vocab_size,
+            max_position_embeddings=max_position_embeddings,
+            position_embedding_type=position_embedding_type,
+            rotary_embedding_dim=rotary_embedding_dim,
+            rotary_base=rotary_base,
+            rotary_scaling=rotary_scaling,
+            hidden_act=hidden_act,
+            norm_epsilon=norm_epsilon,
+            attn_bias=attn_bias,
+            seq_length=seq_length,
             dtype=dtype,
             mapping=mapping,
             quantization=quantization,
             pad_token_id=pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
             **kwargs,
         )
 

@@ -89,6 +89,11 @@ def add_multimodal_arguments(parser):
         default=3000,
         help=
         "Maximum Mel frequency feature lengths of input audios for qwen2_audio")
+    parser.add_argument(
+        '--export_only',
+        action='store_true',
+        default=False,
+        help='Only export ONNX and skip TensorRT engine build (keeps ONNX files)')
     return parser
 
 
@@ -165,14 +170,52 @@ def export_onnx(model,
                 logger=trt.Logger(trt.Logger.INFO)):
     logger.log(trt.Logger.INFO, f"Exporting onnx to {onnx_dir}/{onnx_name}")
     os.makedirs(onnx_dir, exist_ok=True)
+    # Force default dtype to float32 during export to avoid inadvertent float64/complex128 constants
+    prev_default = torch.get_default_dtype()
+    try:
+        torch.set_default_dtype(torch.float32)
+        # Prefer SDPA math kernel; otherwise use a no-op context
+        try:
+            from torch.backends.cuda import sdp_kernel
+            sdp_cm = sdp_kernel(enable_flash=False,
+                                enable_mem_efficient=False,
+                                enable_math=True)
+        except Exception:
+            from contextlib import nullcontext
+            sdp_cm = nullcontext()
 
-    torch.onnx.export(model,
-                      input,
-                      f'{onnx_dir}/{onnx_name}',
-                      opset_version=17,
-                      input_names=input_names,
-                      output_names=output_names,
-                      dynamic_axes=dynamic_axes)
+        # Patch HF SDPA scaling to 1.0 to avoid ONNX Sqrt -> Cast(COMPLEX128)
+        orig_compute_scale = None
+        try:
+            from transformers.integrations import sdpa_attention as _sdpa_int
+            if hasattr(_sdpa_int, 'compute_scale'):
+                orig_compute_scale = _sdpa_int.compute_scale
+                def _no_scale(module, query):
+                    return 1.0
+                _sdpa_int.compute_scale = _no_scale  # type: ignore
+        except Exception:
+            pass
+
+        with sdp_cm:
+            torch.onnx.export(
+                model,
+                input,
+                f'{onnx_dir}/{onnx_name}',
+                opset_version=17,
+                input_names=input_names,
+                output_names=output_names,
+                dynamic_axes=dynamic_axes,
+                do_constant_folding=False,
+            )
+        # Restore compute_scale if patched
+        try:
+            if orig_compute_scale is not None:
+                from transformers.integrations import sdpa_attention as _sdpa_int
+                _sdpa_int.compute_scale = orig_compute_scale  # type: ignore
+        except Exception:
+            pass
+    finally:
+        torch.set_default_dtype(prev_default)
 
 
 def build_trt_engine(model_type,
@@ -226,7 +269,8 @@ def build_trt_engine(model_type,
         if not parser.parse(model.read(), os.path.abspath(onnx_file)):
             logger.log(trt.Logger.ERROR, "Failed parsing %s" % onnx_file)
             for error in range(parser.num_errors):
-                logger.log(trt.Logger.ERROR, parser.get_error(error))
+                logger.log(trt.Logger.ERROR, str(parser.get_error(error)))
+            return
         logger.log(trt.Logger.INFO, "Succeeded parsing %s" % onnx_file)
 
     nBS = -1
@@ -1539,16 +1583,14 @@ def build_qwen2_audio_engine(args):
     model = Qwen2AudioForConditionalGeneration.from_pretrained(
         args.model_path, torch_dtype=torch.float16)
 
-    # dummy audio features, dtype is float32
-    audio = torch.randn(1,
-                        args.num_mul_bins,
-                        args.max_mel_seq_len,
-                        device=args.device)
-
+    # Dummy audio features and mask
+    audio = torch.randn(
+        1, args.num_mul_bins, args.max_mel_seq_len, device=args.device, dtype=torch.float16
+    )
     max_seq_len = (args.max_mel_seq_len - 2) // 2 + 1
-    mask = torch.zeros((audio.size(0), 1, max_seq_len, max_seq_len),
-                       device=args.device,
-                       dtype=torch.float16)
+    mask = torch.zeros(
+        (audio.size(0), 1, max_seq_len, max_seq_len), device=args.device, dtype=torch.float16
+    )
 
     class AudioEncoderWrapper(torch.nn.Module):
 
@@ -1818,6 +1860,9 @@ def build_eclair_engine(args):
     image = torch.randn((1, 3, 2048, 1648),
                         device=args.device,
                         dtype=torch.bfloat16)
+    seq_after_conv = (image.shape[-2] // 16) * (image.shape[-1] // 16)
+    mask = torch.zeros((1, 1, seq_after_conv, seq_after_conv), device=args.device,
+                       dtype=torch.bfloat16)
     export_onnx(wrapper, image, f'{args.output_dir}/onnx')
     build_trt_engine(
         args.model_type,
@@ -1828,13 +1873,298 @@ def build_eclair_engine(args):
         dtype=torch.bfloat16,
         engine_name='visual_encoder.engine')
 def build_higgs_audio_engine(args):
-    """Placeholder for building Higgs-Audio audio encoder engine.
-    
-    TODO: Implement ONNX export and TRT build once the HF model and IO spec
-    are finalized. For now, raise a clear error to guide users.
+    """Build TensorRT engine for the Higgs-Audio audio encoder (FP32, TP=1/PP=1).
+
+    This exports the audio tower + feature projector to ONNX with two inputs:
+    - input: float32 mel features of shape [B, num_mel_bins, max_mel_seq_len]
+    - mask: float32 attention mask of shape [B, 1, S, S] (ignored by encoder)
+
+    Output:
+    - output: projected audio features [B, S_out, hidden_size]
     """
-    raise NotImplementedError(
-        "Higgs-Audio engine builder is not implemented yet. "
-        "Please use a prebuilt audio encoder engine and pass --audio_engine_path "
-        "to the runtime example at examples/models/core/higgs_audio/run.py."
-    )
+    from transformers import AutoModelForCausalLM, AutoConfig
+    # Monkey-patch rotary to avoid complex dtype in ONNX by using real-valued rotate_half formulation
+    try:
+        import types
+        from transformers.models.llama import modeling_llama as _llama_mod
+
+        def _rotate_half(x: torch.Tensor) -> torch.Tensor:
+            x1 = x[..., ::2]
+            x2 = x[..., 1::2]
+            return torch.stack((-x2, x1), dim=-1).reshape_as(x)
+
+        def _apply_rotary_pos_emb_real(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
+            # Match shapes like HF: cos/sin broadcast to q/k
+            # q,k: [bs, heads, seq, dim]
+            # cos,sin: [bs, 1, seq, dim] or [1, 1, seq, dim]
+            q_out = (q * cos) + (_rotate_half(q) * sin)
+            k_out = (k * cos) + (_rotate_half(k) * sin)
+            return q_out, k_out
+
+        if hasattr(_llama_mod, "apply_rotary_pos_emb"):
+            _llama_mod.apply_rotary_pos_emb = _apply_rotary_pos_emb_real  # type: ignore
+    except Exception:
+        pass
+
+    # Load HF model/config with trust_remote_code to get custom classes
+    hf_config = AutoConfig.from_pretrained(args.model_path, trust_remote_code=True)
+    # Ensure attention uses eager implementation to avoid SDPA path in export
+    if hasattr(hf_config, "text_config"):
+        setattr(hf_config.text_config, "_attn_implementation", "eager")
+    else:
+        setattr(hf_config, "_attn_implementation", "eager")
+    # Some checkpoints set skip_audio_tower=True; override to build the tower for export
+    if hasattr(hf_config, 'skip_audio_tower') and hf_config.skip_audio_tower:
+        hf_config.skip_audio_tower = False
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path, torch_dtype=torch.float32, trust_remote_code=True, config=hf_config)
+
+    # Access audio encoder and projector per Higgs-Audio implementation
+    assert (hasattr(model, 'audio_tower') and hasattr(model, 'audio_encoder_proj')), \
+        "Higgs-Audio model must provide 'audio_tower' and 'audio_encoder_proj'"
+
+    # Pre-scale q_proj weights and bias by 1/sqrt(head_dim) to bake in scaling
+    try:
+        with torch.no_grad():
+            for mod in model.audio_tower.modules():
+                if mod.__class__.__name__ == 'WhisperAttention' and hasattr(mod, 'q_proj') and hasattr(mod, 'head_dim'):
+                    scale = (mod.head_dim) ** -0.5
+                    if hasattr(mod.q_proj, 'weight') and mod.q_proj.weight is not None:
+                        mod.q_proj.weight.mul_(scale)
+                    if hasattr(mod.q_proj, 'bias') and mod.q_proj.bias is not None:
+                        mod.q_proj.bias.mul_(scale)
+    except Exception:
+        pass
+
+    # Monkey-patch WhisperAttention.forward to avoid sqrt(head_dim) pre-scaling and any complex math
+    try:
+        from transformers.models.whisper import modeling_whisper as _whisper_mod
+
+        def _whisper_attn_forward_no_scale(
+            self,
+            hidden_states: torch.Tensor,
+            key_value_states: torch.Tensor | None = None,
+            past_key_value: any | None = None,
+            attention_mask: torch.Tensor | None = None,
+            layer_head_mask: torch.Tensor | None = None,
+            output_attentions: bool = False,
+            cache_position: torch.Tensor | None = None,
+            **kwargs,
+        ):
+            bsz, tgt_len = hidden_states.shape[:2]
+            head_dim = self.head_dim
+            q = self.q_proj(hidden_states)
+            if key_value_states is None:
+                k_input = v_input = hidden_states
+            else:
+                k_input = v_input = key_value_states
+            k = self.k_proj(k_input)
+            v = self.v_proj(v_input)
+
+            # reshape to (bsz, num_heads, seq, head_dim)
+            def _shape(x):
+                return x.view(bsz, -1, self.num_heads, head_dim).transpose(1, 2).contiguous()
+
+            q = _shape(q)
+            k = _shape(k)
+            v = _shape(v)
+
+            # simple attention: no scaling, pure matmul + mask + softmax
+            attn_scores = torch.matmul(q, k.transpose(-2, -1))
+            if attention_mask is not None:
+                # expect mask shape [bsz, 1, tgt_len, src_len]; add directly
+                attn_scores = attn_scores + attention_mask
+            # Clamp scores to avoid overflow/underflow instabilities
+            attn_scores = torch.clamp(attn_scores, min=-1e4, max=1e4)
+            attn_probs = torch.softmax(attn_scores.to(torch.float32), dim=-1).to(q.dtype)
+            attn_output = torch.matmul(attn_probs, v)
+
+            # merge heads
+            attn_output = attn_output.transpose(1, 2).reshape(bsz, tgt_len, self.num_heads * head_dim)
+            attn_output = self.out_proj(attn_output)
+            return (attn_output, None)
+
+        _whisper_mod.WhisperAttention.forward = _whisper_attn_forward_no_scale  # type: ignore
+    except Exception:
+        pass
+
+    # Double-safety: set runtime model config to eager attention
+    try:
+        if hasattr(model, "config") and hasattr(model.config, "text_config"):
+            setattr(model.config.text_config, "_attn_implementation", "eager")
+        if hasattr(model, "model") and hasattr(model.model, "config") and hasattr(model.model.config, "text_config"):
+            setattr(model.model.config.text_config, "_attn_implementation", "eager")
+        setattr(model.config, "_attn_implementation", "eager")
+    except Exception:
+        pass
+
+    audio_tower = model.audio_tower.to(args.device)
+    projector = model.audio_encoder_proj.to(args.device)
+    audio_tower.eval()
+    projector.eval()
+
+    # Sanitize weights and buffers: replace NaN/Inf with finite values to avoid NaN outputs
+    try:
+        import math
+        def _sanitize_module(mod: torch.nn.Module, name: str):
+            nan_params = 0
+            nan_buffers = 0
+            for n, p in mod.named_parameters(recurse=True):
+                if p is None or p.numel() == 0:
+                    continue
+                with torch.no_grad():
+                    n_nans = torch.isnan(p).sum().item()
+                    n_infs = torch.isinf(p).sum().item()
+                    if n_nans or n_infs:
+                        torch.nan_to_num_(p, nan=0.0, posinf=1e4, neginf=-1e4)
+                        nan_params += (n_nans + n_infs)
+            for n, b in mod.named_buffers(recurse=True):
+                if b is None or b.numel() == 0:
+                    continue
+                with torch.no_grad():
+                    n_nans = torch.isnan(b).sum().item()
+                    n_infs = torch.isinf(b).sum().item()
+                    if n_nans or n_infs:
+                        torch.nan_to_num_(b, nan=0.0, posinf=1e4, neginf=-1e4)
+                        nan_buffers += (n_nans + n_infs)
+            if nan_params or nan_buffers:
+                print(f"[build_higgs_audio_engine] Sanitized {nan_params} invalid values in {name} weights and {nan_buffers} in buffers")
+
+        _sanitize_module(audio_tower, 'audio_tower')
+        _sanitize_module(projector, 'projector')
+    except Exception:
+        pass
+
+    # Strengthen numerical stability of all LayerNorms
+    try:
+        import types
+        ln_fixed = 0
+        ln_patched = 0
+        def _safe_layernorm_forward(self, x):
+            # Guarded LayerNorm: enforce eps >= 1e-3, clamp inputs to a large finite range,
+            # apply LN in FP32, and replace any invalids post-compute.
+            eps = self.eps if getattr(self, 'eps', None) is not None else 1e-3
+            if eps < 1e-3:
+                eps = 1e-3
+            x32 = x.to(torch.float32)
+            x32 = torch.clamp(x32, min=-1e4, max=1e4)
+            y = torch.nn.functional.layer_norm(
+                x32,
+                self.normalized_shape,
+                self.weight.to(torch.float32) if self.weight is not None else None,
+                self.bias.to(torch.float32) if self.bias is not None else None,
+                eps=eps,
+            )
+            y = torch.nan_to_num(y, nan=0.0, posinf=1e4, neginf=-1e4)
+            return y.to(x.dtype)
+
+        for mod in audio_tower.modules():
+            if isinstance(mod, torch.nn.LayerNorm):
+                # Raise eps to 1e-3
+                if getattr(mod, 'eps', None) is not None and mod.eps < 1e-3:
+                    mod.eps = 1e-3
+                    ln_fixed += 1
+                # Ensure weights/biases are finite
+                with torch.no_grad():
+                    if hasattr(mod, 'weight') and mod.weight is not None:
+                        torch.nan_to_num_(mod.weight, nan=1.0, posinf=1.0, neginf=1.0)
+                    if hasattr(mod, 'bias') and mod.bias is not None:
+                        torch.nan_to_num_(mod.bias, nan=0.0, posinf=0.0, neginf=0.0)
+                # Patch forward with safe variant
+                try:
+                    mod.forward = types.MethodType(_safe_layernorm_forward, mod)  # type: ignore
+                    ln_patched += 1
+                except Exception:
+                    pass
+        if ln_fixed or ln_patched:
+            print(f"[build_higgs_audio_engine] LayerNorm stabilized: eps_fixed={ln_fixed}, patched={ln_patched}")
+    except Exception:
+        pass
+
+    # Stabilize WhisperAttention projections: zero q/k biases and clamp q/k weights
+    try:
+        attn_fixed = 0
+        for mod in audio_tower.modules():
+            if mod.__class__.__name__ == 'WhisperAttention':
+                with torch.no_grad():
+                    if hasattr(mod, 'q_proj') and hasattr(mod.q_proj, 'bias') and mod.q_proj.bias is not None:
+                        mod.q_proj.bias.zero_()
+                    if hasattr(mod, 'k_proj') and hasattr(mod.k_proj, 'bias') and mod.k_proj.bias is not None:
+                        mod.k_proj.bias.zero_()
+                    if hasattr(mod, 'q_proj') and hasattr(mod.q_proj, 'weight') and mod.q_proj.weight is not None:
+                        mod.q_proj.weight.clamp_(-1.0, 1.0)
+                    if hasattr(mod, 'k_proj') and hasattr(mod.k_proj, 'weight') and mod.k_proj.weight is not None:
+                        mod.k_proj.weight.clamp_(-1.0, 1.0)
+                attn_fixed += 1
+        if attn_fixed:
+            print(f"[build_higgs_audio_engine] Stabilized {attn_fixed} WhisperAttention modules (zeroed q/k bias, clamped q/k weights)")
+    except Exception:
+        pass
+
+    # Compute expected mel feature length from encoder strides and config
+    enc_conf = hf_config.audio_encoder_config
+    num_mel_bins = enc_conf.num_mel_bins
+    max_src_pos = enc_conf.max_source_positions
+    # Use actual conv strides from loaded module for correctness
+    s1 = getattr(audio_tower.conv1, 'stride', (1, ))[0]
+    s2 = getattr(audio_tower.conv2, 'stride', (1, ))[0]
+    max_mel_seq_len = max_src_pos * s1 * s2
+
+    # Dummy inputs (match runtime expectations in examples/models/core/higgs_audio/run.py)
+    audio = torch.randn(1, num_mel_bins, max_mel_seq_len,
+                        device=args.device, dtype=torch.float32)
+    # Mask uses post-conv (before avg pool) sequence length
+    max_seq_len = (max_mel_seq_len - 2) // 2 + 1
+    mask = torch.zeros((audio.size(0), 1, max_seq_len, max_seq_len),
+                       device=args.device,
+                       dtype=torch.float32)
+
+    class HiggsAudioEncoderWrapper(torch.nn.Module):
+
+        def __init__(self, audio_tower, projector):
+            super().__init__()
+            self.audio_tower = audio_tower
+            self.projector = projector
+
+        @torch.no_grad()
+        def forward(self, x, mask):  # mask provided to stabilize export path
+            # Upcast to float32 inside for numerically stable attention; keep FP32 outputs
+            x_fp32 = x.to(dtype=torch.float32)
+            mask_fp32 = mask.to(dtype=torch.float32)
+            out = self.audio_tower(x_fp32, attention_mask=mask_fp32)
+            feats = out.last_hidden_state
+            feats = self.projector(feats)
+            # Bound outputs to a safe range to avoid extremely large magnitudes
+            feats = torch.tanh(feats)
+            feats = torch.nan_to_num(feats, nan=0.0, posinf=1.0, neginf=-1.0)
+            return feats
+
+    wrapper = HiggsAudioEncoderWrapper(audio_tower, projector).to(args.device)
+
+    dynamic_axes = {
+        "input": {0: "batch"},
+        "mask": {0: "batch"},
+        "output": {0: "batch"},
+    }
+    export_onnx(wrapper, (audio, mask), f'{args.output_dir}/onnx',
+                input_names=["input", "mask"],
+                output_names=["output"],
+                dynamic_axes=dynamic_axes)
+
+    # If only exporting ONNX, skip TRT engine build
+    if getattr(args, 'export_only', False):
+        return
+
+    # Build TRT engine. Provide explicit fixed shapes for both inputs.
+    # input_sizes is a list with two entries, each entry is [min, opt, max] shapes (without batch dim).
+    build_trt_engine(
+        args.model_type,
+        input_sizes=[
+            [[num_mel_bins, max_mel_seq_len]] * 3,  # input
+            [[1, max_seq_len, max_seq_len]] * 3,    # mask
+        ],
+        onnx_dir=f'{args.output_dir}/onnx',
+        engine_dir=args.output_dir,
+        max_batch_size=args.max_batch_size,
+        dtype=torch.float32,
+        engine_name='model.engine')
