@@ -25,30 +25,6 @@ from ..modeling_utils import QuantConfig
 from .config import HiggsAudioConfig
 
 
-def build_config_from_hf(
-    hf_model_dir: str,
-    *,
-    dtype: str = "auto",
-    mapping: Optional[Mapping] = None,
-    quant_config: Optional[QuantConfig] = None,
-    trust_remote_code: bool = True,
-    **kwargs,
-) -> HiggsAudioConfig:
-    """Create a `HiggsAudioConfig` from a HuggingFace model directory.
-
-    This reads the HF composition config (text + audio encoder) and flattens
-    what we need for TRT-LLM.
-    """
-    import transformers
-
-    hf_cfg, _unused = transformers.AutoConfig.from_pretrained(
-        hf_model_dir, trust_remote_code=trust_remote_code, return_unused_kwargs=True
-    )
-    return HiggsAudioConfig.from_hugging_face(
-        hf_cfg, dtype=dtype, mapping=mapping, quant_config=quant_config, **kwargs
-    )
-
-
 def _backbone_key_template(config: HiggsAudioConfig):
     """Return a list of expected TRT-LLM tensor keys for the LLaMA-like backbone with DualFFN support.
 

@@ -65,35 +65,6 @@ class GraphCacheKey:
 
 
 @dataclass
-class GraphExecutionStats:
-    """Statistics for CUDA graph execution performance."""
-    total_executions: int = 0
-    total_time_ms: float = 0.0
-    min_time_ms: float = float('inf')
-    max_time_ms: float = 0.0
-    avg_time_ms: float = 0.0
-    cache_hits: int = 0
-    cache_misses: int = 0
-    fallback_executions: int = 0
-    
-    def update(self, execution_time_ms: float, cache_hit: bool = True, fallback: bool = False) -> None:
-        """Update statistics with new execution data."""
-        self.total_executions += 1
-        self.total_time_ms += execution_time_ms
-        self.min_time_ms = min(self.min_time_ms, execution_time_ms)
-        self.max_time_ms = max(self.max_time_ms, execution_time_ms)
-        self.avg_time_ms = self.total_time_ms / self.total_executions
-        
-        if cache_hit:
-            self.cache_hits += 1
-        else:
-            self.cache_misses += 1
-            
-        if fallback:
-            self.fallback_executions += 1
-
-
-@dataclass
 class CudaGraphInstance:
     """Represents a cached CUDA graph instance with metadata."""
     graph: torch.cuda.CUDAGraph
@@ -142,12 +113,6 @@ class CudaGraphManager:
     Example:
         >>> config = HiggsAudioConfig()
         >>> manager = CudaGraphManager(config)
-        >>> graph = manager.get_or_create_graph(
-        ...     graph_type=TTSGraphType.AUDIO_INIT,
-        ...     batch_size=2,
-        ...     sequence_length=100,
-        ...     forward_fn=model.forward
-        ... )
         >>> outputs = manager.execute_graph(graph, inputs)
     """
     
@@ -177,17 +142,12 @@ class CudaGraphManager:
         # Graph cache and management
         self.graph_cache: Dict[GraphCacheKey, CudaGraphInstance] = {}
         self.memory_pool = memory_pool_handle or torch.cuda.graph_pool_handle()
-        
-        # Performance monitoring
-        self.execution_stats: Dict[TTSGraphType, GraphExecutionStats] = {
-            graph_type: GraphExecutionStats() for graph_type in TTSGraphType
-        }
-        self.global_stats = GraphExecutionStats()
+
         
         # TTS-specific configuration
-        self.tts_batch_sizes = getattr(config, 'cuda_graph_tts_batch_sizes', [1, 2, 4, 8])
-        self.tts_sequence_lengths = getattr(config, 'cuda_graph_tts_sequence_lengths', [128, 256, 512, 1024])
-        self.streaming_chunk_sizes = getattr(config, 'cuda_graph_streaming_chunk_sizes', [16, 32, 64])
+        self.tts_batch_sizes = getattr(config, 'cuda_graph_tts_batch_sizes', [1])
+        self.tts_sequence_lengths = getattr(config, 'cuda_graph_tts_sequence_lengths', [1024])
+        self.streaming_chunk_sizes = getattr(config, 'cuda_graph_streaming_chunk_sizes', [32])
         self.enable_streaming_graphs = getattr(config, 'cuda_graph_enable_streaming', True)
         self.enable_delay_pattern_graphs = getattr(config, 'cuda_graph_enable_delay_patterns', True)
         
@@ -345,43 +305,22 @@ class CudaGraphManager:
         Raises:
             RuntimeError: If graph execution fails
         """
-        start_time = time.time() if self.enable_performance_monitoring else 0
         
-        try:
-            # Update input tensors
-            graph_instance.update_inputs(inputs)
-            
-            # Execute graph
-            if stream is not None:
-                with torch.cuda.stream(stream):
-                    graph_instance.execute()
-                stream.synchronize()
-            else:
+        # Update input tensors
+        graph_instance.update_inputs(inputs)
+        
+        # Execute graph
+        if stream is not None:
+            with torch.cuda.stream(stream):
                 graph_instance.execute()
-                torch.cuda.synchronize()
+            stream.synchronize()
+        else:
+            graph_instance.execute()
+            torch.cuda.synchronize()
+        
+        return graph_instance.output_tensors.copy()
             
-            # Update performance statistics
-            if self.enable_performance_monitoring:
-                execution_time = (time.time() - start_time) * 1000  # Convert to ms
-                self.execution_stats[graph_instance.cache_key.graph_type].update(
-                    execution_time, cache_hit=True, fallback=False
-                )
-                self.global_stats.update(execution_time, cache_hit=True, fallback=False)
-            
-            return graph_instance.output_tensors.copy()
-            
-        except Exception as e:
-            if self.fallback_enabled:
-                warnings.warn(f"CUDA graph execution failed, using fallback: {e}")
-                if self.enable_performance_monitoring:
-                    execution_time = (time.time() - start_time) * 1000
-                    self.execution_stats[graph_instance.cache_key.graph_type].update(
-                        execution_time, cache_hit=False, fallback=True
-                    )
-                    self.global_stats.update(execution_time, cache_hit=False, fallback=True)
-                return {}  # Fallback should be handled by caller
-            else:
-                raise RuntimeError(f"CUDA graph execution failed: {e}") from e
+
     
     def create_streaming_graph(self,
                               model: torch.nn.Module,
@@ -542,98 +481,6 @@ class CudaGraphManager:
         except Exception as e:
             warnings.warn(f"Memory pool management failed: {e}")
             return {'error': str(e)}
-    
-    def get_performance_summary(self) -> Dict[str, Any]:
-        """Get comprehensive performance summary with TTS-specific metrics.
-        
-        Returns:
-            Dictionary containing detailed performance statistics
-        """
-        summary = {
-            'global_stats': {
-                'total_executions': self.global_stats.total_executions,
-                'avg_time_ms': self.global_stats.avg_time_ms,
-                'min_time_ms': self.global_stats.min_time_ms,
-                'max_time_ms': self.global_stats.max_time_ms,
-                'cache_hit_ratio': (
-                    self.global_stats.cache_hits / max(1, self.global_stats.total_executions)
-                ),
-                'fallback_ratio': (
-                    self.global_stats.fallback_executions / max(1, self.global_stats.total_executions)
-                )
-            },
-            'per_graph_type': {},
-            'cache_stats': {
-                'total_cached_graphs': len(self.graph_cache),
-                'max_cache_size': self.max_cache_size,
-                'cache_usage_ratio': len(self.graph_cache) / max(1, self.max_cache_size),
-                'warmup_completed': self.warmup_completed,
-                'warmup_graphs_count': len(self.warmup_graphs)
-            },
-            'memory_stats': self.manage_memory_pools(cleanup_threshold=1.0)  # Just get stats
-        }
-        
-        # Per-graph-type statistics
-        for graph_type, stats in self.execution_stats.items():
-            if stats.total_executions > 0:
-                summary['per_graph_type'][graph_type.value] = {
-                    'total_executions': stats.total_executions,
-                    'avg_time_ms': stats.avg_time_ms,
-                    'min_time_ms': stats.min_time_ms,
-                    'max_time_ms': stats.max_time_ms,
-                    'cache_hit_ratio': stats.cache_hits / max(1, stats.total_executions),
-                    'fallback_ratio': stats.fallback_executions / max(1, stats.total_executions)
-                }
-        
-        return summary
-    
-    def validate_graph_compatibility(self,
-                                   graph_instance: CudaGraphInstance,
-                                   inputs: Dict[str, torch.Tensor]) -> Tuple[bool, List[str]]:
-        """Validate that inputs are compatible with the given graph.
-        
-        Args:
-            graph_instance: Graph instance to validate against
-            inputs: Input tensors to validate
-            
-        Returns:
-            Tuple of (is_compatible, list_of_issues)
-        """
-        issues = []
-        
-        try:
-            # Check input tensor shapes
-            for name, input_tensor in inputs.items():
-                if name in graph_instance.input_tensors:
-                    expected_shape = graph_instance.input_tensors[name].shape
-                    if input_tensor.shape != expected_shape:
-                        issues.append(
-                            f"Input '{name}' shape mismatch: expected {expected_shape}, "
-                            f"got {input_tensor.shape}"
-                        )
-                else:
-                    issues.append(f"Unexpected input tensor '{name}' not found in graph")
-            
-            # Check for missing required inputs
-            for name in graph_instance.input_tensors:
-                if name not in inputs:
-                    issues.append(f"Missing required input tensor '{name}'")
-            
-            # Check device compatibility
-            for name, input_tensor in inputs.items():
-                if name in graph_instance.input_tensors:
-                    expected_device = graph_instance.input_tensors[name].device
-                    if input_tensor.device != expected_device:
-                        issues.append(
-                            f"Input '{name}' device mismatch: expected {expected_device}, "
-                            f"got {input_tensor.device}"
-                        )
-            
-            return len(issues) == 0, issues
-            
-        except Exception as e:
-            issues.append(f"Validation failed with exception: {e}")
-            return False, issues
     
     def cleanup_cache(self, max_age_hours: float = 24.0, max_unused_hours: float = 1.0) -> int:
         """Clean up old or unused CUDA graphs from cache.
@@ -851,51 +698,6 @@ class CudaGraphManager:
         
         return delay_pattern_graphs
     
-    def _validate_graph_instance(self, graph_instance: CudaGraphInstance) -> None:
-        """Validate that a graph instance is properly created and functional."""
-        try:
-            # Test graph execution with sample data
-            test_execution_success = False
-            
-            # Create test inputs matching the graph's expected inputs
-            test_inputs = {}
-            for name, tensor in graph_instance.input_tensors.items():
-                # Create test tensor with same shape and properties
-                if tensor.dtype in [torch.int32, torch.long]:
-                    test_tensor = torch.randint(0, 1000, tensor.shape, dtype=tensor.dtype, device=tensor.device)
-                elif tensor.dtype == torch.bool:
-                    test_tensor = torch.rand(tensor.shape, device=tensor.device) > 0.5
-                else:
-                    test_tensor = torch.randn_like(tensor)
-                test_inputs[name] = test_tensor
-            
-            # Execute graph and verify outputs
-            try:
-                graph_instance.update_inputs(test_inputs)
-                graph_instance.execute()
-                test_execution_success = True
-            except Exception as e:
-                raise RuntimeError(f"Graph execution test failed: {e}")
-            
-            # Verify outputs have expected structure
-            if not graph_instance.output_tensors:
-                raise RuntimeError("Graph produced no outputs")
-            
-            # Check output tensor validity
-            for name, tensor in graph_instance.output_tensors.items():
-                if not isinstance(tensor, torch.Tensor):
-                    raise RuntimeError(f"Output '{name}' is not a tensor: {type(tensor)}")
-                if tensor.numel() == 0:
-                    raise RuntimeError(f"Output '{name}' is empty")
-                if torch.isnan(tensor).any():
-                    warnings.warn(f"Output '{name}' contains NaN values")
-            
-            if not test_execution_success:
-                raise RuntimeError("Graph validation failed: execution test unsuccessful")
-                
-        except Exception as e:
-            raise RuntimeError(f"Graph instance validation failed: {e}") from e
-    
     def _add_to_cache(self, cache_key: GraphCacheKey, graph_instance: CudaGraphInstance) -> None:
         """Add graph instance to cache with size management."""
         # Check if we need to make room in cache
@@ -928,47 +730,7 @@ class CudaGraphManager:
             del self.graph_cache[cache_key]
         
         return len(graphs_to_remove)
-    
-    @contextmanager
-    def temporary_graph_disable(self):
-        """Context manager to temporarily disable CUDA graph usage."""
-        original_caching = self.enable_caching
-        self.enable_caching = False
-        try:
-            yield
-        finally:
-            self.enable_caching = original_caching
-    
-    def reset_statistics(self) -> None:
-        """Reset all performance statistics."""
-        self.global_stats = GraphExecutionStats()
-        self.execution_stats = {
-            graph_type: GraphExecutionStats() for graph_type in TTSGraphType
-        }
-    
-    def export_performance_metrics(self, filepath: str) -> None:
-        """Export performance metrics to file for analysis."""
-        import json
-        
-        metrics = {
-            'timestamp': time.time(),
-            'config': {
-                'tts_batch_sizes': self.tts_batch_sizes,
-                'tts_sequence_lengths': self.tts_sequence_lengths,
-                'streaming_chunk_sizes': self.streaming_chunk_sizes,
-                'max_cache_size': self.max_cache_size,
-                'enable_streaming_graphs': self.enable_streaming_graphs,
-                'enable_delay_pattern_graphs': self.enable_delay_pattern_graphs
-            },
-            'performance': self.get_performance_summary()
-        }
-        
-        try:
-            with open(filepath, 'w') as f:
-                json.dump(metrics, f, indent=2, default=str)
-        except Exception as e:
-            warnings.warn(f"Failed to export performance metrics: {e}")
-    
+
     def __del__(self):
         """Cleanup resources when manager is destroyed."""
         try:
@@ -978,90 +740,6 @@ class CudaGraphManager:
         except:
             pass  # Ignore errors during cleanup
 
-
-# Utility functions for CUDA graph optimization
-
-def estimate_graph_memory_usage(batch_size: int, 
-                               sequence_length: int, 
-                               hidden_size: int = 4096,
-                               num_layers: int = 32,
-                               dtype: torch.dtype = torch.float16) -> float:
-    """Estimate memory usage for a CUDA graph in GB.
-    
-    Args:
-        batch_size: Batch size for the graph
-        sequence_length: Sequence length
-        hidden_size: Model hidden dimension
-        num_layers: Number of transformer layers
-        dtype: Data type for tensors
-        
-    Returns:
-        Estimated memory usage in GB
-    """
-    # Calculate bytes per element
-    bytes_per_element = 2 if dtype == torch.float16 else 4
-    
-    # Estimate activation memory
-    # This is a rough estimate based on transformer architecture
-    activation_elements = (
-        batch_size * sequence_length * hidden_size * num_layers * 4  # Rough multiplier
-    )
-    
-    activation_memory_gb = (activation_elements * bytes_per_element) / 1e9
-    
-    # Add overhead for CUDA graph structure (rough estimate)
-    overhead_gb = 0.1  # 100MB overhead
-    
-    return activation_memory_gb + overhead_gb
-
-
-def select_optimal_batch_sizes(max_batch_size: int, 
-                              max_memory_gb: float = 4.0,
-                              sequence_length: int = 512) -> List[int]:
-    """Select optimal batch sizes for CUDA graph creation based on memory constraints.
-    
-    Args:
-        max_batch_size: Maximum allowed batch size
-        max_memory_gb: Maximum memory budget in GB
-        sequence_length: Target sequence length
-        
-    Returns:
-        List of recommended batch sizes
-    """
-    recommended_sizes = []
-    
-    # Common TTS batch sizes in priority order
-    candidate_sizes = [1, 2, 4, 8, 16, 32]
-    
-    for batch_size in candidate_sizes:
-        if batch_size > max_batch_size:
-            break
-            
-        estimated_memory = estimate_graph_memory_usage(batch_size, sequence_length)
-        
-        if estimated_memory <= max_memory_gb:
-            recommended_sizes.append(batch_size)
-        else:
-            break  # Stop at first size that exceeds memory budget
-    
-    return recommended_sizes or [1]  # Always include at least batch size 1
-
-
-@contextmanager
-def cuda_graph_capture_context(warmup_iterations: int = 3):
-    """Context manager for proper CUDA graph capture setup.
-    
-    Args:
-        warmup_iterations: Number of warmup iterations before capture
-    """
-    # Ensure we're in evaluation mode and sync before capture
-    torch.cuda.synchronize()
-    
-    # Disable autograd for efficiency
-    with torch.no_grad():
-        yield warmup_iterations
-    
-    torch.cuda.synchronize()
 
 
 class DualFFNGraphOptimizer:
