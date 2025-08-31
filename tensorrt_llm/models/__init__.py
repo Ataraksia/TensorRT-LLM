@@ -62,7 +62,7 @@ from .qwen.model import QWenForCausalLM
 from .recurrentgemma.model import RecurrentGemmaForCausalLM
 from .redrafter.model import ReDrafterForLLaMALM, ReDrafterForQWenLM
 from .stdit.model import STDiT3Model
-from .higgs_audio.model import HiggsAudioForCausalLM
+# from .higgs_audio.model import HiggsAudioForCausalLM
 
 __all__ = [
     'BertModel',
@@ -135,7 +135,7 @@ __all__ = [
     'SpeculativeDecodingMode',
     'CohereForCausalLM',
     'MLLaMAForCausalLM',
-    'HiggsAudioForCausalLM',
+    # 'HiggsAudioForCausalLM',
 ]
 
 MODEL_MAP = {
@@ -222,7 +222,7 @@ MODEL_MAP = {
     'RobertaModel': RobertaModel,
     'RobertaForQuestionAnswering': RobertaForQuestionAnswering,
     'RobertaForSequenceClassification': RobertaForSequenceClassification,
-    'HiggsAudioForCausalLM': HiggsAudioForCausalLM,
-    'HiggsAudioForConditionalGeneration': HiggsAudioForCausalLM,
-    'HiggsAudioModel': HiggsAudioForCausalLM,
+    # 'HiggsAudioForCausalLM': HiggsAudioForCausalLM,
+    # 'HiggsAudioForConditionalGeneration': HiggsAudioForCausalLM,
+    # 'HiggsAudioModel': HiggsAudioForCausalLM,
 }

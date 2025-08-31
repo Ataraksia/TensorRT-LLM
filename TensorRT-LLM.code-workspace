@@ -2,21 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../higgs-audio-v2-generation-3B-base"
-		},
-		{
-			"path": "../higgs-audio-v2-generation-3B-base-FP32-TRT"
-		},
-		{
-			"path": "../higgs-audio-v2-generation-3B-base-tokenizer"
-		},
-		{
-			"path": "../Llama-3.2-3B-TRT"
-		},
-		{
-			"path": "../higgs-audio"
 		}
 	],
 	"settings": {}
