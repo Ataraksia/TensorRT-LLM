@@ -9,7 +9,9 @@ Usage:
     python basic_tts.py --text "Hello, this is a test." --output output.wav
     python basic_tts.py --text "Hello, world!" --model_path /path/to/model --engine_path /path/to/engine
 """
-from transformers import AutoTokenizer, AutoProcessor, AutoConfig
+import sounddevice as sd
+import os
+from transformers import AutoTokenizer, AutoProcessor, AutoConfig, AutoModel, AutoModelForCausalLM
 from loguru import logger
 import base64
 from io import BytesIO
@@ -29,15 +31,17 @@ import shutil
 from transformers.models.whisper.processing_whisper import WhisperProcessor
 from tensorrt_llm.builder import Builder
 from tensorrt_llm.network import net_guard
-from tensorrt_llm.models.higgs_audio.convert import load_weights_from_hf_model
 from tensorrt_llm.plugin import PluginConfig
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm._utils import to_json_file
 # TensorRT-LLM imports
-import tensorrt_llm
+import sys
+sys.path.append("/home/me/TTS/higgs-audio") # Add the directory to the search path
+from boson_multimodal.model.higgs_audio import *  
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM
 from tensorrt_llm.models.higgs_audio.higgs_audio_tokenizer import load_higgs_audio_tokenizer
+from tensorrt_llm.models.higgs_audio.convert import load_weights_from_hf_model
 from tensorrt_llm import LLM, BuildConfig
 from tensorrt_llm.llmapi import QuantConfig, QuantAlgo, CalibConfig
 from tensorrt_llm.runtime import ModelRunnerCpp as ModelRunner
@@ -47,17 +51,7 @@ logger.set_level('verbose')
 
 
 class HiggsAudioTTS:
-    """Simple TTS interface using the unified Higgs Audio architecture.
-    
-    This class provides a user-friendly interface for text-to-speech generation
-    using the production-ready unified TensorRT engine with quantified performance
-    improvements (15-25ms latency reduction, 20-30% memory reduction).
-    
-    Example:
-        >>> tts = HiggsAudioTTS(model_path="path/to/model", engine_path="path/to/engine")
-        >>> audio = tts.generate_speech("Hello, world!")
-        >>> tts.save_audio(audio, "output.wav")
-    """
+    """Simple TTS interface using the unified Higgs Audio architecture."""
     
     def __init__(
         self,
@@ -65,7 +59,8 @@ class HiggsAudioTTS:
         engine_path: Optional[str] = None,
         audio_tokenizer_path: str = None,
         device: Union[str, torch.device] = "cuda:0",
-        max_len: int = 1024,
+        max_len: int = 3072,
+        dtype: str = "bfloat16",
     ):
         """Initialize the Higgs Audio TTS system.
         
@@ -89,10 +84,9 @@ class HiggsAudioTTS:
         # Initialize system
         logger.info("Initializing Higgs Audio TTS system...")
         start_time = time.perf_counter()
-
         # Load configuration first
-        self.config = AutoConfig.from_pretrained(self.model_path)
-
+        self.config = HiggsAudioConfig.from_hugging_face(self.model_path)
+        self.dtype = str(self.config.dtype)
         # Initialize TensorRT engine
         # Step 1: Setup directories and validate inputs
         if not self.engine_path or \
@@ -102,7 +96,7 @@ class HiggsAudioTTS:
             self._build_engine()
             
         logger.info(f"Loading TensorRT engine from {self.engine_path}")
-        self.engine_runner = ModelRunner.from_dir(str(self.engine_path), cuda_graph_mode = True)
+        self.engine_runner = ModelRunner.from_dir(str(self.engine_path), cuda_graph_mode = True, use_gpu_direct_storage = True)
 
         # Initialize tokenizers and processors
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
@@ -153,58 +147,13 @@ class HiggsAudioTTS:
     
     def _build_engine(self) -> ModelRunner:
         """Build TensorRT engine for Higgs Audio TTS model."""
-
-
         build_start_time = time.perf_counter()
-        logger.info("=" * 60)
-        logger.info("STARTING UNIFIED HIGGS AUDIO TTS ENGINE BUILD")
-        logger.info("=" * 60)
-
-        logger.info("Step 1: Setting up build environment...")
         self.engine_path.mkdir(parents=True, exist_ok=True)
+        # # Validate model path exists
+        # if not Path(self.model_path).exists():
+        #     raise FileNotFoundError(f"Model path does not exist: {self.model_path}")
 
-        # Validate model path exists
-        if not Path(self.model_path).exists():
-            raise FileNotFoundError(f"Model path does not exist: {self.model_path}")
-
-        logger.info(f"  ✓ Build directory: {self.engine_path}")
-        logger.info(f"  ✓ Model path: {self.model_path}")
-
-        # Step 2: Setup mapping and plugin configuration
-        logger.info("Step 2: Configuring TensorRT-LLM settings...")
-        mapping = Mapping(world_size=1, rank=0, tp_size=1, pp_size=1)
-
-        # Basic plugin configuration for compatibility
-        plugin_config = PluginConfig()
-        plugin_config.dtype='bfloat16'
-        plugin_config.norm_quant_fusion = True
-        plugin_config.tokens_per_block = 32
-        plugin_config.reduce_fusion = True
-        plugin_config.use_fp8_context_fmha = False
-        plugin_config.paged_kv_cache = True
-
-        logger.info(f"  ✓ Mapping: TP={mapping.tp_size}, PP={mapping.pp_size}")
-
-        # Step 3: Build configuration from JSON files (avoiding transformers dependency)
-        logger.info("Step 3: Building configuration from JSON files...")
         step_start = time.perf_counter()
-
-    
-        # Use the existing JSON loading method instead of transformers-based approach
-        trt_config = HiggsAudioConfig.from_hugging_face(self.model_path)
-        trt_config.mapping = mapping
-        trt_config.dtype = 'bfloat16'
-        trt_config.audio_adapter_type = "dual_ffn_fast_forward"
-
-        step_time = time.perf_counter() - step_start
-        logger.info(f"  ✓ Configuration built in {step_time:.2f}s")
-        logger.info(f"  ✓ Model: {trt_config.num_hidden_layers} layers, {trt_config.hidden_size} hidden size")
-
-
-        # Step 4: Load and convert weights with DualFFN support
-        logger.info("Step 4: Loading and converting weights...")
-        step_start = time.perf_counter()
-
         checkpoint = load_weights_from_hf_model(
             hf_model_dir=self.model_path,
             config=self.config,
@@ -212,28 +161,16 @@ class HiggsAudioTTS:
             fallback_strategy='duplicate_text'
         )
 
-        # Extract DualFFN information for logging
-        dual_ffn_info = checkpoint.get('metadata', {}).get('dual_ffn_info', {})
-        audio_dual_ffn_layers = dual_ffn_info.get('audio_dual_ffn_layers_converted', [])
-        total_layers = len(dual_ffn_info.get('layers_processed', []))
-
-        step_time = time.perf_counter() - step_start
-        logger.info(f"  ✓ Weights converted in {step_time:.2f}s")
-        logger.info(f"  ✓ DualFFN layers: {len(audio_dual_ffn_layers)}/{total_layers}")
-        if dual_ffn_info.get('fallback_used'):
-            logger.info(f"  ✓ Fallback used for layers: {dual_ffn_info['fallback_used']}")
-
-        # Step 5: Create builder and network
-        logger.info("Step 5: Creating TensorRT builder and network...")
-        step_start = time.perf_counter()
-
+        mapping = Mapping(world_size=1, rank=0, tp_size=1, pp_size=1)
+        plugin_config = PluginConfig()
+        plugin_config.dtype=self.dtype
+        plugin_config.use_fp8_context_fmha = False
+        plugin_config.paged_kv_cache = True
         builder = Builder()
         builder_config = builder.create_builder_config(
-            precision='bfloat16',
-            timing_cache=None,
+            precision=self.dtype,
             tensor_parallel=mapping.tp_size,
             pipeline_parallel=mapping.pp_size,
-            parallel_build=False,
             plugin_config=plugin_config,
             max_multimodal_length = 128,
             max_batch_size = 1,  
@@ -241,85 +178,43 @@ class HiggsAudioTTS:
             max_output_len = self.max_len //2,   
             max_beam_width = 1,
             max_num_tokens = self.max_len,
-            kv_cache_type = 'paged',
+            kv_cache_type = 'PAGED',
             builder_optimization_level = 5,  
         )
-
+        engine_config = HiggsAudioConfig.from_hugging_face(
+                self.model_path,
+                dtype=self.dtype,
+                mapping=mapping,
+                quant_config=None,
+            )
         network = builder.create_network()
         network.plugin_config = plugin_config
-
-        step_time = time.perf_counter() - step_start
-        logger.info(f"  ✓ Builder and network created in {step_time:.2f}s")
-        logger.info(f"  ✓ Max batch size: {builder_config.max_batch_size}")
-        logger.info(f"  ✓ Max input/output: {builder_config.max_input_len}/{builder_config.max_output_len}")
-
-        # Step 6: Build network graph
-        logger.info("Step 6: Building network computation graph...")
-        step_start = time.perf_counter()
-
         with net_guard(network):
             # Create the complete Higgs Audio model
-            higgs_audio_model = HiggsAudioModelForCausalLM.from_hugging_face(
-                self.model_path,
-                dtype="bfloat16",
-                mapping=mapping
-            )
-
+            higgs_audio_model = HiggsAudioForCausalLM(engine_config)
             # Prepare inputs for network building
             inputs = higgs_audio_model.prepare_inputs(
                 max_batch_size=builder_config.max_batch_size,
                 max_input_len=builder_config.max_input_len,
                 max_seq_len=self.max_len,
-                max_beam_width=builder_config.max_beam_width,
                 max_num_tokens=builder_config.max_num_tokens,
                 use_cache=False,
-                opt_num_tokens=None,
-                prompt_embedding_table_size=0,
-                position_encoding_2d=False,
-                max_draft_len=0
             )
-
-            # Build the computation graph
-            logger.info("  → Building forward pass...")
             outputs = higgs_audio_model.forward(**inputs)
-
-            # Validate outputs
             if outputs is None:
                 raise RuntimeError("Model forward pass returned None")
 
-            step_time = time.perf_counter() - step_start
-            logger.info(f"  ✓ Network graph built in {step_time:.2f}s")
-
-        # Step 7: Build TensorRT engine
-        logger.info("Step 7: Compiling TensorRT engine...")
-        step_start = time.perf_counter()
-
         logger.info("  → Starting engine compilation (this may take several minutes)...")
-
-        # Build the engine with progress monitoring
         engine_buffer = builder.build_engine(network, builder_config)
-
         if engine_buffer is None:
             raise RuntimeError("TensorRT builder returned None - engine compilation failed")
-
-        step_time = time.perf_counter() - step_start
-        logger.info(f"  ✓ Engine compiled successfully in {step_time:.2f}s")
-
-        # Step 8: Save engine and configuration files
-        logger.info("Step 8: Saving engine and configuration files...")
-        step_start = time.perf_counter()
-
         # Save engine
         with open(self.engine_path / "rank0.engine", "wb") as f:
             f.write(engine_buffer)
         logger.info(f"  ✓ Engine saved: {self.engine_path}")
-
-        # Save weights in TRT-LLM format with BFloat16 conversion
-        import numpy as np
         weights_dict = {}
         for key, tensor in checkpoint['tensors'].items():
             if hasattr(tensor, 'cpu'):
-                # Convert BFloat16 tensors to Float32 for numpy compatibility
                 tensor_cpu = tensor.cpu()
                 if hasattr(tensor_cpu, 'dtype') and str(tensor_cpu.dtype) == 'torch.bfloat16':
                     tensor_cpu = tensor_cpu.float()  # Convert BFloat16 to Float32
@@ -328,75 +223,28 @@ class HiggsAudioTTS:
                 weights_dict[key] = tensor
         np.savez(self.engine_path / "weights.npz", **weights_dict)
         logger.info(f"  ✓ Weights saved: {self.engine_path}")
-
         # Save comprehensive configuration in TensorRT-LLM expected format
         config_path = self.engine_path / "config.json"
-        
-        # Extract critical parameters from builder_config for root-level access
-        builder_config_dict = builder_config.to_dict()
-        max_beam_width = builder_config_dict.get('max_beam_width', 1)
-        kv_cache_type = builder_config_dict.get('kv_cache_type', 'paged')
-        
         # Create configuration in the expected TensorRT-LLM format
         config_dict = {
             # Root level configuration for ExecutorConfig compatibility
             "version": "1.0",
-            "model_type": "higgs_audio",
-            "max_beam_width": max_beam_width,
-            "kv_cache_type": kv_cache_type,
-            "max_num_tokens": self.max_len,
-            
             # Pretrained model configuration
             "pretrained_config": {
-                **trt_config.to_dict(),
-                "max_num_tokens": self.max_len
+                **engine_config.to_dict(),
             },
-            
-            # Build configuration with flattened structure for ExecutorConfig
             "build_config": {
-                "model_type": "higgs_audio",
-                "max_num_tokens": self.max_len,
-                # Flatten builder_config - avoid double nesting
-                "precision": builder_config_dict.get("precision", "bfloat16"),
-                "tensor_parallel": builder_config_dict.get("tensor_parallel", 1),
-                "pipeline_parallel": builder_config_dict.get("pipeline_parallel", 1),
-                "max_batch_size": builder_config_dict.get("max_batch_size", 1),
-                "max_input_len": builder_config_dict.get("max_input_len", 512),
-                "max_output_len": builder_config_dict.get("max_output_len", 512),
-                "max_seq_len": self.max_len,  # Add explicit max sequence length
-                "max_sequence_length": self.max_len,  # Alternative naming
-                "max_beam_width": max_beam_width,
-                "kv_cache_type": kv_cache_type,
-                "builder_optimization_level": builder_config_dict.get("builder_optimization_level", 5),
+                **builder_config.to_dict(),
                 "plugin_config": {
                     **plugin_config.to_dict()
                 },
                 "lora_config": {}
             },
-            
-            # Additional metadata
-            "conversion_metadata": checkpoint.get('metadata', {}),
-            "dual_ffn_info": dual_ffn_info,
-            "build_info": {
-                "build_time_seconds": time.perf_counter() - build_start_time,
-                "tensorrt_llm_version": getattr(tensorrt_llm, '__version__', 'unknown'),
-                "optimization_settings": {
-                    "tts_optimized": True,
-                    "dualffn_enabled": len(audio_dual_ffn_layers) > 0,
-                    "delay_patterns_enabled": True,
-                    "cuda_graphs_enabled": True
-                }
-            }
         }
         logger.info(f"  Config_Dict: {config_dict}")
-        # Diagnostic logging for skip_audio_tower in saved config
-        saved_skip_audio_tower = config_dict.get("pretrained_config", {}).get("skip_audio_tower", "NOT_IN_DICT")
-        logger.info(f"Saving skip_audio_tower to config: {saved_skip_audio_tower}")
         to_json_file(config_dict, str(config_path))
         logger.info(f"  ✓ Configuration saved: {config_path}")
         
-        # Validate the saved configuration format
-        logger.info("  → Validating saved configuration format...")
         if self._validate_config_format(config_path):
             logger.info("  ✓ Configuration format validation passed")
         else:
@@ -404,26 +252,40 @@ class HiggsAudioTTS:
 
         step_time = time.perf_counter() - step_start
         logger.info(f"  ✓ Files saved in {step_time:.2f}s")
-            
-        # Step 10: Finalize and cleanup
-        total_build_time = time.perf_counter() - build_start_time
-        logger.info("=" * 60)
-        logger.info("ENGINE BUILD COMPLETED SUCCESSFULLY")
-        logger.info("=" * 60)
-        logger.info(f"Total build time: {total_build_time:.2f}s")
-        logger.info(f"Engine saved to: {self.engine_path}")
-        logger.info(f"Model: Higgs Audio Unified TTS")
-        logger.info(f"Configuration: {builder_config.max_batch_size} batch, "
-                    f"{builder_config.max_input_len}/{builder_config.max_output_len} seq len")
-        logger.info(f"DualFFN: {len(audio_dual_ffn_layers)}/{total_layers} layers")
 
+    def _split_text_for_streaming(self, text: str, chunk_size: int) -> List[str]:
+        """Split text into segments optimized for streaming generation."""
+        # Simple word-boundary splitting for better audio quality
+        words = text.split()
+        segments = []
+        current_segment = []
+        current_length = 0
+        
+        for word in words:
+            # Add word if it fits in current chunk
+            if current_length + len(word) + 1 <= chunk_size * 4:  # Rough character estimate
+                current_segment.append(word)
+                current_length += len(word) + 1
+            else:
+                # Finalize current segment
+                if current_segment:
+                    segments.append(' '.join(current_segment))
+                
+                # Start new segment
+                current_segment = [word]
+                current_length = len(word)
+        
+        # Add final segment
+        if current_segment:
+            segments.append(' '.join(current_segment))
+        
+        return segments
     
-    def generate_speech(
+    def generate(
         self,
         text: str,
         voice_sample: Optional[str] = None,
         temperature: Optional[float] = None,
-        streaming: bool = False
     ) -> np.ndarray:
         """Generate speech from text.
 
@@ -432,9 +294,6 @@ class HiggsAudioTTS:
             voice_sample: Optional path to voice sample for cloning
             temperature: Generation temperature (overrides config default)
             streaming: Enable streaming generation for long texts
-
-        Returns:
-            Generated audio as numpy array (sample_rate=22050)
         """
         if not self.is_initialized():
             raise RuntimeError("TTS system is not properly initialized. Please check the logs for initialization errors.")
@@ -442,32 +301,135 @@ class HiggsAudioTTS:
         if not text or not text.strip():
             raise ValueError("Input text cannot be empty")
 
+         # Filter for audio tokens only (skip text tokens)
+        audio_start_token = 128013  # <|audio_out_bos|>
+        audio_end_token = 128012    # <|audio_eos|>
+        inputs = {
+            'batch_input_ids': inputs['input_ids'],
+            'max_new_tokens': inputs['max_new_tokens'],
+            'temperature': inputs['temperature'],
+            'top_k': inputs['top_k'],
+            'top_p': inputs['top_p'],
+            'end_id': inputs['end_id'],
+            'pad_id': inputs['pad_id'],
+            'return_dict': inputs['return_dict']
+        }
+        chunk_size = inputs['chunk_size']
+        in_audio_section = False
+
         start_time = time.perf_counter()
 
         audio_features = None
         if voice_sample:
-            input_tokens, attention_mask, audio_features, audio_feature_attention_mask = self.prepare_inputs(audio=voice_sample, text=text)
+            input_ids, _, audio_features, audio_feature_attention_mask = self.prepare_inputs(audio=voice_sample, text=text)
             logger.info(f"Loaded voice features from {voice_sample}")
         else:
-            input_tokens, attention_mask, _, _ = self.prepare_inputs(audio=None, text=text)
+            input_ids, _, _, _ = self.prepare_inputs(audio=None, text=text)
     
-        max_new_tokens = min(self.max_len, len(input_tokens) * 4)  # Adaptive length
-        temperature = temperature or 1.0
-        top_k = 50
-        top_p = 0.95
-        do_sample = True
+        # if isinstance(input_tokens, torch.Tensor):
+        #     input_tokens_cpu = input_tokens.cpu().flatten()
+        #     input_ids_list = [input_tokens_cpu]
+        # else:
+        #     input_tokens_tensor = torch.tensor(input_tokens, dtype=torch.int32)
+        #     input_ids_list = [input_tokens_tensor]
+        # input_ids = input_tokens.unsqueeze(0)  # Keep tensor version for compatibility
+
+        # Add voice conditioning if available
+        if audio_features is not None:
+            # Encode voice features
+            encoded_features = self.audio_tokenizer.encode(
+                input=audio_features,
+                sr=self.audio_tokenizer.sampling_rate,
+            )
         
-        if streaming and not warmup:
-            return self._generate_streaming(input_tokens, audio_features, max_new_tokens, temperature, top_k, top_p, do_sample)
-        else:
-            return self._generate_standard(input_tokens, audio_features, max_new_tokens, temperature, top_k, top_p, do_sample)
+        inputs = {  
+            batch_input_ids=input_ids,
+            max_new_tokens=max_new_tokens,
+            temperature=1.0,        
+            top_k=50,
+            top_p=0.95,
+            end_id=self.config.eos_token_id,
+            pad_id=self.config.pad_token_id,
+            chunk_size=32,
+            return_dict=True,
+        }
+
+        # Audio playback queue
+        playback_queue = queue.Queue()
+        playback_active = threading.Event()
+        playback_active.set()
+        
+        # Default playback callback (logs audio info)
+        if playback_callback is None:
+            def default_playback(chunk: np.ndarray):
+                sd.play(chunk.audio_data, self.audio_tokenizer.sampling_rate)
+                sd.wait()
+            
+            playback_callback = default_playback
+        
+        # Playback thread
+        def playback_worker():
+            while playback_active.is_set() or not playback_queue.empty():
+                try:
+                    chunk = playback_queue.get(timeout=0.1)
+                    playback_callback(chunk)
+                    playback_queue.task_done()
+                except queue.Empty:
+                    continue
+        
+        playback_thread = threading.Thread(target=playback_worker, daemon=True)
+        playback_thread.start()
+        # Stream and queue audio chunks
+        chunk_start_time = time.perf_counter()
+
+        ##Split text into segments for streaming
+        #chunk_size = inputs['chunk_size']
+        #text_segments = self._split_text_for_streaming(text, chunk_size)
+
+        for chunk in self.engine_runner.generate(**inputs):
+            if not in_audio_section:
+                for i, token in enumerate(chunk):
+                    if token == audio_start_token:
+                        in_audio_section = True
+                        chunk = chunk[i+1:]
+                        break
+            if in_audio_section:
+                for i, token in enumerate(chunk):
+                    if token == audio_end_token:
+                        in_audio_section = False
+                        chunk = chunk[:i]
+                        break
+                    
+            chunk_audio = self.audio_tokenizer.decode(chunk)
+            # Add to playback queue
+            playback_queue.put(chunk_audio)
+
+            # Monitor buffer health
+            buffer_size = playback_queue.qsize()
+            if buffer_size > self.streaming_config.buffer_size * 0.8:
+                logger.warning(f"Playback buffer filling up: {buffer_size} chunks")
+            elif buffer_size == 0 and not chunk.is_final:
+                logger.warning("Buffer underrun detected")
+                self.streaming_stats.buffer_underruns += 1
+            
+            # Calculate timing
+            generation_time = (time.perf_counter() - chunk_start_time) * 1000
+            #chunk_duration = len(chunk_audio) / 24000
+        
+
+        # Wait for playback to finish
+        playback_queue.join()
+        playback_active.clear()
+        playback_thread.join(timeout=5.0)
+        
+        logger.info("Live playback completed")
+            
+        # Concatenate all chunks
+        #return np.concatenate(audio_chunks) if audio_chunks else np.array([])
 
         # Update performance stats
         generation_time = (time.perf_counter() - start_time) * 1000
         self._update_stats(generation_time)
-
-        logger.info(f"Generated {len(audio_output)/24000:.1f}s audio in {generation_time:.1f}ms")
-        return audio_output
 
     
     def prepare_inputs(self, audio=None, text=None):
@@ -558,200 +520,6 @@ class HiggsAudioTTS:
                     inputs[k] = v
         return inputs["input_ids"], inputs["attention_mask"], inputs["audio_features"], inputs["audio_feature_attention_mask"]
     
-    def _generate_standard(
-        self,
-        input_tokens: torch.Tensor,
-        voice_features: Optional[torch.Tensor],
-        gen_config: dict
-    ) -> np.ndarray:
-        """Standard (non-streaming) generation."""
-        
-        # Setup inputs for engine
-        batch_size = 1
-        # Convert input_tokens to the format expected by ModelRunner.generate()
-        # Need a list of tensors (each tensor is a 1D token sequence)
-        if isinstance(input_tokens, torch.Tensor):
-            # Ensure input_tokens is on CPU and is 1D
-            input_tokens_cpu = input_tokens.cpu().flatten()
-            input_ids_list = [input_tokens_cpu]  # List containing single tensor
-        else:
-            # If it's already a list, convert to tensor
-            input_tokens_tensor = torch.tensor(input_tokens, dtype=torch.int32)
-            input_ids_list = [input_tokens_tensor]
-        
-        input_ids = input_tokens.unsqueeze(0)  # Keep tensor version for compatibility
-        
-        # Prepare generation parameters with explicit type conversion
-        max_new_tokens = gen_config["max_new_tokens"]
-        if max_new_tokens is None:
-            max_new_tokens = 512  # Default fallback
-        
-        generation_params = {
-            "max_new_tokens": int(max_new_tokens),  # Ensure it's an integer
-            "temperature": float(gen_config["temperature"]),
-            "top_k": int(gen_config["top_k"]),
-            "top_p": float(gen_config["top_p"]),
-            "end_id": getattr(self.config, 'eos_token_id', 2),  # Default EOS token
-            "pad_id": getattr(self.config, 'pad_token_id', 0),  # Default PAD token
-        }
-        
-        # Add voice conditioning if available
-        if voice_features is not None:
-            # Encode voice features
-            audio_attention_mask = torch.ones(
-                voice_features.shape[0], voice_features.shape[1], 
-                device=self.device, dtype=torch.float32
-            )
-            encoded_features = self.audio_tokenizer.encode(
-                input=voice_features,
-                mask=audio_attention_mask
-            )
-            generation_params["prompt_table"] = encoded_features
-
-       
-        
-        # Ensure max_new_tokens is properly set
-        max_new_tokens = generation_params["max_new_tokens"]
-        if max_new_tokens is None or max_new_tokens <= 0:
-            max_new_tokens = 512  # Default fallback
-            logger.warning(f"max_new_tokens was {generation_params['max_new_tokens']}, using default: {max_new_tokens}")
-        
-        logger.info(f"Creating SamplingConfig with max_new_tokens={max_new_tokens}")
-        
-        # Create a complete SamplingConfig with valid parameters
-        sampling_config = SamplingConfig(
-            max_new_tokens=max_new_tokens,
-            temperature=generation_params["temperature"],
-            top_k=generation_params["top_k"],
-            top_p=generation_params["top_p"],
-            end_id=generation_params["end_id"],
-            pad_id=generation_params["end_id"],
-        )
-        
-        # Add beam_width attribute that the engine runner expects
-        sampling_config.beam_width = 1
-        logger.info(f"SamplingConfig created: max_new_tokens={sampling_config.max_new_tokens}, beam_width={sampling_config.beam_width}")
-        
-        # Generate using unified engine
-        with torch.cuda.stream(torch.cuda.current_stream(device=self.device)):
-            # Use direct parameter passing instead of SamplingConfig object
-            logger.info(f"Generating with max_new_tokens: {max_new_tokens}")
-            
-            # Use the engine runner with simplified parameters matching ngram example
-            outputs = self.engine_runner.generate(
-                batch_input_ids=input_ids_list,
-                max_new_tokens=max_new_tokens,
-                temperature=generation_params["temperature"],
-                top_k=generation_params["top_k"],
-                top_p=generation_params["top_p"],
-                end_id=generation_params["end_id"],
-                pad_id=generation_params["end_id"],
-                num_beams=1,
-                return_dict=True,
-            )
-        # Extract generated tokens
-        if isinstance(outputs, dict) and "output_ids" in outputs:
-            generated_tokens = outputs["output_ids"][0, input_tokens.shape[0]:]
-        else:
-            # Fallback: assume outputs is the generated sequence
-            generated_tokens = outputs[0, input_tokens.shape[0]:]
-        
-        logger.info(f"Generated {generated_tokens.shape[0]} tokens")
-        
-        # Filter for audio tokens only (skip text tokens)
-        # Audio tokens typically start after a special audio_out_bos token (128013)
-        audio_start_token = 128013  # <|audio_out_bos|>
-        audio_end_token = 128012    # <|audio_eos|>
-        
-        # Find where audio generation starts
-        audio_tokens = []
-        in_audio_section = False
-        
-        for token in generated_tokens:
-            if token.item() == audio_start_token:
-                in_audio_section = True
-                continue
-            elif token.item() == audio_end_token:
-                in_audio_section = False
-                break
-            elif in_audio_section:
-                # Only collect tokens that could be audio tokens
-                # Audio tokens are typically in a specific range (e.g., < 1024 for codebook tokens)
-                if 0 <= token.item() < 1024:
-                    audio_tokens.append(token.item())
-        
-        if not audio_tokens:
-            logger.warning("No audio tokens found in generated output, using dummy audio")
-            # Create a dummy audio output (1 second of silence at 24kHz)
-            return np.zeros((24000,), dtype=np.float32)
-        
-        logger.info(f"Found {len(audio_tokens)} audio tokens")
-        
-        # Decode audio tokens to audio array
-        if hasattr(self, 'audio_tokenizer') and self.audio_tokenizer:
-            try:
-                # Reshape audio tokens for the audio tokenizer
-                # The audio tokenizer expects tokens in the format [seq_len, num_codebooks]
-                # For now, let's assume single codebook and reshape accordingly
-                audio_tensor = torch.tensor(audio_tokens, dtype=torch.long).unsqueeze(0)  # [1, seq_len]
-                
-                # Try to decode using the audio tokenizer
-                logger.info("Decoding audio tokens to waveform...")
-                audio_array = self.audio_tokenizer.decode(audio_tensor)
-                
-            except Exception as e:
-                logger.warning(f"Audio tokenizer decode failed: {e}")
-                # Fallback: create a simple sine wave based on token values
-                logger.info("Creating fallback audio based on token values...")
-                duration = len(audio_tokens) * 0.02  # 20ms per token
-                sample_rate = 24000
-                t = np.linspace(0, duration, int(sample_rate * duration))
-                
-                # Use token values to modulate frequency
-                audio_array = np.zeros_like(t)
-                for i, token in enumerate(audio_tokens):
-                    start_idx = int(i * len(t) / len(audio_tokens))
-                    end_idx = int((i + 1) * len(t) / len(audio_tokens))
-                    freq = 220 + (token % 100) * 5  # Base frequency + modulation
-                    audio_array[start_idx:end_idx] = 0.1 * np.sin(2 * np.pi * freq * t[start_idx:end_idx])
-        else:
-            # Fallback: generate dummy audio for testing
-            logger.warning("No audio tokenizer available, generating dummy audio")
-            audio_array = np.random.randn(len(generated_tokens) * 100).astype(np.float32) * 0.1
-        
-        return audio_array
-    
-    def _generate_streaming(
-        self,
-        input_tokens: torch.Tensor,
-        voice_features: Optional[torch.Tensor],
-        gen_config: dict
-    ) -> np.ndarray:
-        """Streaming generation with delay pattern coordination."""
-        
-        audio_chunks = []
-        chunk_size = 32
-        
-        # Setup streaming generation
-        streaming_inputs = {
-            "input_ids": input_tokens.unsqueeze(0),
-            "chunk_size": chunk_size,
-            "temperature": gen_config["temperature"],
-            "use_delay_pattern": True
-        }
-        
-        if voice_features is not None:
-            streaming_inputs["prompt_table"] = voice_features
-            
-        # Generate in chunks
-        for chunk in self.engine_runner.generate_streaming(**streaming_inputs):
-            # Decode chunk to audio
-            chunk_audio = self.audio_tokenizer.decode(chunk)
-            audio_chunks.append(chunk_audio)
-            
-        # Concatenate all chunks
-        return np.concatenate(audio_chunks) if audio_chunks else np.array([])
-    
     def _update_stats(self, generation_time_ms: float):
         """Update performance statistics."""
         self.generation_stats["total_generations"] += 1
@@ -760,13 +528,13 @@ class HiggsAudioTTS:
             self.generation_stats["total_time_ms"] / self.generation_stats["total_generations"]
         )
     
-    def save_audio(self, audio: np.ndarray, output_path: str, sample_rate: int = 22050):
+    def save_audio(self, audio: np.ndarray, output_path: str, sample_rate: int = 24000):
         """Save audio array to file.
         
         Args:
             audio: Audio array to save
             output_path: Output file path
-            sample_rate: Audio sample rate (default: 22050)
+            sample_rate: Audio sample rate (default: 24000)
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -879,7 +647,7 @@ def main():
         "--benchmark",
         action="store_true",
         help="Run performance benchmark"
-
+    )
     parser.add_argument(
         "--force_rebuild",
         action="store_true",
@@ -888,58 +656,51 @@ def main():
     
     args = parser.parse_args()
     
-    try:
-        # Initialize TTS system
-        logger.info("Initializing Higgs Audio TTS system...")
-        if args.force_rebuild:
-            if args.engine_path:
-                shutil.rmtree(args.engine_path)
+    # Initialize TTS system
+    logger.info("Initializing Higgs Audio TTS system...")
+    if args.force_rebuild:
+        if args.engine_path and os.path.exists(args.engine_path):
+            shutil.rmtree(args.engine_path)
 
-        tts = HiggsAudioTTS(
-            model_path=args.model_path,
-            engine_path=args.engine_path if args.engine_path else None,
-            audio_tokenizer_path=args.audio_tokenizer_path,
-            device=args.device,
-            max_len=args.max_len
-        )
+    tts = HiggsAudioTTS(
+        model_path=args.model_path,
+        engine_path=args.engine_path if args.engine_path else None,
+        audio_tokenizer_path=args.audio_tokenizer_path,
+        device=args.device,
+        max_len=args.max_len
+    )
 
-        # Print system info for debugging
-        system_info = tts.get_system_info()
-        logger.info(f"System Info: {system_info}")
+    # Print system info for debugging
+    system_info = tts.get_system_info()
+    logger.info(f"System Info: {system_info}")
 
 
-        # Run benchmark if requested
-        if args.benchmark:
-            run_benchmark(tts)
-            return
+    # Run benchmark if requested
+    if args.benchmark:
+        run_benchmark(tts)
+        return
 
-        logger.info(f"Generating speech for: '{args.text[:100]}{'...' if len(args.text) > 100 else ''}'")
+    logger.info(f"Generating speech for: '{args.text[:100]}{'...' if len(args.text) > 100 else ''}'")
 
-        audio = tts.generate_speech(
-            text=args.text,
-            voice_sample=args.voice_sample,
-            temperature=args.temperature,
-            streaming=args.streaming
-        )
+    tts.generate(
+        text=args.text,
+        voice_sample=args.voice_sample,
+        temperature=args.temperature,
+        streaming=args.streaming
+    )
 
-        # Save output
-        tts.save_audio(audio, args.output)
+    # Save output
+    tts.save_audio(audio, args.output)
 
-        # Print performance stats
-        stats = tts.get_performance_stats()
-        logger.info(f"Performance: {stats['avg_latency_ms']:.1f}ms average latency")
+    # Print performance stats
+    stats = tts.get_performance_stats()
+    logger.info(f"Performance: {stats['avg_latency_ms']:.1f}ms average latency")
 
-        # Cleanup
-        tts.cleanup()
+    # Cleanup
+    tts.cleanup()
 
-        logger.info("Speech generation completed successfully!")
+    logger.info("Speech generation completed successfully!")
 
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return 1
-    
     return 0
 
 #TODO: Add TTFT
@@ -973,11 +734,11 @@ def run_benchmark(tts: HiggsAudioTTS):
         
         results.append({
             "text_length": len(text),
-            "audio_duration": len(audio) / 22050,
+            "audio_duration": len(audio) / 24000,
             "avg_time_ms": avg_time,
             "min_time_ms": min_time,
             "max_time_ms": max_time,
-            "real_time_factor": (len(audio) / 22050) / (avg_time / 1000)
+            "real_time_factor": (len(audio) / 24000) / (avg_time / 1000)
         })
         
         logger.info(f"  Avg: {avg_time:.1f}ms, RTF: {results[-1]['real_time_factor']:.2f}")

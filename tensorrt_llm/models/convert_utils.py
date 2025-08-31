@@ -10,7 +10,6 @@ from .._utils import torch_dtype_to_str
 from ..logger import logger
 from ..quantization import QuantAlgo
 
-
 def infer_dtype(dtype: str,
                 source_dtype: Optional[Union[str, torch.dtype]] = None) -> str:
     if dtype == 'auto':

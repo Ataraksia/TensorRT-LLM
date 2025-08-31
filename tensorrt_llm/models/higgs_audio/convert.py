@@ -4,15 +4,15 @@
 from __future__ import annotations
 
 from typing import Dict, Optional, List, Set, Tuple, Any
-import warnings
-
+from pathlib import Path
 import torch
+import tempfile
+from transformers import AutoModel
 
-from ...logger import logger
-from ...mapping import Mapping
-from ...quantization import QuantAlgo
-from ..convert_utils import (
-    infer_dtype,
+from tensorrt_llm.logger import logger
+from tensorrt_llm.mapping import Mapping
+from tensorrt_llm.quantization import QuantAlgo
+from tensorrt_llm.models.convert_utils import (
     iterate_shard_files,
     load_state_dict,
     split,
@@ -21,8 +21,8 @@ from ..convert_utils import (
     split_matrix_tp,
     dup_kv_weight,
 )
-from ..modeling_utils import QuantConfig
-from .config import HiggsAudioConfig
+from tensorrt_llm.models.modeling_utils import QuantConfig
+from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 
 def _backbone_key_template(config: HiggsAudioConfig):
@@ -550,7 +550,14 @@ def load_weights_from_hf_model(
     model_params: Dict[str, torch.Tensor] = {}
     available_keys = set()
     
-    for shard_path in iterate_shard_files(hf_model_dir, rank=mapping.rank, progress_bar=False):
+    model_dir = hf_model_dir
+    if (not Path(hf_model_dir).exists()):
+        model = AutoModel.from_pretrained(hf_model_dir)
+        tmp_dir = tempfile.TemporaryDirectory()
+        model.save_pretrained(tmp_dir.name, max_shard_size="5GB")
+        model_dir = tmp_dir.name
+    
+    for shard_path in iterate_shard_files(model_dir, rank=mapping.rank, progress_bar=False):
         sd = load_state_dict(shard_path, dtype=dtype, device='cuda')
         # Keep all relevant parameters including DualFFN components
         for k, v in sd.items():
@@ -563,7 +570,9 @@ def load_weights_from_hf_model(
             # Keep text backbone and DualFFN components
             model_params[k] = v
             available_keys.add(k)
-
+    
+    if (not Path(hf_model_dir).exists()):
+        tmp_dir.cleanup()
     weights: Dict[str, torch.Tensor] = {}
     dual_ffn_processing_info = {
         'layers_processed': [],

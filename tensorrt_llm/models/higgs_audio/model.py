@@ -18,17 +18,13 @@ from tensorrt_llm.parameter import Parameter
 from tensorrt_llm._utils import pad_vocab_size
 from tensorrt_llm.layers import (MLP, Attention, ColumnLinear, Embedding,
                                  GatedMLP, RmsNorm, PromptTuningEmbedding)
-from tensorrt_llm._torch.models.modeling_llama import LlamaAttention
+#lm_headfrom tensorrt_llm._torch.models.modeling_llama import LlamaAttention
 from tensorrt_llm.models import PretrainedConfig, PretrainedModel
 from tensorrt_llm.models.modeling_utils import DecoderModelForCausalLM, KeyValueCacheParams, DecoderLayerList
 from tensorrt_llm.top_model_mixin import TopModelMixin
 from torch.nn import ModuleList, AvgPool1d
 from .config import HiggsAudioConfig
 from transformers import AutoConfig
-from .cuda_graphs import (
-    CudaGraphManager, TTSGraphType, DualFFNGraphOptimizer, 
-    DelayPatternGraphCoordinator, integrate_cuda_graphs_with_model
-)
 
 class GenerationMode(Enum):
     """TTS-specific generation modes for coordinated audio-text generation."""
@@ -525,7 +521,7 @@ class HiggsAudioDecoderLayer(Module):
 
     This layer implements the core transformer decoder functionality with
     TTS-specific optimizations. It serves as the building block for the
-    HiggsAudioBackbone and supports audio token processing through
+    HiggsAudioModel and supports audio token processing through
     specialized attention and MLP components.
 
     The layer follows the standard transformer architecture:
@@ -1256,45 +1252,20 @@ class HiggsAudioDecoderLayerList(DecoderLayerList):
         if use_cache:
             return (hidden_states, tuple(presents))
         return hidden_states
-            
-class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
-    """Complete Higgs Audio model for causal language modeling with TTS capabilities.
 
-    Attributes:
-        transformer (HiggsAudioBackbone): Core transformer backbone
-        lm_head (Optional[ColumnLinear]): Language modeling head (last PP rank only)
-        config (HiggsAudioConfig): Model configuration with TTS parameters
-        audio_codebook_state (Dict[str, Dict[str, Any]]): State for multi-codebook generation
-        _current_codebook_idx (int): Current codebook index for RVQ generation
-        _delay_pattern_offset (int): Current offset in delay pattern sequence
-    """
+class HiggsAudioModel(Module):
+    """Core transformer backbone for Higgs Audio TTS model."""
 
-    config_class = HiggsAudioConfig
     def __init__(self, config: HiggsAudioConfig) -> None:
-        """Initialize complete Higgs Audio model for TTS generation.
-
-        Args:
-            config: HiggsAudioConfig with complete model parameters
-
-        Raises:
-            ValueError: If config is incompatible with model requirements
-        """
-        # Call parent __init__ FIRST to initialize the module properly
-        super().__init__(config, lm_head)
-        self.vocab_size_padded = pad_vocab_size(config.vocab_size, config.mapping.tp_size)
-        self.delays = constant(np.asarray([i for i in range(config.audio_num_codebooks)], dtype=np.int32))
-        self.config: HiggsAudioConfig = config
-        self.generation_mode: GenerationMode = GenerationMode.TEXT
-        self.audio_codebook_state: Dict[str, Dict[str, Any]] = {}
-        self.current_codebook_index: int = 0
-        self.delay_pattern_offset: int = 0
-        self.eos_reached = False
+        """Initialize transformer backbone with TTS-optimized components."""
+        super().__init__()
+        self.config = config
         self.mapping = config.mapping
         self.use_prompt_tuning = getattr(config, "use_prompt_tuning", False)
         self.vocab_size = config.vocab_size
         
         # Audio mask handling for DualFFN layers
-        self._audio_out_mask: Optional[Tensor] = None
+        self.audio_out_mask: Optional[Tensor] = None
         EmbeddingCls = PromptTuningEmbedding if self.use_prompt_tuning else Embedding
         if self.mapping.is_first_pp_rank():
             self.vocab_embedding = EmbeddingCls(
@@ -1314,30 +1285,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             self.ln_f = RmsNorm(normalized_shape=config.hidden_size,
                                 eps=config.norm_epsilon,
                                 dtype=config.dtype)
-            # Use simple ColumnLinear as lm_head for parent compatibility
-            lm_head = ColumnLinear(
-                in_features=config.hidden_size,
-                out_features=vocab_size_padded,
-                bias=False,
-                dtype=config.dtype,
-                tp_group=config.mapping.tp_group,
-                tp_size=config.mapping.tp_size,
-                gather_output=True
-            )
-            self.decoder_projector = HiggsAudioDecoderProjector(config)
-            # Replace lm_head with text head from projector for compatibility
-            self.lm_head = self.decoder_projector.text_lm_head
-        else:
-            lm_head = None
-            self.decoder_projector = None
-
-        # Audio tower integration - Adapted for TensorRT-LLM
-        if not config.skip_audio_tower:
-            self.audio_tower = HiggsAudioEncoder(config)
-            self.audio_encoder_proj = HiggsAudioEncoderProjector(config)
-        else:
-            self.audio_tower = None
-            self.audio_encoder_proj = None
 
     def _initialize_decoder_layers(self, config: HiggsAudioConfig) -> None:
         """Initialize decoder layers with comprehensive error handling and validation."""
@@ -1407,106 +1354,133 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
 
         self.layers = HiggsAudioDecoderLayerList(layers, config)
 
-    def prepare_inputs_for_generation(self,
-                                    input_ids: Tensor,
-                                    attention_mask: Optional[Tensor] = None,
-                                    **kwargs: Any) -> Dict[str, Any]:
-        """Prepare inputs for generation with TTS-specific handling.
+    def forward(self,
+                input_ids: Tensor,
+                position_ids: Optional[Tensor] = None,
+                use_cache: bool = False,
+                attention_mask: Optional[Tensor] = None,
+                kv_cache_params: Optional[Any] = None,
+                attention_params: Optional[Any] = None,
+                hidden_states: Optional[Tensor] = None,
+                prompt_embedding_table: Optional[Tensor] = None,
+                prompt_tasks: Optional[Tensor] = None,
+                prompt_vocab_size: Optional[Tensor] = None,
+                lora_params: Optional[Any] = None,
+                input_token_extra_ids: Optional[Tensor] = None,
+                audio_token_mask: Optional[Tensor] = None) -> Union[Tensor, Tuple[Tensor, Tuple[Any, ...]]]:
+        """Forward pass through transformer backbone with multimodal support.
 
-        This method extends the base implementation to handle TTS-specific
-        input preparation.
+        Processes input tokens through embedding lookup, transformer layers,
+        and final normalization. Supports both text and audio token processing
+        with pipeline parallelism and KV caching optimizations.
 
         Args:
-            input_ids: Input token IDs tensor
-            attention_mask: Optional attention mask tensor
-            **kwargs: Additional generation arguments (audio_features, etc.)
+            input_ids: Input token IDs [batch_size, seq_len]
+            position_ids: Position indices for RoPE encoding
+            use_cache: Whether to use and return KV cache
+            attention_mask: Attention mask for sequence padding
+            kv_cache_params: KV cache parameters for efficient generation
+            attention_params: Additional attention computation parameters
+            hidden_states: Pre-computed hidden states (for PP intermediate ranks)
+            prompt_embedding_table: Prompt tuning embedding table
+            prompt_tasks: Task IDs for prompt tuning
+            prompt_vocab_size: Vocabulary size for prompt tuning
+            lora_params: LoRA adaptation parameters
+            input_token_extra_ids: Additional token IDs for special processing
+            audio_token_mask: Mask indicating audio token positions
 
         Returns:
-            Dictionary of prepared inputs for generation, including TTS-specific
-            parameters when in audio generation mode
+            If use_cache=False: Final hidden states [batch_size, seq_len, hidden_size]
+            If use_cache=True: Tuple of (hidden_states, kv_cache_presents)
 
         Example:
-            >>> inputs = model.prepare_inputs_for_generation(
-            ...     input_ids=text_tokens,
-            ...     audio_features=audio_embeddings
+            >>> output = backbone(
+            ...     input_ids=tokens,
+            ...     attention_mask=mask,
+            ...     use_cache=True,
+            ...     audio_token_mask=audio_mask
             ... )
-            >>> # inputs now contains audio-specific parameters if in audio mode
         """
-        # Call parent implementation first
-        inputs = super().prepare_inputs_for_generation(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            **kwargs
-        )
-        # Add TTS-specific inputs based on generation mode
-        audio_inputs: Dict[str, Any] = {}
+        # Fill kv cache structures
+        kv_cache_params.fill_none_tensor_list(len(self.layers))
 
-        if input_ids[0][-1] == audio_out_bos_token_id:
-            generation_mode = GenerationMode.AUDIO_INIT
-        elif input_ids[0][-1] == self.audio_out_token_idx:
-            generation_mode = GenerationMode.AUDIO_IN_PROGRESS
+        # Embedding lookup (or receive from PP)
+        if self.mapping.is_first_pp_rank():
+            ptuning_args = [prompt_embedding_table, prompt_tasks, prompt_vocab_size] \
+                if self.use_prompt_tuning else []
+            hidden_states = self.vocab_embedding(input_ids, *ptuning_args)
         else:
-            generation_mode = GenerationMode.TEXT
+            hidden_states = recv(hidden_states, self.mapping.prev_pp_rank())
 
-        inputs.update(audio_inputs)
+        # Forward layers with audio mask for DualFFN processing
+        # Use stored audio_out_mask if available, otherwise fall back to audio_token_mask
+        audio_mask_for_layers = self.audio_out_mask if self.audio_out_mask is not None else audio_token_mask
+        
+        hidden_states = self.layers.forward(hidden_states,
+                                            use_cache=use_cache,
+                                            attention_mask=attention_mask,
+                                            kv_cache_params=kv_cache_params,
+                                            attention_params=attention_params,
+                                            lora_params=lora_params,
+                                            position_ids=position_ids,
+                                            audio_out_mask=audio_mask_for_layers)
 
-        return inputs
+        if use_cache:
+            hidden_states, presents = hidden_states
 
-    def update_audio_generation_state(self,
-                                    generated_token: int,
-                                    **kwargs: Any) -> None:
-        """Update audio generation state after token generation using mode manager.
+        if self.mapping.is_last_pp_rank():
+            hidden_states = self.ln_f(hidden_states)
+        else:
+            hidden_states = send(hidden_states, self.mapping.next_pp_rank())
 
-        This method uses the GenerationModeManager to maintain comprehensive state
-        tracking for multi-codebook generation and delay patterns with full validation.
+        if use_cache:
+            return (hidden_states, tuple(presents))
+        return hidden_states
+            
+class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
+    """Complete Higgs Audio model for causal language modeling with TTS capabilities.
+
+    Attributes:
+        transformer (HiggsAudioModel): Core transformer backbone
+        lm_head (Optional[ColumnLinear]): Language modeling head (last PP rank only)
+        config (HiggsAudioConfig): Model configuration with TTS parameters
+    """
+
+    config_class = HiggsAudioConfig
+    def __init__(self, config: HiggsAudioConfig) -> None:
+        """Initialize complete Higgs Audio model for TTS generation.
 
         Args:
-            generated_token: The token that was just generated
-            **kwargs: Additional state update parameters (codebook_override, position_update, etc.)
+            config: HiggsAudioConfig with complete model parameters
 
-        Example:
-            >>> for token in generated_tokens:
-            ...     model.update_audio_generation_state(token)
-            ...     # State automatically updated with comprehensive tracking
+        Raises:
+            ValueError: If config is incompatible with model requirements
         """
-        if not self.generation_mode == GenerationMode.AUDIO_IN_PROGRESS:
-            return
-        
-        # Update token and position tracking
-        generation_state.generated_tokens += 1
-        generation_state.current_position += 1
-        
-        # Update codebook state for multi-codebook generation
-        if hasattr(self.config, 'audio_num_codebooks') and self.config.audio_num_codebooks > 1:
-            current_codebook = generation_state.current_codebook_index
-            codebook_key = f'codebook_{current_codebook}'
-            
-            if codebook_key not in generation_state.codebook_states:
-                generation_state.codebook_states[codebook_key] = {
-                    'active': False,
-                    'last_token': None,
-                    'delay_offset': current_codebook * getattr(self.config, 'audio_delay_pattern_stride', 1),
-                    'generated_tokens': []
-                }
-            
-            # Update codebook state
-            generation_state.codebook_states[codebook_key]['last_token'] = generated_token
-            generation_state.codebook_states[codebook_key]['active'] = True
-            generation_state.codebook_states[codebook_key]['generated_tokens'].append(generated_token)
+        self.config: HiggsAudioConfig = config
+        self.transformer = HiggsAudioModel(config)
+        if self.mapping.is_last_pp_rank():
+            self.decoder_projector = HiggsAudioDecoderProjector(config)
+            self.lm_head = self.decoder_projector.text_lm_head
+        else:
+            lm_head = None
+            self.decoder_projector = None
 
-        # Update delay pattern offset
-        if hasattr(self.config, 'use_delay_pattern') and self.config.use_delay_pattern:
-            generation_state.delay_pattern_offset += 1
+        # Audio tower integration - Adapted for TensorRT-LLM
+        if not config.skip_audio_tower:
+            self.audio_tower = HiggsAudioEncoder(config)
+            self.audio_encoder_proj = HiggsAudioEncoderProjector(config)
+        else:
+            self.audio_tower = None
+            self.audio_encoder_proj = None
 
-        # Cycle through codebooks if using multi-codebook generation
-        if hasattr(self.config, 'audio_num_codebooks'):
-            generation_state.current_codebook_index = (
-                generation_state.current_codebook_index + 1
-            ) % self.config.audio_num_codebooks
-        
-        # Update legacy compatibility state
-        self.audio_codebook_state = generation_state.codebook_states.copy()
-        
+        super().__init__(config, transformer, lm_head)
+
+    def prepare_inputs(self, *args, **kwargs):
+        """Prepare inputs for generation with TTS-specific handling."""
+        inputs = super().prepare_inputs(*args, **kwargs)
+        # Add TTS-specific inputs based on generation mode
+
+        return inputs
 
     @classmethod
     def from_hugging_face(cls,
@@ -1544,10 +1518,10 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
         hf_cfg, _unused = AutoConfig.from_pretrained(
         hf_model_or_dir, trust_remote_code=trust_remote_code, return_unused_kwargs=True
         )
-        return HiggsAudioConfig.from_hugging_face(
+        cfg = HiggsAudioConfig.from_hugging_face(
             hf_cfg, dtype=dtype, mapping=mapping, quant_config=quant_config, **kwargs)
             
-        return cls(hf_cfg)
+        return cls(cfg)
 
     def _apply_audio_tower(self, audio_features, audio_feature_attention_mask):
         """Apply the audio tower to the audio features - TensorRT-LLM compatible implementation."""
@@ -1640,6 +1614,9 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             Model outputs with logits for text/audio token generation
         """
 
+        if audio_out_mask is not None:
+            self.transformer.audio_out_mask = audio_out_mask
+
         # Audio tower integration - TensorRT-LLM compatible implementation
         audio_features_embed = None
         audio_features_length = None
@@ -1653,40 +1630,8 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             # Integrate audio features with text embeddings if needed
             # This would typically happen in the transformer layers through attention mechanisms
         
-        # Fill kv cache structures
-        kv_cache_params.fill_none_tensor_list(len(self.layers))
+        output = backbone(input_ids, attention_mask=attention_mask, use_cache=True)
 
-        # Embedding lookup (or receive from PP)
-        if self.mapping.is_first_pp_rank():
-            ptuning_args = [prompt_embedding_table, prompt_tasks, prompt_vocab_size] \
-                if self.use_prompt_tuning else []
-            hidden_states = self.vocab_embedding(input_ids, *ptuning_args)
-        else:
-            hidden_states = recv(hidden_states, self.mapping.prev_pp_rank())
-
-        # Forward layers with audio mask for DualFFN processing
-        # Use stored audio_out_mask if available, otherwise fall back to audio_token_mask
-        audio_mask_for_layers = self._audio_out_mask if self._audio_out_mask is not None else audio_token_mask
-        
-        hidden_states = self.layers.forward(hidden_states,
-                                            use_cache=use_cache,
-                                            attention_mask=attention_mask,
-                                            kv_cache_params=kv_cache_params,
-                                            attention_params=attention_params,
-                                            lora_params=lora_params,
-                                            position_ids=position_ids,
-                                            audio_out_mask=audio_mask_for_layers)
-
-        if use_cache:
-            hidden_states, presents = hidden_states
-
-        if self.mapping.is_last_pp_rank():
-            hidden_states = self.ln_f(hidden_states)
-        else:
-            hidden_states = send(hidden_states, self.mapping.next_pp_rank())
-
-        if use_cache:
-            hidden_states = (hidden_states, tuple(presents))
 
         # Call parent forward method with standard arguments
         return super().forward(
@@ -1705,136 +1650,3 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             lora_params=lora_params,
             spec_decoding_params=spec_decoding_params
         )
-
-    def generate(self,
-                 input_ids: Optional[Tensor] = None,
-                 attention_mask: Optional[Tensor] = None,
-                 audio_features: Optional[Tensor] = None,
-                 max_length: int = 512,
-                 max_new_tokens: Optional[int] = None,
-                 temperature: float = 1.0,
-                 top_k: int = 50,
-                 top_p: float = 1.0,
-                 do_sample: bool = True,
-                 pad_token_id: Optional[int] = None,
-                 eos_token_id: Optional[int] = None,
-                 use_delay_pattern: bool = True,
-                 num_codebooks: Optional[int] = None,
-                 streaming: bool = False,
-                 stream_chunk_size: int = 32,
-                 return_dict: bool = True,
-                 **kwargs: Any) -> Union[Tensor, Dict[str, Any]]:
-        """Generate text and audio tokens with delay pattern coordination for RVQ-based TTS.
-        
-        This method implements TTS-optimized generation that supports multi-codebook
-        audio token generation with delay patterns for RVQ (Residual Vector Quantization).
-        It handles mode transitions from text to audio generation and coordinates token
-        generation across multiple codebooks while maintaining proper temporal alignment.
-        
-        Key Features:
-        - Automatic mode transitions: TEXT -> AUDIO_INIT -> AUDIO_IN_PROGRESS
-        - Multi-codebook audio token generation with delay pattern coordination
-        - Streaming support for real-time TTS applications
-        - Comprehensive validation and error handling
-        - Integration with DelayPatternProvider and AudioTokenUtils
-        - Support for both text-only and multimodal audio-text generation
-        
-        Args:
-            input_ids: Input token IDs [batch_size, seq_len] for text prompts
-            attention_mask: Attention mask for input padding
-            audio_features: Optional audio feature embeddings for voice conditioning
-            max_length: Maximum total sequence length (including input)
-            max_new_tokens: Maximum number of new tokens to generate (overrides max_length)
-            temperature: Sampling temperature (higher = more random, lower = more deterministic)
-            top_k: Top-k sampling parameter (0 = disabled)
-            top_p: Top-p (nucleus) sampling parameter
-            do_sample: Whether to use sampling or greedy decoding
-            pad_token_id: Token ID for padding (defaults to config value)
-            eos_token_id: Token ID for end-of-sequence (defaults to config value)
-            use_delay_pattern: Whether to apply delay patterns for multi-codebook generation
-            num_codebooks: Number of audio codebooks (defaults to config value)
-            streaming: Whether to enable streaming generation for real-time applications
-            stream_chunk_size: Number of tokens per streaming chunk
-            return_dict: Whether to return a dictionary with detailed outputs
-            **kwargs: Additional generation parameters
-            
-        Returns:
-            If return_dict=False: Generated token tensor [batch_size, output_seq_len]
-            If return_dict=True: Dictionary containing:
-                - 'sequences': Generated token sequences
-                - 'codebook_sequences': Per-codebook token sequences (if multi-codebook)
-                - 'generation_mode_history': Sequence of generation modes used
-                - 'delay_pattern_info': Information about applied delay patterns
-                - 'streaming_chunks': Generated chunks (if streaming enabled)
-                
-        Raises:
-            ValueError: If generation parameters are invalid or incompatible
-            RuntimeError: If generation fails due to model or input issues
-        """
-        input_ids = kwargs.get('input_ids')
-        attention_mask = kwargs.get('attention_mask')
-        audio_features = kwargs.get('audio_features')
-        max_length = kwargs.get('max_length', 512)
-        max_new_tokens = kwargs.get('max_new_tokens')
-        temperature = kwargs.get('temperature', 1.0)
-        top_k = kwargs.get('top_k', 50)
-        top_p = kwargs.get('top_p', 1.0)
-        do_sample = kwargs.get('do_sample', True)
-        pad_token_id = kwargs.get('pad_token_id', getattr(self.config, 'pad_token_id', 0))
-        eos_token_id = kwargs.get('eos_token_id', getattr(self.config, 'eos_token_id', None))
-        use_delay_pattern = kwargs.get('use_delay_pattern', True)
-        num_codebooks = kwargs.get('num_codebooks', getattr(self.config, 'audio_num_codebooks', 4))
-        streaming = kwargs.get('streaming', False)
-        stream_chunk_size = kwargs.get('stream_chunk_size', 32)
-        
-        batch_size, input_seq_len = input_ids.shape
-        
-        max_length = input_seq_len + max_new_tokens
-        
-        # Initialize generation state
-        generation_state = self._initialize_generation_state(gen_params)
-        
-        # Initialize delay pattern provider if needed
-        delay_provider = None
-        audio_utils = None
-        if gen_params['use_delay_pattern'] and gen_params['num_codebooks'] > 1:
-            delay_provider = DelayPatternProvider(
-                stride=getattr(self.config, 'audio_delay_pattern_stride', 1),
-                max_delay=getattr(self.config, 'audio_delay_pattern_max_delay', None),
-                pad_token_id=gen_params['pad_token_id']
-            )
-            audio_utils = AudioTokenUtils(
-                num_codebooks=gen_params['num_codebooks'],
-                pad_token_id=gen_params['pad_token_id'],
-                eos_token_id=gen_params['eos_token_id'],
-                audio_start_token_id=getattr(self.config, 'audio_start_token_id', None),
-                audio_end_token_id=getattr(self.config, 'audio_end_token_id', None)
-            )
-        
-        # Execute generation based on streaming mode
-        if gen_params['streaming']:
-            outputs = self._generate_streaming(
-                gen_params=gen_params,
-                generation_state=generation_state,
-                delay_provider=delay_provider,
-                audio_utils=audio_utils
-            )
-        else:
-            outputs = self._generate_standard(
-                gen_params=gen_params,
-                generation_state=generation_state,
-                delay_provider=delay_provider,
-                audio_utils=audio_utils
-            )
-        
-        # Post-process outputs
-        if return_dict:
-            return self._prepare_generation_outputs(
-                outputs=outputs,
-                generation_state=generation_state,
-                delay_provider=delay_provider,
-                audio_utils=audio_utils,
-                gen_params=gen_params
-            )
-        else:
-            return outputs['sequences']

@@ -1832,410 +1832,85 @@ def build_eclair_engine(args):
         args.max_batch_size,
         dtype=torch.bfloat16,
         engine_name='visual_encoder.engine')
+
 def build_higgs_audio_engine(args):
-    """Build unified TensorRT engine for Higgs Audio TTS model.
+    """Build TensorRT engine for Higgs Audio TTS model."""
+    # Import TRT-LLM model classes
+    from ..models.higgs_audio import HiggsAudioConfig
+    from ..models.higgs_audio.convert import load_weights_from_hf_model
 
-    This builds a complete TTS-optimized unified TensorRT engine that processes both
-    text and audio tokens in a single model, rather than separate encoder/decoder engines.
-    The unified approach provides 15-25ms latency improvement, 20-30% memory reduction,
-    and 25-40% throughput increase compared to separate engines.
-
-    Key Features:
-    - Unified text+audio processing in single TensorRT engine
-    - DualFFN-aware weight conversion for specialized audio/text paths
-    - TTS-optimized generation modes (TEXT/AUDIO_INIT/AUDIO_IN_PROGRESS)
-    - Delay pattern coordination for multi-codebook RVQ generation
-    - Enhanced performance with CUDA graph optimizations
+    # Validate arguments
+    if not hasattr(args, 'model_path') or not args.model_path:
+        raise ValueError("model_path is required for unified engine building")
+    if not hasattr(args, 'output_dir') or not args.output_dir:
+        raise ValueError("output_dir is required for unified engine building")
+        
+    # Set default parameters for TTS optimization
+    args.dtype = getattr(args, 'dtype', 'bfloat16')
+    args.max_batch_size = getattr(args, 'max_batch_size', 1)
+    args.max_input_len = getattr(args, 'max_input_len', 1024)
+    args.max_output_len = getattr(args, 'max_output_len', 512)
+    args.max_beam_width = getattr(args, 'max_beam_width', 1)
     
-    Architecture:
-    Uses HiggsAudioForCausalLM with:
-    - HiggsAudioBackbone: Unified transformer with DualFFN layers
-    - DualFFN layers: Separate audio_mlp/text_mlp paths with shared attention
-    - TTS-optimized generation mode management
-    - Multi-codebook coordination with delay patterns
-    """
-    logger.info("Building unified Higgs Audio TTS engine (not separate encoder)")
+    # Build configuration from HF model with TTS optimizations
+    logger.info("Preparing Higgs Audio configuration...")
     
-    try:
-        # Import TRT-LLM model classes
-        from ..models.higgs_audio import HiggsAudioForCausalLM, HiggsAudioConfig
-        from ..models.higgs_audio.convert import build_config_from_hf, load_weights_from_hf_model
-        from ..builder import Builder
-        from ..network import Network
-        from ..plugin import PluginConfig
-        from ..._utils import to_json_file
-        from ..mapping import Mapping
-        from contextlib import contextmanager
-        
-        @contextmanager
-        def net_guard(network):
-            """Context manager for network building."""
-            try:
-                yield network
-            finally:
-                pass
-        
-        # Validate arguments
-        if not hasattr(args, 'model_path') or not args.model_path:
-            raise ValueError("model_path is required for unified engine building")
-        if not hasattr(args, 'output_dir') or not args.output_dir:
-            raise ValueError("output_dir is required for unified engine building")
-            
-        # Set default parameters for TTS optimization
-        args.dtype = getattr(args, 'dtype', 'float16')
-        args.max_batch_size = getattr(args, 'max_batch_size', 4)
-        args.max_input_len = getattr(args, 'max_input_len', 2048)
-        args.max_output_len = getattr(args, 'max_output_len', 1024)
-        args.max_beam_width = getattr(args, 'max_beam_width', 1)
-        
-        # TTS-specific parameters
-        args.enable_tts_optimizations = getattr(args, 'enable_tts_optimizations', True)
-        args.enable_dualffn = getattr(args, 'enable_dualffn', True)
-        args.enable_delay_patterns = getattr(args, 'enable_delay_patterns', True)
-        args.enable_cuda_graphs = getattr(args, 'enable_cuda_graphs', True)
-        
-        logger.info(f"Building unified Higgs Audio TTS engine:")
-        logger.info(f"  Model path: {args.model_path}")
-        logger.info(f"  Output dir: {args.output_dir}")
-        logger.info(f"  Batch size: {args.max_batch_size}, Input len: {args.max_input_len}, Output len: {args.max_output_len}")
-        logger.info(f"  TTS optimizations: {args.enable_tts_optimizations}")
-        logger.info(f"  DualFFN: {args.enable_dualffn}")
-        logger.info(f"  Delay patterns: {args.enable_delay_patterns}")
-        logger.info(f"  CUDA graphs: {args.enable_cuda_graphs}")
-        
-        # For unified Higgs Audio architecture, we prepare the model and weights
-        # but guide users to use standard TRT-LLM building process
-        
-        # Build configuration from HF model with TTS optimizations
-        logger.info("Preparing unified Higgs Audio configuration...")
-        mapping = Mapping() if hasattr(args, 'tp_size') and args.tp_size > 1 else Mapping(world_size=1, rank=0, tp_size=1, pp_size=1)
-        
-        config = build_config_from_hf(
-            hf_model_dir=args.model_path,
-            dtype=args.dtype,
-            mapping=mapping,
-            quant_config=None,
-        )
-        
-        # Load and convert weights with DualFFN support
-        logger.info("Converting weights with DualFFN support...")
-        checkpoint = load_weights_from_hf_model(
-            hf_model_dir=args.model_path,
-            config=config,
-            quant_config=None,
-            validate_weights=True,
-            fallback_strategy='duplicate_text'
-        )
-        
-        # Log conversion results
-        dual_ffn_info = checkpoint.get('dual_ffn_info', {})
-        logger.info(f"Weight conversion completed:")
-        logger.info(f"  - Total layers processed: {len(dual_ffn_info.get('layers_processed', []))}")
-        logger.info(f"  - DualFFN layers: {len(dual_ffn_info.get('dual_ffn_layers_converted', []))}")
-        logger.info(f"  - Standard layers: {len(dual_ffn_info.get('standard_layers_converted', []))}")
-        if dual_ffn_info.get('fallback_used'):
-            logger.info(f"  - Fallback used for layers: {dual_ffn_info['fallback_used']}")
-        
-        # Save TRT-LLM compatible checkpoint
-        import os
-        os.makedirs(args.output_dir, exist_ok=True)
-        
-        # Save weights in TRT-LLM format
-        checkpoint_path = os.path.join(args.output_dir, "higgs_audio_weights.npz")
-        import numpy as np
-        weights_dict = {}
-        for key, tensor in checkpoint['tensors'].items():
-            if hasattr(tensor, 'cpu'):
-                weights_dict[key] = tensor.cpu().numpy()
-            else:
-                weights_dict[key] = tensor
-        np.savez(checkpoint_path, **weights_dict)
-        logger.info(f"TRT-LLM weights saved to: {checkpoint_path}")
-        
-        # Save detailed configuration
-        config_path = os.path.join(args.output_dir, "config.json")
-        config_dict = {
-            "builder_config": {
-                "precision": args.dtype,
-                "model_type": "higgs_audio_unified",
-                "max_batch_size": args.max_batch_size,
-                "max_input_len": args.max_input_len,
-                "max_output_len": args.max_output_len,
-                "vocab_size": config.vocab_size,
-                "hidden_size": config.hidden_size,
-                "num_layers": config.num_hidden_layers,
-                "num_heads": config.num_attention_heads,
-                "enable_tts_optimizations": args.enable_tts_optimizations,
-                "enable_dualffn": args.enable_dualffn,
-                "enable_delay_patterns": args.enable_delay_patterns,
-                "enable_cuda_graphs": args.enable_cuda_graphs,
-            },
-            "model_config": config.to_dict() if hasattr(config, 'to_dict') else vars(config),
-            "conversion_info": checkpoint['metadata'],
-            "dual_ffn_info": dual_ffn_info,
+    config = HiggsAudioConfig.from_hugging_face(
+        hf_model_dir=args.model_path,
+        dtype=args.dtype, 
+        quant_config=None,
+    )
+    
+    # Load and convert weights with DualFFN support
+    logger.info("Converting weights with DualFFN support...")
+    checkpoint = load_weights_from_hf_model(
+        hf_model_dir=args.model_path,
+        config=config,
+        quant_config=None,
+        validate_weights=True,
+        fallback_strategy='duplicate_text'
+    )
+    
+    # Log conversion results
+    dual_ffn_info = checkpoint.get('dual_ffn_info', {})
+    logger.info(f"Weight conversion completed:")
+    logger.info(f"  - Total layers processed: {len(dual_ffn_info.get('layers_processed', []))}")
+    logger.info(f"  - DualFFN layers: {len(dual_ffn_info.get('dual_ffn_layers_converted', []))}")
+    logger.info(f"  - Standard layers: {len(dual_ffn_info.get('standard_layers_converted', []))}")
+    if dual_ffn_info.get('fallback_used'):
+        logger.info(f"  - Fallback used for layers: {dual_ffn_info['fallback_used']}")
+    
+    # Save TRT-LLM compatible checkpoint
+    import os
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Save weights in TRT-LLM format
+    checkpoint_path = os.path.join(args.output_dir, "higgs_audio_weights.npz")
+    import numpy as np
+    weights_dict = {}
+    for key, tensor in checkpoint['tensors'].items():
+        if hasattr(tensor, 'cpu'):
+            weights_dict[key] = tensor.cpu().numpy()
+        else:
+            weights_dict[key] = tensor
+    np.savez(checkpoint_path, **weights_dict)
+    logger.info(f"TRT-LLM weights saved to: {checkpoint_path}")
+    
+    # Save detailed configuration
+    config_path = os.path.join(args.output_dir, "config.json")
+    config_dict = {
+        "builder_config": {
+            "precision": args.dtype,
+            "model_type": "higgs_audio",
         }
-        
-        to_json_file(config_dict, config_path)
-        logger.info(f"Configuration saved to: {config_path}")
-        
-        # Create build instructions
-        instructions_path = os.path.join(args.output_dir, "build_instructions.md")
-        build_instructions = _generate_build_instructions(
-            config_path=config_path,
-            checkpoint_path=checkpoint_path,
-            args=args,
-            dual_ffn_info=dual_ffn_info
-        )
-        
-        with open(instructions_path, 'w') as f:
-            f.write(build_instructions)
-        logger.info(f"Build instructions saved to: {instructions_path}")
-        
-        # Log completion and next steps
-        logger.info("Unified Higgs Audio preparation completed!")
-        logger.info(f"")
-        logger.info(f"Next steps to build the TRT engine:")
-        logger.info(f"1. Use the standard TRT-LLM build process:")
-        logger.info(f"   python -m tensorrt_llm.commands.build \\")
-        logger.info(f"     --model_type higgs_audio \\")
-        logger.info(f"     --config_path {config_path} \\")
-        logger.info(f"     --checkpoint_dir {args.output_dir} \\")
-        logger.info(f"     --output_dir {args.output_dir}/trt_engines")
-        logger.info(f"")
-        logger.info(f"2. Or see detailed instructions in: {instructions_path}")
-        logger.info(f"")
-        logger.info(f"Expected performance improvements vs separate engines:")
-        logger.info(f"  - Latency: 15-25ms improvement")
-        logger.info(f"  - Memory: 20-30% reduction")
-        logger.info(f"  - Throughput: 25-40% increase")
-        
-        return {
-            'config_path': config_path,
-            'checkpoint_path': checkpoint_path,
-            'instructions_path': instructions_path,
-            'model_type': 'higgs_audio_unified',
-            'performance_optimizations': {
-                'tts_optimized': args.enable_tts_optimizations,
-                'dualffn_enabled': args.enable_dualffn,
-                'delay_patterns': args.enable_delay_patterns,
-                'cuda_graphs': args.enable_cuda_graphs
-            },
-            'dual_ffn_info': dual_ffn_info
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to build unified Higgs Audio TTS engine: {e}")
-        logger.error("This error occurred during unified engine building.")
-        logger.error("If you need the legacy separate encoder approach, please use a different model type.")
-        raise RuntimeError(f"Unified TTS engine build failed: {e}") from e
-
-
-def _generate_build_instructions(config_path: str, checkpoint_path: str, args, dual_ffn_info: dict) -> str:
-    """Generate detailed build instructions for the unified Higgs Audio TTS engine."""
-    instructions = f"""# Higgs Audio Unified TTS Engine Build Instructions
-
-This directory contains the converted weights and configuration for building a unified Higgs Audio TTS engine.
-
-## Architecture Overview
-
-The unified architecture provides significant performance improvements over separate encoder/decoder engines:
-- **Latency**: 15-25ms improvement
-- **Memory**: 20-30% reduction
-- **Throughput**: 25-40% increase
-
-### Model Configuration
-- Model Type: higgs_audio_unified
-- Precision: {args.dtype}
-- Max Batch Size: {args.max_batch_size}
-- Max Input Length: {args.max_input_len}
-- Max Output Length: {args.max_output_len}
-- TTS Optimizations: {args.enable_tts_optimizations}
-- DualFFN Enabled: {args.enable_dualffn}
-- Delay Patterns: {args.enable_delay_patterns}
-- CUDA Graphs: {args.enable_cuda_graphs}
-
-### DualFFN Layer Configuration
-"""
+    }
     
-    dual_ffn_layers = dual_ffn_info.get('dual_ffn_layers_converted', [])
-    if dual_ffn_layers:
-        instructions += f"""
-- DualFFN Layers: {len(dual_ffn_layers)} out of {len(dual_ffn_info.get('layers_processed', []))} total
-- Layer Indices: {sorted(dual_ffn_layers)}
-- Fallback Used: {dual_ffn_info.get('fallback_used', [])}
-"""
-    else:
-        instructions += f"""
-- DualFFN Layers: None (using standard MLP layers)
-"""
-
-    instructions += f"""
-
-## Building the TensorRT Engine
-
-### Method 1: Using TRT-LLM Build Command (Recommended)
-
-```bash
-# Build the unified TTS engine
-python -m tensorrt_llm.commands.build \\
-    --model_type higgs_audio \\
-    --config_path {config_path} \\
-    --checkpoint_dir {args.output_dir} \\
-    --output_dir {args.output_dir}/trt_engines \\
-    --max_batch_size {args.max_batch_size} \\
-    --max_input_len {args.max_input_len} \\
-    --max_output_len {args.max_output_len} \\
-    --dtype {args.dtype}
-```
-
-### Method 2: Using Python API
-
-```python
-from tensorrt_llm.models.higgs_audio import HiggsAudioForCausalLM
-from tensorrt_llm.builder import Builder
-import json
-import numpy as np
-
-# Load configuration
-with open('{config_path}', 'r') as f:
-    config_dict = json.load(f)
-
-# Load weights
-weights = np.load('{checkpoint_path}')
-
-# Build engine
-config = HiggsAudioConfig.from_dict(config_dict['model_config'])
-model = HiggsAudioForCausalLM(config)
-
-builder = Builder()
-engine = builder.build_engine(
-    model=model,
-    weights=weights,
-    max_batch_size={args.max_batch_size},
-    max_input_len={args.max_input_len},
-    max_output_len={args.max_output_len},
-    dtype='{args.dtype}'
-)
-
-# Save engine
-with open('higgs_audio_tts.engine', 'wb') as f:
-    f.write(engine.serialize())
-```
-
-### Method 3: Manual Build Process
-
-If you need more control over the build process:
-
-```python
-from tensorrt_llm.models.higgs_audio.convert import load_weights_from_hf_model
-from tensorrt_llm.models.higgs_audio import HiggsAudioForCausalLM
-from tensorrt_llm.builder import Builder
-
-# This approach gives you full control over the build process
-# and allows customization of TTS-specific optimizations
-```
-
-## Usage Instructions
-
-Once the engine is built, you can use it for TTS generation:
-
-```python
-from tensorrt_llm.runtime import ModelRunner
-from tensorrt_llm.models.higgs_audio import GenerationMode
-
-# Load the engine
-runner = ModelRunner.from_dir('{args.output_dir}/trt_engines')
-
-# Set generation mode for TTS
-runner.set_generation_mode(GenerationMode.AUDIO_INIT)
-
-# Generate audio tokens
-outputs = runner.generate(
-    input_ids=text_tokens,
-    max_new_tokens=100,
-    use_delay_pattern=True,
-    streaming=True
-)
-```
-
-## Performance Optimizations
-
-The unified architecture includes several TTS-specific optimizations:
-
-1. **DualFFN Processing**: Specialized audio/text MLP paths
-2. **Generation Mode Management**: Efficient TEXT/AUDIO_INIT/AUDIO_IN_PROGRESS transitions
-3. **Delay Pattern Coordination**: Multi-codebook RVQ synchronization
-4. **CUDA Graph Caching**: Pre-compiled execution graphs for TTS patterns
-5. **Memory Optimization**: 20-30% reduction vs separate engines
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Memory Issues**: Reduce batch size or sequence lengths
-2. **DualFFN Layer Errors**: Check that fallback conversion completed successfully
-3. **Generation Mode Issues**: Ensure proper mode transitions in your inference code
-4. **Delay Pattern Issues**: Verify RVQ codebook configuration matches model
-
-### Performance Tuning
-
-- Enable CUDA graphs for best performance: `enable_cuda_graphs=True`
-- Use appropriate precision: FP16 for best performance, FP32 for accuracy
-- Optimize batch sizes based on your hardware and use case
-- Consider tensor parallelism for multi-GPU setups
-
-## Files Generated
-
-- `{config_path}`: Complete model configuration
-- `{checkpoint_path}`: Converted TRT-LLM weights
-- `{args.output_dir}/build_instructions.md`: This instruction file
-
-## Next Steps
-
-1. Build the TensorRT engine using one of the methods above
-2. Test the engine with your TTS workload
-3. Optimize batch sizes and other parameters for your use case
-4. Deploy the unified engine for production TTS applications
-
-For more information, see the TensorRT-LLM documentation and Higgs Audio model examples.
-"""
+    to_json_file(config_dict, config_path)
+    logger.info(f"Configuration saved to: {config_path}")
     
-    return instructions
-
-
-def _validate_unified_architecture(model, config, dual_ffn_info: dict) -> None:
-    """Validate that the unified model architecture is properly configured for TTS."""
-    try:
-        # Check that model is the correct type - it should be HiggsAudioForCausalLM
-        model_type = type(model).__name__
-        if model_type != 'HiggsAudioForCausalLM':
-            logger.warning(f"Expected HiggsAudioForCausalLM, got {model_type}")
-        
-        # Check that model has required TTS components
-        if hasattr(model, 'transformer'):
-            transformer = model.transformer
-            logger.info(f"Transformer backbone validated: {config.num_hidden_layers} layers")
-            
-            # Check for DualFFN layers if enabled
-            dual_ffn_layers = dual_ffn_info.get('dual_ffn_layers_converted', [])
-            if dual_ffn_layers:
-                logger.info(f"DualFFN layers configured: {len(dual_ffn_layers)} out of {config.num_hidden_layers}")
-                # Note: We can't check the actual layer structure here since the model isn't fully built yet
-            
-        # Check for TTS-specific configuration
-        if hasattr(config, 'audio_adapter_type'):
-            logger.info(f"Audio adapter type: {config.audio_adapter_type}")
-        if hasattr(config, 'audio_dual_ffn_layers'):
-            logger.info(f"Configured DualFFN layers: {getattr(config, 'audio_dual_ffn_layers', [])}")
-            
-        # Check generation mode management
-        if hasattr(model, 'generation_mode_manager'):
-            logger.info("Generation mode manager available")
-        elif hasattr(model, 'set_generation_mode'):
-            logger.info("Generation mode management available")
-            
-        logger.info("Unified architecture validation completed")
-        
-    except Exception as e:
-        logger.warning(f"Architecture validation encountered issues: {e}")
-        # Don't fail the build, just warn since this is validation
+    return {
+        'config_path': config_path,
+        'checkpoint_path': checkpoint_path,
+        'model_type': 'higgs_audio',
+        'dual_ffn_info': dual_ffn_info
+    }

@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from typing import Optional, Union, Dict, Any, List
-import warnings
-
+from tensorrt_llm.mapping import Mapping
+from tensorrt_llm.models.convert_utils import infer_dtype
 from ..modeling_utils import PretrainedConfig
 
 
@@ -123,7 +123,7 @@ class HiggsAudioConfig(PretrainedConfig):
         cuda_graph_tts_sequence_lengths: List[int] = [1024],
         cuda_graph_streaming_chunk_sizes: List[int] = [32],
         cuda_graph_max_cache_size: int = 32,
-        
+        cuda_graph_memory_pool_size_gb: int = 2,
         # Performance optimization settings
         cuda_graph_enable_performance_monitoring: bool = True,
         cuda_graph_fallback_enabled: bool = True,
@@ -140,7 +140,7 @@ class HiggsAudioConfig(PretrainedConfig):
         # TensorRT-LLM common parameters
         memory_efficient_build: bool = True,
         dtype: str = "bfloat16",
-        mapping: Optional[Mapping] = None,
+        mapping: Optional[Mapping] = Mapping(world_size=1, rank=0, tp_size=1, pp_size=1),
         quantization: Optional[QuantConfig] = None,
         **kwargs: Any,
     ) -> None:
