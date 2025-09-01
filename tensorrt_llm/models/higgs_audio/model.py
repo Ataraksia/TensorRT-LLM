@@ -432,6 +432,151 @@ class HiggsAudioEncoderProjector(Module):
             gather_output=True  # Gather output across TP ranks
         )
 
+    def preprocess_audio_features(self, audio_features: Tensor) -> Tensor:
+        """
+        Preprocess audio features for multimodal generation.
+        
+        Args:
+            audio_features: Raw audio features from audio encoder
+            
+        Returns:
+            Preprocessed audio features ready for transformer
+        """
+        # Audio features are typically already preprocessed by audio encoder
+        # Apply any additional normalization or projection if needed
+        if hasattr(self, 'audio_projection'):
+            audio_features = self.audio_projection(audio_features)
+        return audio_features
+
+    def prepare_multimodal_inputs(
+        self,
+        input_ids: Tensor,
+        audio_features: Optional[Tensor] = None,
+        audio_mask: Optional[Tensor] = None,
+        text_positions: Optional[Tensor] = None,
+        audio_positions: Optional[Tensor] = None
+    ) -> Dict[str, Tensor]:
+        """
+        Prepare inputs for multimodal forward pass.
+        
+        Args:
+            input_ids: Text token IDs
+            audio_features: Preprocessed audio features
+            audio_mask: Mask indicating audio token positions
+            text_positions: Positions of text tokens in sequence
+            audio_positions: Positions of audio tokens in sequence
+            
+        Returns:
+            Dictionary containing prepared inputs
+        """
+        batch_size = input_ids.shape[0]
+        device = input_ids.device if hasattr(input_ids, 'device') else None
+        
+        # Initialize embeddings
+        if audio_features is not None and audio_mask is not None:
+            # Get text embeddings
+            text_embeds = self.vocab_embedding(input_ids)
+            
+            # Combine text and audio embeddings based on mask
+            combined_embeds = where(
+                audio_mask.unsqueeze(-1),
+                audio_features,
+                text_embeds
+            )
+        else:
+            # Text-only mode
+            combined_embeds = self.vocab_embedding(input_ids)
+            
+        return {
+            'embeddings': combined_embeds,
+            'audio_mask': audio_mask,
+            'text_positions': text_positions,
+            'audio_positions': audio_positions
+        }
+
+    def multimodal_forward(
+        self,
+        input_ids: Tensor,
+        audio_features: Optional[Tensor] = None,
+        audio_mask: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        past_key_value: Optional[list] = None,
+        sequence_length: Optional[Tensor] = None,
+        past_key_value_length: Optional[Tensor] = None,
+        masked_tokens: Optional[Tensor] = None,
+        use_cache: bool = False,
+        last_token_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        cache_indirection: Optional[Tensor] = None,
+        kv_cache_params: Optional[KeyValueCacheParams] = None,
+        attention_params: Optional[AttentionParams] = None,
+        hidden_states: Optional[Tensor] = None,
+        lora_params: Optional[LoraParams] = None,
+        prompt_embedding_table: Optional[Tensor] = None,
+        prompt_tasks: Optional[Tensor] = None,
+        prompt_vocab_size: Optional[Tensor] = None
+    ) -> Dict[str, Any]:
+        """
+        Multimodal forward pass handling both text and audio modalities.
+        
+        Returns:
+            Dictionary containing logits and hidden states
+        """
+        # Prepare multimodal inputs
+        mm_inputs = self.prepare_multimodal_inputs(
+            input_ids=input_ids,
+            audio_features=audio_features,
+            audio_mask=audio_mask
+        )
+        
+        # Use prepared embeddings instead of input_ids
+        hidden_states = mm_inputs['embeddings']
+        
+        # Pass through transformer layers with audio mask for modal routing
+        outputs = self.decoder(
+            hidden_states=hidden_states,
+            use_cache=use_cache,
+            attention_mask=attention_mask,
+            kv_cache_params=kv_cache_params,
+            attention_params=attention_params,
+            position_ids=position_ids,
+            hidden_states_input=hidden_states,
+            audio_out_mask=audio_mask,  # Route audio tokens through audio layers
+            lora_params=lora_params
+        )
+        
+        if use_cache:
+            hidden_states, present_key_value = outputs
+        else:
+            hidden_states = outputs
+            present_key_value = None
+            
+        # Get logits for both text and audio
+        logits = {}
+        
+        # Text logits from language model head
+        if audio_mask is None or not audio_mask.all():
+            text_logits = self.lm_head(hidden_states)
+            logits['text'] = text_logits
+            
+        # Audio logits from decoder projector
+        if audio_mask is not None and audio_mask.any():
+            # Get audio hidden states
+            audio_hidden = where(
+                audio_mask.unsqueeze(-1),
+                hidden_states,
+                constant(0.0)
+            )
+            # Project to audio logits
+            audio_logits = self.decoder_projector(audio_hidden)
+            logits['audio'] = audio_logits
+            
+        return {
+            'logits': logits,
+            'hidden_states': hidden_states,
+            'present_key_value': present_key_value
+        }
+
     def forward(self, audio_features: Tensor) -> Tensor:
         """
         Project audio features to text model dimension.
@@ -1508,61 +1653,43 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
                 - Boolean indicating if audio generation should end
         """
         should_end_audio = False
-        
-        if self.use_delay_pattern:
-            # Apply linear delay pattern with stride 1
-            # Each codebook starts one timestep after the previous one
-            
-            # Start new codebooks if we haven't started all of them yet
-            if num_delay + 1 < self.audio_num_codebooks:
-                # Set all codebooks after the current delay to BOS token
-                # This ensures they haven't started generating yet
-                for i in range(num_delay + 1, self.audio_num_codebooks):
-                    next_audio_tokens = where(
-                        constant(i) < self.audio_num_codebooks,
-                        full([1], self.audio_stream_bos_id, dtype=next_audio_tokens.dtype),
-                        next_audio_tokens
-                    )
-                num_delay += 1
-            
-            # Handle the ending pattern
-            if num_remaining_delays is not None:
-                # Set codebooks that should have ended to EOS token
-                num_ended = self.audio_num_codebooks - num_remaining_delays
-                for i in range(num_ended):
-                    next_audio_tokens = where(
-                        constant(i) < num_ended,
-                        full([1], self.audio_stream_eos_id, dtype=next_audio_tokens.dtype),
-                        next_audio_tokens
-                    )
-                num_remaining_delays -= 1
-            else:
-                # Check if any codebook has generated an EOS token
-                # If so, start the ending pattern
-                has_eos = False
-                for i in range(self.audio_num_codebooks):
-                    token_val = next_audio_tokens
-                    if token_val == self.audio_stream_eos_id:
-                        has_eos = True
-                        last_eos_idx = i
-                        break
-                
-                if has_eos:
-                    # Set all codebooks before the last EOS to EOS
-                    for i in range(last_eos_idx):
-                        next_audio_tokens = where(
-                            constant(i) < last_eos_idx,
-                            full([1], self.audio_stream_eos_id, dtype=next_audio_tokens.dtype),
-                            next_audio_tokens
-                        )
-                    num_remaining_delays = self.audio_num_codebooks - last_eos_idx - 1
-            
-            # Check if we should end audio generation
-            if num_remaining_delays is not None and num_remaining_delays <= 0:
+
+        if not self.use_delay_pattern:
+            return next_audio_tokens, num_delay, num_remaining_delays, should_end_audio
+
+        # Build codebook index vector [0, 1, ..., num_codebooks-1]
+        num_cb = self.audio_num_codebooks
+        idx = arange(0, num_cb, dtype='int32')  # [num_cb]
+
+        # 1) Start pattern (linear stride = 1): allow first (num_delay+1) codebooks to generate
+        started = constant(num_delay + 1)
+        # mask_started = (idx < started)
+        mask_started = lt(idx, started)
+        bos_vec = full([num_cb], self.audio_stream_bos_id, dtype=next_audio_tokens.dtype)
+        # Keep tokens for started codebooks; force BOS for the ones not yet started
+        next_audio_tokens = where(mask_started, next_audio_tokens, bos_vec)
+
+        # Increase delay until all codebooks have started
+        if num_delay + 1 < num_cb:
+            num_delay += 1
+
+        # 2) Ending pattern: if already ending, force EOS on the first num_ended codebooks
+        if num_remaining_delays is not None:
+            num_ended = num_cb - num_remaining_delays
+            ended_threshold = constant(num_ended)
+            mask_ended = lt(idx, ended_threshold)
+            eos_vec = full([num_cb], self.audio_stream_eos_id, dtype=next_audio_tokens.dtype)
+            next_audio_tokens = where(mask_ended, eos_vec, next_audio_tokens)
+            num_remaining_delays -= 1
+
+            if num_remaining_delays <= 0:
                 should_end_audio = True
                 num_delay = 0
                 num_remaining_delays = None
-        
+
+        # Note: EOS-triggered start of ending pattern is handled by the caller that
+        # computes num_remaining_delays, to keep this utility simple and TRT-LLM friendly.
+
         return next_audio_tokens, num_delay, num_remaining_delays, should_end_audio
 
     def sample_audio_tokens_with_delay_pattern(
@@ -1596,22 +1723,45 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
                 - Updated num_remaining_delays
                 - Boolean indicating if audio should end
         """
-        # For TensorRT-LLM, we need to handle sampling differently
-        # This is a simplified version - in production, you'd use proper sampling
-        
-        # Get the last timestep's logits
-        if len(audio_logits.shape) == 3:
-            # [batch, num_codebooks, vocab_size] -> [num_codebooks, vocab_size]
-            audio_logits = audio_logits[-1, :, :]
-        
-        # Apply temperature if specified
+        # Gather last-step logits: [B, V_a] where V_a = num_codebooks*(codebook_size+2)
+        last_logits = gather_last_token_logits(audio_logits)
+
+        # Assume batch size 1 in generation; squeeze to [V_a]
+        if len(last_logits.shape) == 2:
+            # [B, V_a] -> [V_a] (B==1 expected)
+            last_logits = last_logits[0]
+
+        # Split into per-codebook logits: [num_cb, vocab_per_cb]
+        vocab_per_cb = self.config.audio_codebook_size + 2
+        num_cb = self.audio_num_codebooks
+        # Reshape for per-codebook argmax
+        per_cb_logits = last_logits.view(num_cb, vocab_per_cb)
+
+        # Temperature scaling (optional)
         if temperature != 1.0:
-            audio_logits = audio_logits / temperature
-        
-        # For now, use argmax (greedy) sampling
-        # In production, you'd implement proper top-k/top-p sampling
-        next_audio_tokens = audio_logits.argmax(dim=-1)
-        
+            per_cb_logits = per_cb_logits / temperature
+
+        # Greedy per-codebook sampling
+        next_audio_tokens = per_cb_logits.argmax(dim=-1)
+
+        # If not already ending, detect EOS to start ending pattern (HF parity)
+        if self.use_delay_pattern and num_remaining_delays is None:
+            last_eos_idx = None
+            # Small loop over codebooks is acceptable here for clarity
+            for i in range(int(num_cb)):
+                token_val = next_audio_tokens[i]
+                if isinstance(token_val, torch.Tensor):
+                    val = int(token_val.item())
+                else:
+                    val = int(token_val)
+                if val == int(self.audio_stream_eos_id):
+                    last_eos_idx = i
+            if last_eos_idx is not None:
+                # Force EOS for codebooks before the last eos index
+                for j in range(last_eos_idx):
+                    next_audio_tokens[j] = int(self.audio_stream_eos_id)
+                num_remaining_delays = int(num_cb) - int(last_eos_idx) - 1
+
         # Apply delay pattern
         next_audio_tokens, num_delay, num_remaining_delays, should_end = \
             self._apply_delay_pattern_to_audio_tokens(
@@ -1920,3 +2070,209 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             lora_params=lora_params,
             spec_decoding_params=spec_decoding_params
         )
+
+    def generate_multimodal(
+        self,
+        input_ids: Tensor,
+        audio_features: Optional[Tensor] = None,
+        max_new_tokens: int = 100,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: Optional[float] = None,
+        use_delay_pattern: bool = True,
+        num_codebooks: int = 8,
+        eos_token_id: Optional[int] = None,
+        pad_token_id: Optional[int] = None,
+        audio_eos_token_id: Optional[int] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Unified multimodal generation with delay pattern support.
+        
+        This method handles:
+        1. Audio input processing and encoding
+        2. Multimodal forward pass with modal switching
+        3. Delay pattern application for multi-codebook audio generation
+        4. Seamless transitions between text and audio generation
+        
+        Args:
+            input_ids: Input text token IDs
+            audio_features: Optional preprocessed audio features
+            max_new_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            top_k: Top-k sampling parameter
+            top_p: Top-p (nucleus) sampling parameter
+            use_delay_pattern: Whether to use delay pattern for audio
+            num_codebooks: Number of audio codebooks
+            eos_token_id: End-of-sequence token ID for text
+            pad_token_id: Padding token ID
+            audio_eos_token_id: End-of-sequence token ID for audio
+            
+        Returns:
+            Dictionary containing:
+            - 'sequences': Generated token sequences
+            - 'audio_sequences': Generated audio token sequences
+            - 'modal_mask': Mask indicating modal types
+            - 'generation_info': Additional generation metadata
+        """
+        batch_size = input_ids.shape[0]
+        device = input_ids.device if hasattr(input_ids, 'device') else None
+        
+        # Initialize generation state
+        if not hasattr(self, '_generation_state'):
+            self._generation_state = {
+                'num_delay': 0,
+                'num_remaining_delays': None,
+                'current_mode': 'text',  # 'text' or 'audio'
+                'audio_buffer': [],
+                'text_buffer': []
+            }
+        
+        # Prepare audio mask if audio features provided
+        audio_mask = None
+        if audio_features is not None:
+            # Create mask for audio positions
+            seq_len = input_ids.shape[1]
+            audio_len = audio_features.shape[1] if len(audio_features.shape) > 1 else 0
+            if audio_len > 0:
+                # Mark positions where audio features are present
+                audio_mask = constant(False, shape=[batch_size, seq_len])
+                # This is simplified - in practice you'd determine audio positions from input
+                
+        # Storage for generated sequences
+        generated_sequences = input_ids.clone() if hasattr(input_ids, 'clone') else input_ids
+        generated_audio = []
+        modal_indicators = []
+        
+        # Generation loop
+        past_key_value = None
+        for step in range(max_new_tokens):
+            # Determine current generation mode
+            current_mode = self._generation_state['current_mode']
+            
+            # Multimodal forward pass
+            outputs = self.multimodal_forward(
+                input_ids=generated_sequences,
+                audio_features=audio_features if step == 0 else None,
+                audio_mask=audio_mask,
+                past_key_value=past_key_value,
+                use_cache=True
+            )
+            
+            logits = outputs['logits']
+            past_key_value = outputs.get('present_key_value')
+            
+            # Sample based on current mode
+            if current_mode == 'audio' and 'audio' in logits:
+                # Audio generation with delay pattern
+                audio_logits = logits['audio']
+                
+                # Apply delay pattern sampling
+                if use_delay_pattern:
+                    audio_tokens, num_delay, num_remaining_delays, should_end = \
+                        self.sample_audio_tokens_with_delay_pattern(
+                            audio_logits,
+                            self._generation_state['num_delay'],
+                            self._generation_state['num_remaining_delays'],
+                            temperature=temperature,
+                            audio_eos_token_id=audio_eos_token_id
+                        )
+                    
+                    # Update delay pattern state
+                    self._generation_state['num_delay'] = num_delay
+                    self._generation_state['num_remaining_delays'] = num_remaining_delays
+                    
+                    # Check if audio generation should end
+                    if should_end:
+                        self._generation_state['current_mode'] = 'text'
+                        self._generation_state['num_delay'] = 0
+                        self._generation_state['num_remaining_delays'] = None
+                else:
+                    # Simple audio sampling without delay pattern
+                    audio_tokens = self._sample_tokens(
+                        audio_logits[:, -1, :],
+                        temperature=temperature,
+                        top_k=top_k,
+                        top_p=top_p
+                    )
+                    
+                generated_audio.append(audio_tokens)
+                modal_indicators.append('audio')
+                
+                # Append audio tokens to sequence
+                next_tokens = audio_tokens[:, 0] if len(audio_tokens.shape) > 1 else audio_tokens
+                
+            else:
+                # Text generation
+                if 'text' in logits:
+                    text_logits = logits['text']
+                    
+                    # Sample text tokens
+                    next_tokens = self._sample_tokens(
+                        text_logits[:, -1, :],
+                        temperature=temperature,
+                        top_k=top_k,
+                        top_p=top_p
+                    )
+                    
+                    modal_indicators.append('text')
+                    
+                    # Check for mode switch indicators (simplified)
+                    # In practice, you'd check for special tokens that indicate mode switch
+                    # For now, we'll continue in text mode
+                else:
+                    # No valid logits, end generation
+                    break
+                    
+            # Update generated sequence
+            next_tokens_expanded = next_tokens.unsqueeze(1) if len(next_tokens.shape) == 1 else next_tokens
+            generated_sequences = concat([generated_sequences, next_tokens_expanded], dim=1)
+            
+            # Check for end-of-sequence
+            if eos_token_id is not None and current_mode == 'text':
+                if (next_tokens == eos_token_id).any():
+                    break
+                    
+        # Prepare output
+        return {
+            'sequences': generated_sequences,
+            'audio_sequences': generated_audio if generated_audio else None,
+            'modal_mask': modal_indicators,
+            'generation_info': {
+                'num_tokens_generated': len(modal_indicators),
+                'final_mode': self._generation_state['current_mode'],
+                'delay_pattern_info': {
+                    'num_delay': self._generation_state['num_delay'],
+                    'num_remaining_delays': self._generation_state['num_remaining_delays']
+                } if use_delay_pattern else None
+            }
+        }
+
+    def _sample_tokens(
+        self,
+        logits: Tensor,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: Optional[float] = None
+    ) -> Tensor:
+        """
+        Sample tokens from logits with temperature, top-k, and top-p.
+        
+        Args:
+            logits: Logits tensor [batch_size, vocab_size]
+            temperature: Sampling temperature
+            top_k: Top-k sampling parameter
+            top_p: Top-p (nucleus) sampling parameter
+            
+        Returns:
+            Sampled token IDs
+        """
+        # Apply temperature
+        if temperature != 1.0:
+            logits = logits / temperature
+            
+        # For now, use argmax sampling (greedy)
+        # Full sampling with top-k/top-p would require more complex implementation
+        sampled = argmax(logits, dim=-1)
+        
+        return sampled

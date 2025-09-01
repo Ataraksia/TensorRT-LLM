@@ -1,0 +1,193 @@
+{
+  "requests": [
+    {
+      "requestId": "req-1",
+      "originalRequest": "Implement complete multimodal generation for HiggsAudio model with delay pattern support, including examining multimodal_model_runner for guidance, handling audio+text input/output, completing delay pattern implementation, and modifying basic_tts.py to work with the new systems",
+      "splitDetails": "Implement complete multimodal generation for HiggsAudio model with delay pattern support, including examining multimodal_model_runner for guidance, handling audio+text input/output, completing delay pattern implementation, and modifying basic_tts.py to work with the new systems",
+      "tasks": [
+        {
+          "id": "task-4",
+          "title": "Analyze multimodal_model_runner implementation",
+          "description": "Examine the existing multimodal_model_runner class to understand how multimodal generation is handled in TensorRT-LLM, focusing on input/output handling, generation loops, and state management",
+          "done": false,
+          "approved": false,
+          "completedDetails": "",
+          "subtasks": [
+            {
+              "id": "subtask-2",
+              "title": "Study MultimodalModelRunner class structure",
+              "description": "Read and understand the main class structure, initialization, and key methods",
+              "done": false
+            },
+            {
+              "id": "subtask-3",
+              "title": "Analyze generation flow for multimodal models",
+              "description": "Understand how multimodal inputs are processed and how generation handles multiple modalities",
+              "done": false
+            },
+            {
+              "id": "subtask-4",
+              "title": "Identify patterns for audio+text handling",
+              "description": "Find relevant patterns for handling both audio and text inputs/outputs simultaneously",
+              "done": false
+            }
+          ]
+        },
+        {
+          "id": "task-9",
+          "title": "Implement multimodal generation in HiggsAudio model",
+          "description": "Create a complete generation implementation that handles both audio and text inputs/outputs, integrating with TensorRT-LLM's generation pipeline",
+          "done": false,
+          "approved": false,
+          "completedDetails": "",
+          "subtasks": [
+            {
+              "id": "subtask-6",
+              "title": "Implement audio feature preprocessing",
+              "description": "Add methods to process audio inputs and prepare them for the model",
+              "done": false
+            },
+            {
+              "id": "subtask-7",
+              "title": "Create multimodal forward pass",
+              "description": "Implement forward method that handles both audio features and text tokens",
+              "done": false
+            },
+            {
+              "id": "subtask-8",
+              "title": "Implement generation loop with modal switching",
+              "description": "Create generation logic that switches between text and audio generation modes",
+              "done": false
+            },
+            {
+              "id": "subtask-9",
+              "title": "Add audio token decoding support",
+              "description": "Implement methods to decode generated audio tokens back to audio features",
+              "done": false
+            }
+          ]
+        },
+        {
+          "id": "task-13",
+          "title": "Complete delay pattern implementation",
+          "description": "Finalize the delay pattern system for coordinated multi-codebook audio generation",
+          "done": false,
+          "approved": false,
+          "completedDetails": "",
+          "subtasks": [
+            {
+              "id": "subtask-11",
+              "title": "Integrate delay pattern with generation loop",
+              "description": "Connect delay pattern logic with the main generation flow",
+              "done": false
+            },
+            {
+              "id": "subtask-12",
+              "title": "Add delay state management",
+              "description": "Implement proper state tracking for delay counters throughout generation",
+              "done": false
+            },
+            {
+              "id": "subtask-13",
+              "title": "Test delay pattern transitions",
+              "description": "Verify delay pattern correctly handles start, progress, and end states",
+              "done": false
+            }
+          ]
+        },
+        {
+          "id": "task-17",
+          "title": "Link generation and delay pattern systems",
+          "description": "Integrate the multimodal generation with delay pattern to create a unified system",
+          "done": false,
+          "approved": false,
+          "completedDetails": "",
+          "subtasks": [
+            {
+              "id": "subtask-15",
+              "title": "Connect modal detection with delay pattern",
+              "description": "Ensure audio mode detection triggers delay pattern initialization",
+              "done": false
+            },
+            {
+              "id": "subtask-16",
+              "title": "Synchronize audio token generation with delays",
+              "description": "Make sure audio tokens are generated respecting the delay pattern",
+              "done": false
+            },
+            {
+              "id": "subtask-17",
+              "title": "Handle mode transitions with delay state",
+              "description": "Properly manage delay state when switching between text and audio modes",
+              "done": false
+            }
+          ]
+        },
+        {
+          "id": "task-22",
+          "title": "Update basic_tts.py for new generation system",
+          "description": "Modify the basic_tts.py example to work with the new multimodal generation and delay pattern",
+          "done": false,
+          "approved": false,
+          "completedDetails": "",
+          "subtasks": [
+            {
+              "id": "subtask-19",
+              "title": "Update imports and initialization",
+              "description": "Add necessary imports and initialize model with new configuration",
+              "done": false
+            },
+            {
+              "id": "subtask-20",
+              "title": "Implement audio preprocessing pipeline",
+              "description": "Add code to process audio inputs before feeding to model",
+              "done": false
+            },
+            {
+              "id": "subtask-21",
+              "title": "Update generation calls",
+              "description": "Modify generation calls to use new multimodal generation methods",
+              "done": false
+            },
+            {
+              "id": "subtask-22",
+              "title": "Add audio postprocessing",
+              "description": "Implement audio reconstruction from generated tokens",
+              "done": false
+            }
+          ]
+        },
+        {
+          "id": "task-26",
+          "title": "Test and validate complete implementation",
+          "description": "Verify the entire system works correctly with audio+text input/output and delay patterns",
+          "done": false,
+          "approved": false,
+          "completedDetails": "",
+          "subtasks": [
+            {
+              "id": "subtask-24",
+              "title": "Test multimodal input processing",
+              "description": "Verify audio and text inputs are correctly processed",
+              "done": false
+            },
+            {
+              "id": "subtask-25",
+              "title": "Validate generation with delay patterns",
+              "description": "Ensure audio generation follows the delay pattern correctly",
+              "done": false
+            },
+            {
+              "id": "subtask-26",
+              "title": "Test end-to-end TTS pipeline",
+              "description": "Run basic_tts.py to verify complete functionality",
+              "done": false
+            }
+          ]
+        }
+      ],
+      "completed": false,
+      "notes": []
+    }
+  ]
+}
