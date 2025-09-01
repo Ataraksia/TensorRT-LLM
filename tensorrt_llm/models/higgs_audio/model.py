@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 import torch
 import random
-from tensorrt_llm.functional import Tensor, gelu, layer_norm, embedding, conv1d, default_net, gather_last_token_logits, AttentionMaskType, PositionEmbeddingType, constant, where, send, recv, cast, arange, unsqueeze, expand, lt, max as trt_max, full, concat
+from tensorrt_llm.functional import Tensor, gelu, layer_norm, embedding, conv1d, default_net, gather_last_token_logits, AttentionMaskType, PositionEmbeddingType, constant, where, send, recv, cast, arange, unsqueeze, expand, lt, max as trt_max, full, concat, argmax, softmax, topk, multinomial
 from tensorrt_llm.layers import Conv1d, Embedding, LayerNorm, Attention, MLP
 from tensorrt_llm.module import Module, ModuleList
 from tensorrt_llm.parameter import Parameter
@@ -20,7 +20,9 @@ from tensorrt_llm.layers import (MLP, Attention, ColumnLinear, Embedding,
                                  GatedMLP, RmsNorm, PromptTuningEmbedding)
 #lm_headfrom tensorrt_llm._torch.models.modeling_llama import LlamaAttention
 from tensorrt_llm.models import PretrainedConfig, PretrainedModel
-from tensorrt_llm.models.modeling_utils import DecoderModelForCausalLM, KeyValueCacheParams, DecoderLayerList
+from tensorrt_llm.quantization import QuantMode
+from tensorrt_llm.mapping import Mapping
+from tensorrt_llm.models.modeling_utils import DecoderModelForCausalLM, KeyValueCacheParams, DecoderLayerList, SpecDecodingParams, LoraParams
 from tensorrt_llm.top_model_mixin import TopModelMixin
 from torch.nn import ModuleList, AvgPool1d
 from .config import HiggsAudioConfig
@@ -1602,12 +1604,16 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             ValueError: If config is incompatible with model requirements
         """
         self.config: HiggsAudioConfig = config
+        # Initialize mapping if not present
+        if not hasattr(self, 'mapping'):
+            self.mapping = config.mapping if hasattr(config, 'mapping') else Mapping()
+        
         self.transformer = HiggsAudioModel(config)
         if self.mapping.is_last_pp_rank():
             self.decoder_projector = HiggsAudioDecoderProjector(config)
             self.lm_head = self.decoder_projector.text_lm_head
         else:
-            lm_head = None
+            self.lm_head = None
             self.decoder_projector = None
 
         # Audio tower integration - Adapted for TensorRT-LLM
@@ -1624,7 +1630,7 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
         self.audio_stream_bos_id = getattr(config, 'audio_stream_bos_id', 0)
         self.audio_stream_eos_id = getattr(config, 'audio_stream_eos_id', 1)
 
-        super().__init__(config, transformer, lm_head)
+        super().__init__(config, self.transformer, self.lm_head if hasattr(self, 'lm_head') else None)
     
     def _apply_delay_pattern_to_audio_tokens(
         self,
@@ -2276,3 +2282,81 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
         sampled = argmax(logits, dim=-1)
         
         return sampled
+
+    def sample_audio_tokens_with_delay_pattern(
+        self,
+        audio_logits: Tensor,
+        num_delay: int,
+        num_remaining_delays: Optional[int],
+        temperature: float = 1.0,
+        audio_eos_token_id: Optional[int] = None
+    ) -> Tuple[Tensor, int, Optional[int], bool]:
+        """
+        Sample audio tokens with delay pattern for multi-codebook generation.
+        
+        Args:
+            audio_logits: Audio logits [batch_size, seq_len, vocab_size, num_codebooks]
+            num_delay: Current delay step
+            num_remaining_delays: Remaining delays to apply
+            temperature: Sampling temperature
+            audio_eos_token_id: Audio end-of-sequence token ID
+            
+        Returns:
+            Tuple of (sampled_tokens, new_num_delay, new_remaining_delays, should_end)
+        """
+        batch_size = audio_logits.shape[0]
+        vocab_size = audio_logits.shape[2] if len(audio_logits.shape) > 2 else audio_logits.shape[1]
+        num_codebooks = audio_logits.shape[3] if len(audio_logits.shape) > 3 else 8
+        
+        # Initialize output tokens
+        sampled_tokens = full([batch_size, num_codebooks], -1, dtype='int32')
+        
+        # Apply delay pattern
+        for cb_idx in range(num_codebooks):
+            if cb_idx <= num_delay:
+                # This codebook is active
+                cb_logits = audio_logits[:, -1, :, cb_idx] if len(audio_logits.shape) > 3 else audio_logits[:, -1, :]
+                tokens = self._sample_tokens(cb_logits, temperature=temperature)
+                sampled_tokens[:, cb_idx] = tokens
+        
+        # Update delay state
+        new_num_delay = min(num_delay + 1, num_codebooks - 1)
+        new_remaining_delays = num_remaining_delays - 1 if num_remaining_delays is not None else None
+        
+        # Check for end condition
+        should_end = False
+        if audio_eos_token_id is not None:
+            # Check if any active codebook has EOS
+            for cb_idx in range(min(num_delay + 1, num_codebooks)):
+                if (sampled_tokens[:, cb_idx] == audio_eos_token_id).any():
+                    should_end = True
+                    break
+        
+        return sampled_tokens, new_num_delay, new_remaining_delays, should_end
+
+    def _apply_delay_pattern_to_audio_tokens(
+        self,
+        audio_tokens: Tensor,
+        delay_pattern_stride: int = 1
+    ) -> Tensor:
+        """
+        Apply delay pattern to audio tokens for synchronized playback.
+        
+        Args:
+            audio_tokens: Audio tokens [batch_size, seq_len, num_codebooks]
+            delay_pattern_stride: Stride for delay pattern
+            
+        Returns:
+            Rearranged audio tokens with delay pattern applied
+        """
+        batch_size, seq_len, num_codebooks = audio_tokens.shape
+        
+        # Create output tensor
+        output = full([batch_size, seq_len + num_codebooks * delay_pattern_stride, num_codebooks], -1, dtype='int32')
+        
+        # Apply delay to each codebook
+        for cb_idx in range(num_codebooks):
+            delay = cb_idx * delay_pattern_stride
+            output[:, delay:delay+seq_len, cb_idx] = audio_tokens[:, :, cb_idx]
+        
+        return output
