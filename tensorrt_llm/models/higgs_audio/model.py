@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 import torch
 import random
-from tensorrt_llm.functional import Tensor, gelu, layer_norm, embedding, conv1d, default_net, gather_last_token_logits, AttentionMaskType, PositionEmbeddingType, constant, where, send, recv, cast, arange, unsqueeze, expand, lt, max as trt_max
+from tensorrt_llm.functional import Tensor, gelu, layer_norm, embedding, conv1d, default_net, gather_last_token_logits, AttentionMaskType, PositionEmbeddingType, constant, where, send, recv, cast, arange, unsqueeze, expand, lt, max as trt_max, full, concat
 from tensorrt_llm.layers import Conv1d, Embedding, LayerNorm, Attention, MLP
 from tensorrt_llm.module import Module, ModuleList
 from tensorrt_llm.parameter import Parameter
@@ -1472,15 +1472,285 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
         else:
             self.audio_tower = None
             self.audio_encoder_proj = None
+        
+        # Initialize delay pattern attributes
+        self.use_delay_pattern = config.use_delay_pattern
+        self.audio_num_codebooks = config.audio_num_codebooks
+        self.audio_stream_bos_id = getattr(config, 'audio_stream_bos_id', 0)
+        self.audio_stream_eos_id = getattr(config, 'audio_stream_eos_id', 1)
 
         super().__init__(config, transformer, lm_head)
+    
+    def _apply_delay_pattern_to_audio_tokens(
+        self,
+        next_audio_tokens: Tensor,
+        num_delay: int,
+        num_remaining_delays: Optional[int],
+        audio_eos_token_id: Optional[int] = None
+    ) -> Tuple[Tensor, int, Optional[int], bool]:
+        """Apply delay pattern to audio tokens for coordinated multi-codebook generation.
+        
+        This implements a linear delay pattern with stride 1, where each codebook
+        starts generating one timestep after the previous one. This ensures proper
+        temporal alignment across RVQ codebooks.
+        
+        Args:
+            next_audio_tokens: Audio tokens for all codebooks [num_codebooks]
+            num_delay: Current delay counter (number of codebooks that have started)
+            num_remaining_delays: Remaining delays to apply (for ending pattern)
+            audio_eos_token_id: Token ID to use when ending audio generation
+            
+        Returns:
+            Tuple of:
+                - Modified audio tokens with delay pattern applied
+                - Updated num_delay counter
+                - Updated num_remaining_delays counter
+                - Boolean indicating if audio generation should end
+        """
+        should_end_audio = False
+        
+        if self.use_delay_pattern:
+            # Apply linear delay pattern with stride 1
+            # Each codebook starts one timestep after the previous one
+            
+            # Start new codebooks if we haven't started all of them yet
+            if num_delay + 1 < self.audio_num_codebooks:
+                # Set all codebooks after the current delay to BOS token
+                # This ensures they haven't started generating yet
+                for i in range(num_delay + 1, self.audio_num_codebooks):
+                    next_audio_tokens = where(
+                        constant(i) < self.audio_num_codebooks,
+                        full([1], self.audio_stream_bos_id, dtype=next_audio_tokens.dtype),
+                        next_audio_tokens
+                    )
+                num_delay += 1
+            
+            # Handle the ending pattern
+            if num_remaining_delays is not None:
+                # Set codebooks that should have ended to EOS token
+                num_ended = self.audio_num_codebooks - num_remaining_delays
+                for i in range(num_ended):
+                    next_audio_tokens = where(
+                        constant(i) < num_ended,
+                        full([1], self.audio_stream_eos_id, dtype=next_audio_tokens.dtype),
+                        next_audio_tokens
+                    )
+                num_remaining_delays -= 1
+            else:
+                # Check if any codebook has generated an EOS token
+                # If so, start the ending pattern
+                has_eos = False
+                for i in range(self.audio_num_codebooks):
+                    token_val = next_audio_tokens
+                    if token_val == self.audio_stream_eos_id:
+                        has_eos = True
+                        last_eos_idx = i
+                        break
+                
+                if has_eos:
+                    # Set all codebooks before the last EOS to EOS
+                    for i in range(last_eos_idx):
+                        next_audio_tokens = where(
+                            constant(i) < last_eos_idx,
+                            full([1], self.audio_stream_eos_id, dtype=next_audio_tokens.dtype),
+                            next_audio_tokens
+                        )
+                    num_remaining_delays = self.audio_num_codebooks - last_eos_idx - 1
+            
+            # Check if we should end audio generation
+            if num_remaining_delays is not None and num_remaining_delays <= 0:
+                should_end_audio = True
+                num_delay = 0
+                num_remaining_delays = None
+        
+        return next_audio_tokens, num_delay, num_remaining_delays, should_end_audio
+
+    def sample_audio_tokens_with_delay_pattern(
+        self,
+        audio_logits: Tensor,
+        num_delay: int = 0,
+        num_remaining_delays: Optional[int] = None,
+        temperature: float = 1.0,
+        top_k: Optional[int] = None,
+        top_p: Optional[float] = None,
+        audio_eos_token_id: Optional[int] = None
+    ) -> Tuple[Tensor, int, Optional[int], bool]:
+        """Sample audio tokens from logits and apply delay pattern.
+        
+        This method handles the sampling of audio tokens across multiple codebooks
+        and applies the delay pattern to ensure proper temporal coordination.
+        
+        Args:
+            audio_logits: Logits for audio token generation [batch, num_codebooks, vocab_size]
+            num_delay: Current delay counter
+            num_remaining_delays: Remaining delays for ending pattern
+            temperature: Sampling temperature
+            top_k: Top-k sampling parameter
+            top_p: Top-p (nucleus) sampling parameter
+            audio_eos_token_id: Token ID for ending audio generation
+            
+        Returns:
+            Tuple of:
+                - Sampled audio tokens [num_codebooks]
+                - Updated num_delay
+                - Updated num_remaining_delays
+                - Boolean indicating if audio should end
+        """
+        # For TensorRT-LLM, we need to handle sampling differently
+        # This is a simplified version - in production, you'd use proper sampling
+        
+        # Get the last timestep's logits
+        if len(audio_logits.shape) == 3:
+            # [batch, num_codebooks, vocab_size] -> [num_codebooks, vocab_size]
+            audio_logits = audio_logits[-1, :, :]
+        
+        # Apply temperature if specified
+        if temperature != 1.0:
+            audio_logits = audio_logits / temperature
+        
+        # For now, use argmax (greedy) sampling
+        # In production, you'd implement proper top-k/top-p sampling
+        next_audio_tokens = audio_logits.argmax(dim=-1)
+        
+        # Apply delay pattern
+        next_audio_tokens, num_delay, num_remaining_delays, should_end = \
+            self._apply_delay_pattern_to_audio_tokens(
+                next_audio_tokens,
+                num_delay,
+                num_remaining_delays,
+                audio_eos_token_id
+            )
+        
+        return next_audio_tokens, num_delay, num_remaining_delays, should_end
 
     def prepare_inputs(self, *args, **kwargs):
         """Prepare inputs for generation with TTS-specific handling."""
         inputs = super().prepare_inputs(*args, **kwargs)
-        # Add TTS-specific inputs based on generation mode
+        
+        # Add delay pattern state if in audio generation mode
+        if hasattr(self, '_generation_state'):
+            if self._generation_state.get('mode') == GenerationMode.AUDIO_IN_PROGRESS:
+                inputs['num_delay'] = self._generation_state.get('num_delay', 0)
+                inputs['num_remaining_delays'] = self._generation_state.get('num_remaining_delays', None)
 
         return inputs
+    
+    def generate_with_delay_pattern(
+        self,
+        input_ids: Tensor,
+        max_new_tokens: int = 100,
+        temperature: float = 1.0,
+        use_delay_pattern: bool = True,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Generate audio tokens with delay pattern support.
+        
+        This is a simplified generation method that demonstrates how to use
+        delay patterns during audio generation. In production, this would be
+        integrated with the full TensorRT-LLM generation pipeline.
+        
+        Args:
+            input_ids: Input token IDs
+            max_new_tokens: Maximum number of new tokens to generate
+            temperature: Sampling temperature
+            use_delay_pattern: Whether to apply delay pattern
+            **kwargs: Additional generation parameters
+            
+        Returns:
+            Dictionary containing generated tokens and metadata
+        """
+        # Initialize generation state
+        self._generation_state = {
+            'mode': GenerationMode.TEXT,
+            'num_delay': 0,
+            'num_remaining_delays': None,
+            'audio_sequences': []
+        }
+        
+        # Store original delay pattern setting
+        original_use_delay = self.use_delay_pattern
+        self.use_delay_pattern = use_delay_pattern
+        
+        generated_tokens = []
+        audio_sequences = []
+        
+        try:
+            # This is a simplified generation loop
+            # In production, you'd use the full TensorRT-LLM generation pipeline
+            for _ in range(max_new_tokens):
+                # Forward pass
+                outputs = self.forward(
+                    input_ids=input_ids,
+                    use_cache=True,
+                    audio_out_mask=self._generation_state.get('audio_out_mask')
+                )
+                
+                # Check generation mode based on last token
+                last_token = input_ids[0, -1] if len(input_ids.shape) > 1 else input_ids[-1]
+                
+                # Determine generation mode
+                if last_token == getattr(self.config, 'audio_out_bos_token_id', -1):
+                    self._generation_state['mode'] = GenerationMode.AUDIO_INIT
+                elif last_token == getattr(self.config, 'audio_out_token_idx', -1):
+                    self._generation_state['mode'] = GenerationMode.AUDIO_IN_PROGRESS
+                else:
+                    self._generation_state['mode'] = GenerationMode.TEXT
+                
+                # Handle audio generation with delay pattern
+                if self._generation_state['mode'] == GenerationMode.AUDIO_IN_PROGRESS:
+                    # Get audio logits from decoder projector
+                    _, audio_logits = self.decoder_projector(outputs[0])
+                    
+                    # Sample audio tokens with delay pattern
+                    audio_tokens, num_delay, num_remaining_delays, should_end = \
+                        self.sample_audio_tokens_with_delay_pattern(
+                            audio_logits,
+                            self._generation_state['num_delay'],
+                            self._generation_state['num_remaining_delays'],
+                            temperature=temperature
+                        )
+                    
+                    # Update state
+                    self._generation_state['num_delay'] = num_delay
+                    self._generation_state['num_remaining_delays'] = num_remaining_delays
+                    
+                    # Store audio tokens
+                    audio_sequences.append(audio_tokens)
+                    
+                    # If audio should end, switch back to text mode
+                    if should_end:
+                        self._generation_state['mode'] = GenerationMode.TEXT
+                        # Add audio end token
+                        next_token = constant(getattr(self.config, 'audio_eos_token_id', 2))
+                    else:
+                        # Continue with audio placeholder token
+                        next_token = constant(getattr(self.config, 'audio_out_token_idx', -1))
+                else:
+                    # Text generation - use regular sampling
+                    text_logits, _ = self.decoder_projector(outputs[0])
+                    next_token = text_logits.argmax(dim=-1)
+                
+                # Append token
+                generated_tokens.append(next_token)
+                input_ids = concat([input_ids, next_token.unsqueeze(0)], dim=-1)
+                
+                # Check for end of generation
+                if next_token == getattr(self.config, 'eos_token_id', 2):
+                    break
+        
+        finally:
+            # Restore original setting
+            self.use_delay_pattern = original_use_delay
+        
+        return {
+            'sequences': input_ids,
+            'audio_sequences': audio_sequences,
+            'generated_tokens': generated_tokens,
+            'delay_pattern_info': {
+                'final_num_delay': self._generation_state['num_delay'],
+                'used_delay_pattern': use_delay_pattern
+            }
+        }
 
     @classmethod
     def from_hugging_face(cls,
