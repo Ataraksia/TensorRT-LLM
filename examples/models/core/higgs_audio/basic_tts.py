@@ -11,6 +11,8 @@ Usage:
 """
 import sounddevice as sd
 import os
+import queue
+import threading
 from transformers import AutoTokenizer, AutoProcessor, AutoConfig, AutoModel, AutoModelForCausalLM
 from loguru import logger
 import base64
@@ -21,7 +23,7 @@ from dataclasses import asdict
 import json
 import time
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List, Dict, Any
 import torch
 import numpy as np
 import soundfile as sf
@@ -286,14 +288,17 @@ class HiggsAudioTTS:
         text: str,
         voice_sample: Optional[str] = None,
         temperature: Optional[float] = None,
+        streaming: bool = False,
+        max_new_tokens: int = 1024,
     ) -> np.ndarray:
-        """Generate speech from text.
+        """Generate speech from text using multimodal generation with delay pattern.
 
         Args:
             text: Input text to convert to speech
             voice_sample: Optional path to voice sample for cloning
             temperature: Generation temperature (overrides config default)
             streaming: Enable streaming generation for long texts
+            max_new_tokens: Maximum number of new tokens to generate
         """
         if not self.is_initialized():
             raise RuntimeError("TTS system is not properly initialized. Please check the logs for initialization errors.")
@@ -301,135 +306,168 @@ class HiggsAudioTTS:
         if not text or not text.strip():
             raise ValueError("Input text cannot be empty")
 
-         # Filter for audio tokens only (skip text tokens)
-        audio_start_token = 128013  # <|audio_out_bos|>
-        audio_end_token = 128012    # <|audio_eos|>
-        inputs = {
-            'batch_input_ids': inputs['input_ids'],
-            'max_new_tokens': inputs['max_new_tokens'],
-            'temperature': inputs['temperature'],
-            'top_k': inputs['top_k'],
-            'top_p': inputs['top_p'],
-            'end_id': inputs['end_id'],
-            'pad_id': inputs['pad_id'],
-            'return_dict': inputs['return_dict']
-        }
-        chunk_size = inputs['chunk_size']
-        in_audio_section = False
-
         start_time = time.perf_counter()
 
+        # Prepare inputs with audio features if provided
         audio_features = None
+        audio_feature_attention_mask = None
         if voice_sample:
-            input_ids, _, audio_features, audio_feature_attention_mask = self.prepare_inputs(audio=voice_sample, text=text)
+            input_ids, attention_mask, audio_features, audio_feature_attention_mask = self.prepare_inputs(
+                audio=voice_sample, text=text
+            )
             logger.info(f"Loaded voice features from {voice_sample}")
         else:
-            input_ids, _, _, _ = self.prepare_inputs(audio=None, text=text)
+            input_ids, attention_mask, _, _ = self.prepare_inputs(audio=None, text=text)
     
-        # if isinstance(input_tokens, torch.Tensor):
-        #     input_tokens_cpu = input_tokens.cpu().flatten()
-        #     input_ids_list = [input_tokens_cpu]
-        # else:
-        #     input_tokens_tensor = torch.tensor(input_tokens, dtype=torch.int32)
-        #     input_ids_list = [input_tokens_tensor]
-        # input_ids = input_tokens.unsqueeze(0)  # Keep tensor version for compatibility
-
-        # Add voice conditioning if available
-        if audio_features is not None:
-            # Encode voice features
-            encoded_features = self.audio_tokenizer.encode(
-                input=audio_features,
-                sr=self.audio_tokenizer.sampling_rate,
-            )
-        
-        inputs = {  
-            batch_input_ids=input_ids,
-            max_new_tokens=max_new_tokens,
-            temperature=1.0,        
-            top_k=50,
-            top_p=0.95,
-            end_id=self.config.eos_token_id,
-            pad_id=self.config.pad_token_id,
-            chunk_size=32,
-            return_dict=True,
+        # Prepare generation parameters
+        generation_params = {
+            'batch_input_ids': input_ids,
+            'max_new_tokens': max_new_tokens,
+            'temperature': temperature or 1.0,
+            'top_k': 50,
+            'top_p': 0.95,
+            'end_id': self.config.eos_token_id,
+            'pad_id': self.config.pad_token_id,
+            'return_dict': True,
+            'use_delay_pattern': True,  # Enable delay pattern for audio generation
         }
+        
+        # Add audio features if available
+        if audio_features is not None:
+            generation_params['audio_features'] = audio_features
+            generation_params['audio_feature_attention_mask'] = audio_feature_attention_mask
+            
+        # Special tokens for audio generation
+        audio_start_token = self.config.audio_stream_bos_id  # <|audio_out_bos|>
+        audio_end_token = self.config.audio_stream_eos_id    # <|audio_eos|>
 
+        if streaming:
+            return self._generate_streaming(generation_params, audio_start_token, audio_end_token, start_time)
+        else:
+            return self._generate_batch(generation_params, audio_start_token, audio_end_token, start_time)
+
+    def _generate_batch(self, generation_params: Dict[str, Any], audio_start_token: int, audio_end_token: int, start_time: float) -> np.ndarray:
+        """Perform batch generation using multimodal generation with delay pattern."""
+        # Use the multimodal generation method from the model
+        with torch.no_grad():
+            # Run generation
+            outputs = self.engine_runner.generate(**generation_params)
+            
+            # Extract audio tokens from the generated sequence
+            generated_ids = outputs['output_ids'][0] if isinstance(outputs, dict) else outputs[0]
+            
+            # Find audio section in generated tokens
+            audio_tokens = []
+            in_audio_section = False
+            
+            for token_id in generated_ids:
+                if token_id == audio_start_token:
+                    in_audio_section = True
+                    continue
+                elif token_id == audio_end_token:
+                    in_audio_section = False
+                    break
+                elif in_audio_section:
+                    audio_tokens.append(token_id)
+            
+            # Decode audio tokens to waveform
+            if audio_tokens:
+                audio_tokens_tensor = torch.tensor(audio_tokens, dtype=torch.long)
+                audio_waveform = self.audio_tokenizer.decode(audio_tokens_tensor)
+                
+                # Convert to numpy array if needed
+                if isinstance(audio_waveform, torch.Tensor):
+                    audio_waveform = audio_waveform.cpu().numpy()
+                
+                # Update performance stats
+                generation_time = (time.perf_counter() - start_time) * 1000
+                self._update_stats(generation_time)
+                
+                logger.info(f"Generated {len(audio_waveform) / self.audio_tokenizer.sampling_rate:.2f}s of audio")
+                return audio_waveform
+            else:
+                logger.warning("No audio tokens generated")
+                return np.array([])
+    
+    def _generate_streaming(self, generation_params: Dict[str, Any], audio_start_token: int, audio_end_token: int, start_time: float) -> np.ndarray:
+        """Perform streaming generation with playback."""
         # Audio playback queue
         playback_queue = queue.Queue()
         playback_active = threading.Event()
         playback_active.set()
-        
-        # Default playback callback (logs audio info)
-        if playback_callback is None:
-            def default_playback(chunk: np.ndarray):
-                sd.play(chunk.audio_data, self.audio_tokenizer.sampling_rate)
-                sd.wait()
-            
-            playback_callback = default_playback
+        audio_chunks = []
         
         # Playback thread
         def playback_worker():
             while playback_active.is_set() or not playback_queue.empty():
                 try:
                     chunk = playback_queue.get(timeout=0.1)
-                    playback_callback(chunk)
+                    if chunk is not None and len(chunk) > 0:
+                        sd.play(chunk, self.audio_tokenizer.sampling_rate)
+                        sd.wait()
                     playback_queue.task_done()
                 except queue.Empty:
                     continue
         
         playback_thread = threading.Thread(target=playback_worker, daemon=True)
         playback_thread.start()
-        # Stream and queue audio chunks
-        chunk_start_time = time.perf_counter()
-
-        ##Split text into segments for streaming
-        #chunk_size = inputs['chunk_size']
-        #text_segments = self._split_text_for_streaming(text, chunk_size)
-
-        for chunk in self.engine_runner.generate(**inputs):
-            if not in_audio_section:
-                for i, token in enumerate(chunk):
-                    if token == audio_start_token:
-                        in_audio_section = True
-                        chunk = chunk[i+1:]
-                        break
-            if in_audio_section:
-                for i, token in enumerate(chunk):
-                    if token == audio_end_token:
-                        in_audio_section = False
-                        chunk = chunk[:i]
-                        break
-                    
-            chunk_audio = self.audio_tokenizer.decode(chunk)
-            # Add to playback queue
-            playback_queue.put(chunk_audio)
-
-            # Monitor buffer health
-            buffer_size = playback_queue.qsize()
-            if buffer_size > self.streaming_config.buffer_size * 0.8:
-                logger.warning(f"Playback buffer filling up: {buffer_size} chunks")
-            elif buffer_size == 0 and not chunk.is_final:
-                logger.warning("Buffer underrun detected")
-                self.streaming_stats.buffer_underruns += 1
-            
-            # Calculate timing
-            generation_time = (time.perf_counter() - chunk_start_time) * 1000
-            #chunk_duration = len(chunk_audio) / 24000
         
+        # Stream generation
+        in_audio_section = False
+        audio_token_buffer = []
+        
+        with torch.no_grad():
+            # Run streaming generation
+            generation_params['streaming'] = True
+            for chunk in self.engine_runner.generate(**generation_params):
+                for token_id in chunk:
+                    if token_id == audio_start_token:
+                        in_audio_section = True
+                        continue
+                    elif token_id == audio_end_token:
+                        in_audio_section = False
+                        # Decode and play remaining buffer
+                        if audio_token_buffer:
+                            audio_chunk = self._decode_audio_tokens(audio_token_buffer)
+                            audio_chunks.append(audio_chunk)
+                            playback_queue.put(audio_chunk)
+                            audio_token_buffer = []
+                        break
+                    elif in_audio_section:
+                        audio_token_buffer.append(token_id)
+                        
+                        # Decode and play when buffer is large enough
+                        if len(audio_token_buffer) >= 32:  # Chunk size for streaming
+                            audio_chunk = self._decode_audio_tokens(audio_token_buffer)
+                            audio_chunks.append(audio_chunk)
+                            playback_queue.put(audio_chunk)
+                            audio_token_buffer = []
 
         # Wait for playback to finish
         playback_queue.join()
         playback_active.clear()
         playback_thread.join(timeout=5.0)
         
-        logger.info("Live playback completed")
-            
+        logger.info("Streaming playback completed")
+        
         # Concatenate all chunks
-        #return np.concatenate(audio_chunks) if audio_chunks else np.array([])
-
-        # Update performance stats
-        generation_time = (time.perf_counter() - start_time) * 1000
-        self._update_stats(generation_time)
+        if audio_chunks:
+            full_audio = np.concatenate(audio_chunks)
+            generation_time = (time.perf_counter() - start_time) * 1000
+            self._update_stats(generation_time)
+            return full_audio
+        else:
+            return np.array([])
+    
+    def _decode_audio_tokens(self, tokens: List[int]) -> np.ndarray:
+        """Decode audio tokens to waveform."""
+        tokens_tensor = torch.tensor(tokens, dtype=torch.long)
+        audio_waveform = self.audio_tokenizer.decode(tokens_tensor)
+        
+        if isinstance(audio_waveform, torch.Tensor):
+            audio_waveform = audio_waveform.cpu().numpy()
+        
+        return audio_waveform
 
     
     def prepare_inputs(self, audio=None, text=None):
@@ -682,15 +720,20 @@ def main():
 
     logger.info(f"Generating speech for: '{args.text[:100]}{'...' if len(args.text) > 100 else ''}'")
 
-    tts.generate(
+    # Generate audio using multimodal generation with delay pattern
+    audio = tts.generate(
         text=args.text,
         voice_sample=args.voice_sample,
         temperature=args.temperature,
-        streaming=args.streaming
+        streaming=args.streaming,
+        max_new_tokens=args.max_len // 2  # Approximate token count
     )
 
     # Save output
-    tts.save_audio(audio, args.output)
+    if audio is not None and len(audio) > 0:
+        tts.save_audio(audio, args.output)
+    else:
+        logger.error("No audio was generated")
 
     # Print performance stats
     stats = tts.get_performance_stats()
@@ -724,7 +767,7 @@ def run_benchmark(tts: HiggsAudioTTS):
         times = []
         for _ in range(5):
             start = time.perf_counter()
-            audio = tts.generate_speech(text)
+            audio = tts.generate(text, streaming=False)  # Use the correct method name
             duration = (time.perf_counter() - start) * 1000
             times.append(duration)
         
