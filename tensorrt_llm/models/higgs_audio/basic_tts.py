@@ -22,12 +22,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import jiwer
 import librosa
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
 import torch
-from transformers import AutoTokenizer
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, AutoTokenizer, pipeline
 
 from tensorrt_llm._utils import to_json_file
 from tensorrt_llm.builder import Builder
@@ -44,8 +45,7 @@ from tensorrt_llm.models.higgs_audio.higgs_audio_collator import HiggsAudioSampl
 from tensorrt_llm.network import net_guard
 from tensorrt_llm.plugin import PluginConfig
 
-sys.path.append("/home/me/TTS/higgs-audio")  # Add the directory to the search path
-from boson_multimodal.model.higgs_audio import *  # noqa: F403
+from boson_multimodal import *
 
 from tensorrt_llm import logger
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
@@ -895,19 +895,19 @@ def main():
         help="Enable streaming generation for long texts",
     )
     parser.add_argument(
-        "--device", 
-        type=str, 
-        default="cuda:0", 
+        "--device",
+        type=str,
+        default="cuda:0",
         help="Device to run inference on"
     )
     parser.add_argument(
-        "--benchmark", 
-        action="store_true", 
+        "--benchmark",
+        action="store_true",
         help="Run performance benchmark"
     )
     parser.add_argument(
         "--test",
-        action="store_true", 
+        action="store_true",
         help="Test the speech output"
     )
     parser.add_argument(
@@ -980,20 +980,40 @@ def run_test(tts: HiggsAudioTTS):
     test_inputs = [
         "Short test.",
         "This is a medium length test sentence for benchmarking.",
-        (
-            "This is a longer test sentence that will be used to benchmark the performance of the "
-            "Higgs Audio TTS system with various text lengths and complexity levels."
-        )
+        "This is a longer test sentence that will be used to benchmark the performance of the Higgs Audio TTS system with various text lengths and complexity levels."
     ]
+    voice_sample = "/home/me/TTS/AussieGirl.wav"
 
+    model_id = "openai/whisper-large-v3-turbo"
+    model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id)
+    processor = AutoProcessor.from_pretrained(model_id)
 
+    pipe = pipeline(
+        "automatic-speech-recognition",
+        model=model,
+        tokenizer=processor.tokenizer,
+        feature_extractor=processor.feature_extractor,
+        return_timestamps=True
+    )
+    avg_wer = 0.0
     for i, inputs in enumerate(test_inputs):
         logger.info(f"Test {i + 1}/{len(test_inputs)}: {inputs['text']}")
-        audio = tts.generate(**inputs)
-        if audio is not None:
-            tts.save_audio(audio, f"test_output_{i + 1}.wav")
-        else:
-            logger.error("No audio was generated")
+        audio = tts.generate(
+            text=inputs['text'],
+            voice_sample=voice_sample,
+            max_new_tokens=1024
+        )
+        actual_transcription = pipe(audio).strip()
+        expected_transcription = inputs["text"]
+        # Calculate the word error rate
+        word_error_rate = jiwer.wer((expected_transcription),
+                                    (actual_transcription))
+        print(f"Expected: {expected_transcription}")
+        print(f"Actual: {actual_transcription}")
+        avg_wer += word_error_rate
+
+    avg_wer /= len(test_inputs)
+    print(f"Average word error rate: {avg_wer}")
 
 # TODO: Add TTFT
 def run_benchmark(tts: HiggsAudioTTS):
