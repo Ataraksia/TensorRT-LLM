@@ -2,7 +2,12 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../higgs-audio"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.pythonPath": "/home/me/TTS/TensorRT-LLM/.venv/bin/python"
+	}
 }

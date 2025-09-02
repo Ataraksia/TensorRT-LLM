@@ -78,7 +78,7 @@ class LlavaNextUtils:
             if effective_resolution > max_effective_resolution or (
                     effective_resolution == max_effective_resolution
                     and wasted_resolution < min_wasted_resolution):
-                max_effective_resolution = effective_resolution
+                max_effective_resolution: int = effective_resolution
                 min_wasted_resolution = wasted_resolution
                 best_fit = (width, height)
 

@@ -98,7 +98,7 @@ class HiggsAudioConfig(PretrainedConfig):
         encode_whisper_embed: bool = True,
         encode_audio_in_tokens: bool = True,
         use_delay_pattern: bool = True,
-        skip_audio_tower: bool = True,
+        skip_audio_tower: bool = False,
         use_audio_out_embed_projector: bool = False,
         use_audio_out_self_attention: bool = False,
         audio_num_codebooks: int = 8,
