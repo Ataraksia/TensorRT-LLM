@@ -894,8 +894,22 @@ def main():
         action="store_true",
         help="Enable streaming generation for long texts",
     )
-    parser.add_argument("--device", type=str, default="cuda:0", help="Device to run inference on")
-    parser.add_argument("--benchmark", action="store_true", help="Run performance benchmark")
+    parser.add_argument(
+        "--device", 
+        type=str, 
+        default="cuda:0", 
+        help="Device to run inference on"
+    )
+    parser.add_argument(
+        "--benchmark", 
+        action="store_true", 
+        help="Run performance benchmark"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true", 
+        help="Test the speech output"
+    )
     parser.add_argument(
         "--force_rebuild",
         action="store_true",
@@ -925,6 +939,9 @@ def main():
     # Run benchmark if requested
     if args.benchmark:
         run_benchmark(tts)
+        return
+    if args.test:
+        run_test(tts=tts)
         return
 
     logger.info(
@@ -957,6 +974,26 @@ def main():
 
     return 0
 
+def run_test(tts: HiggsAudioTTS):
+    """Test speech generation with sample inputs."""
+    logger.info("Testing speech generation...")
+    test_inputs = [
+        "Short test.",
+        "This is a medium length test sentence for benchmarking.",
+        (
+            "This is a longer test sentence that will be used to benchmark the performance of the "
+            "Higgs Audio TTS system with various text lengths and complexity levels."
+        )
+    ]
+
+
+    for i, inputs in enumerate(test_inputs):
+        logger.info(f"Test {i + 1}/{len(test_inputs)}: {inputs['text']}")
+        audio = tts.generate(**inputs)
+        if audio is not None:
+            tts.save_audio(audio, f"test_output_{i + 1}.wav")
+        else:
+            logger.error("No audio was generated")
 
 # TODO: Add TTFT
 def run_benchmark(tts: HiggsAudioTTS):
