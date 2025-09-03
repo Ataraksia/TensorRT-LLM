@@ -14,16 +14,8 @@
 # limitations under the License.
 import torch
 
-from tensorrt_llm.layers import (
-    GELU,
-    MLP,
-    Attention,
-    AvgPool1d,
-    Conv1d,
-    Embedding,
-    LayerNorm,
-    Linear,
-)
+from tensorrt_llm.functional import gelu
+from tensorrt_llm.layers import MLP, Attention, Conv1d, Embedding, LayerNorm, Linear
 from tensorrt_llm.module import Module, ModuleList
 
 from .config import HiggsAudioConfig
@@ -111,7 +103,7 @@ class HiggsAudioEncoder(Module):
         self.conv1 = Conv1d(self.num_mel_bins, self.embed_dim, kernel_size=3, padding=1)
         self.conv2 = Conv1d(self.embed_dim, self.embed_dim, kernel_size=3, stride=2, padding=1)
 
-        self.gelu = GELU()
+        # Using functional gelu; no module needed
 
         self.embed_positions = Embedding(self.config.max_source_positions, self.embed_dim)
 
@@ -121,17 +113,15 @@ class HiggsAudioEncoder(Module):
 
         self.layer_norm = LayerNorm(normalized_shape=self.embed_dim, dtype=self.dtype)
 
-        self.avg_pooler = AvgPool1d(kernel_size=2, stride=2)
-
         self.gradient_checkpointing = False
 
     def forward(self, inputs, input_lengths=None, use_flash_attn=True, return_projected=True):
         # TODO: Add zero-shape tensor support
 
         hidden_states = self.conv1(inputs)
-        hidden_states = self.gelu(hidden_states)
+        hidden_states = gelu(hidden_states)
         hidden_states = self.conv2(hidden_states)
-        hidden_states = self.gelu(hidden_states)
+        hidden_states = gelu(hidden_states)
 
         hidden_states = hidden_states.permute(0, 2, 1)
 
@@ -148,8 +138,6 @@ class HiggsAudioEncoder(Module):
 
         hidden_states = self.layer_norm(hidden_states)
 
-        hidden_states = hidden_states.permute(0, 2, 1)
-        hidden_states = self.avg_pooler(hidden_states)
-        hidden_states = hidden_states.permute(0, 2, 1)
+        # Optional temporal pooling removed for now to avoid dependency on AvgPool1d
 
         return hidden_states

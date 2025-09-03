@@ -36,7 +36,8 @@ class PartiallyFrozenEmbedding(Module):
             for idx in freeze_indices:
                 if 0 <= idx < num_embeddings:
                     mask[idx] = True
-        self.register_buffer("freeze_mask", mask, persistent=True)
+        # Store mask as simple attribute since TensorRT-LLM Module doesn't have register_buffer
+        self.freeze_mask = mask
 
         # Register a hook to zero out gradients for frozen rows
         def _grad_mask_hook(grad: torch.Tensor) -> torch.Tensor:
