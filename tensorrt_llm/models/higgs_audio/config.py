@@ -21,6 +21,7 @@ The model includes:
 - HiggsAudioEncoderConfig: Configuration for the Whisper-based audio encoder
 """
 
+import json
 from typing import Dict, Optional, Union
 
 from ..modeling_utils import PretrainedConfig
@@ -168,6 +169,41 @@ class HiggsAudioEncoderConfig(PretrainedConfig):
                 f"{valid_activations}. Please ensure it's supported by your implementation.",
                 UserWarning,
             )
+
+    def to_dict(self) -> Dict:
+        """Convert configuration to dictionary."""
+        output = super().to_dict()
+
+        # Add audio encoder specific attributes
+        output.update(
+            {
+                "num_mel_bins": self.num_mel_bins,
+                "encoder_layers": self.encoder_layers,
+                "encoder_attention_heads": self.encoder_attention_heads,
+                "encoder_ffn_dim": self.encoder_ffn_dim,
+                "encoder_layerdrop": self.encoder_layerdrop,
+                "d_model": self.d_model,
+                "dropout": self.dropout,
+                "attention_dropout": self.attention_dropout,
+                "activation_function": self.activation_function,
+                "activation_dropout": self.activation_dropout,
+                "scale_embedding": self.scale_embedding,
+                "init_std": self.init_std,
+                "max_source_positions": self.max_source_positions,
+                "pad_token_id": self.pad_token_id,
+            }
+        )
+
+        return output
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict) -> "HiggsAudioEncoderConfig":
+        """Create configuration from dictionary."""
+        return cls(**config_dict)
+
+    def to_json_string(self):
+        """Return JSON string representation of the config."""
+        return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
 class HiggsAudioConfig(PretrainedConfig):
@@ -531,6 +567,9 @@ class HiggsAudioConfig(PretrainedConfig):
             if hasattr(self, attr):
                 output[attr] = getattr(self, attr)
 
+        # Ensure model_type is included
+        output["model_type"] = self.model_type
+
         return output
 
     @classmethod
@@ -572,3 +611,8 @@ class HiggsAudioConfig(PretrainedConfig):
     def model_type(self) -> str:
         """Return model type for HuggingFace compatibility."""
         return self.architecture
+
+    @classmethod
+    def from_json_string(cls, json_string: str):
+        """Create a new config from a JSON string."""
+        return cls.from_dict(json.loads(json_string))

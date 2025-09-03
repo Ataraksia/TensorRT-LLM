@@ -51,7 +51,8 @@ setuptools<80
 ordered-set
 peft
 einops
-flashinfer-python==0.2.5+cu128torch2.7
+# flashinfer-python==0.2.5+cu128torch2.7
+flashinfer-python
 opencv-python-headless
 xgrammar
 llguidance==0.7.29
@@ -67,3 +68,4 @@ soundfile
 triton==3.3.1; platform_machine == "x86_64"
 tiktoken
 blobfile
+boson-multimodal
