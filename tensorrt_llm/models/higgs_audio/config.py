@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from re import S
 from typing import Optional, Union, Dict, Any, List
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models.convert_utils import infer_dtype
@@ -19,7 +20,7 @@ class HiggsAudioConfig(PretrainedConfig):
 
     The underlying architecture consists of:
     - Text backbone: Llama-like transformer for language modeling
-    - Audio encoder: Whisper-like architecture for audio feature extraction  
+    - Audio encoder: Whisper-like architecture for audio feature extraction
     - Fusion mechanism: Prompt table integration for audio-text generation
     - TTS optimizations: Real-time performance and streaming support
 
@@ -93,7 +94,7 @@ class HiggsAudioConfig(PretrainedConfig):
         # Audio-text fusion and token parameters
         audio_adapter_type: str = "dual_ffn_fast_forward",
         audio_embed_avg: bool = False,
-        audio_dual_ffn_layers: Optional[List[int]] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27],   
+        audio_dual_ffn_layers: Optional[List[int]] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27],
         audio_decoder_proj_num_layers: int = 0,
         encode_whisper_embed: bool = True,
         encode_audio_in_tokens: bool = True,
@@ -105,10 +106,16 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_codebook_size: int = 1024,
         audio_in_token_idx: int = 128015,
         audio_out_token_idx: int = 128016,
+        audio_in_token: str = "<|AUDIO|>",
+        audio_out_token: str = "<|AUDIO_OUT|>",
         audio_stream_bos_id: int = 1024,
         audio_stream_eos_id: int = 1025,
+        audio_bos_token_id: int = 128011,
         audio_out_bos_token_id: int = 128013,
         audio_eos_token_id: int = 128012,
+        audio_bos_token: str = "<|audio_bos|>",
+        audio_out_bos_token: str = "<|audio_out_bos|>",
+        audio_eos_token: str = "<|audio_eos|>",
         bos_token_id: int = 128000,
         eos_token_id: int = 128001,
         pad_token_id: int = 128001,
@@ -117,7 +124,7 @@ class HiggsAudioConfig(PretrainedConfig):
         cuda_graph_enable: bool = True,
         cuda_graph_enable_streaming: bool = True,
         cuda_graph_enable_delay_patterns: bool = True,
-        
+
         # TTS-specific batch sizes and sequence lengths for graph optimization
         cuda_graph_tts_batch_sizes: List[int] = [1],
         cuda_graph_tts_sequence_lengths: List[int] = [1024],
@@ -127,15 +134,15 @@ class HiggsAudioConfig(PretrainedConfig):
         # Performance optimization settings
         cuda_graph_enable_performance_monitoring: bool = True,
         cuda_graph_fallback_enabled: bool = True,
-        
+
         # DualFFN-specific graph optimization
         cuda_graph_dualffn_separate_graphs: bool = True,
         cuda_graph_dualffn_audio_text_ratio_threshold: float = 0.3,
-        
+
         # Delay pattern optimization for RVQ multi-codebook coordination
         cuda_graph_delay_pattern_max_codebooks: int = 16,
         cuda_graph_delay_pattern_optimization_enabled: bool = True,
-        
+
         cuda_graph_validation_enabled: bool = True,
         # TensorRT-LLM common parameters
         memory_efficient_build: bool = True,
@@ -240,34 +247,40 @@ class HiggsAudioConfig(PretrainedConfig):
         self.audio_codebook_size = audio_codebook_size
         self.audio_in_token_idx = audio_in_token_idx
         self.audio_out_token_idx = audio_out_token_idx
+        self.audio_in_token = audio_in_token
+        self.audio_out_token = audio_out_token
         self.audio_stream_bos_id = audio_stream_bos_id
         self.audio_stream_eos_id = audio_stream_eos_id
         self.audio_out_bos_token_id = audio_out_bos_token_id
+        self.audio_out_bos_token = audio_out_bos_token
+        self.audio_eos_token = audio_eos_token
+        self.audio_bos_token = audio_bos_token
+        self.audio_out_bos_token_id = audio_bos_token_id
         self.audio_eos_token_id = audio_eos_token_id
 
         # Set CUDA graph parameters as instance attributes
         self.cuda_graph_enable = cuda_graph_enable
         self.cuda_graph_enable_streaming = cuda_graph_enable_streaming
         self.cuda_graph_enable_delay_patterns = cuda_graph_enable_delay_patterns
-        
+
         self.cuda_graph_tts_batch_sizes = cuda_graph_tts_batch_sizes
         self.cuda_graph_tts_sequence_lengths = cuda_graph_tts_sequence_lengths
         self.cuda_graph_streaming_chunk_sizes = cuda_graph_streaming_chunk_sizes
-        
+
         self.cuda_graph_max_cache_size = cuda_graph_max_cache_size
         self.cuda_graph_memory_pool_size_gb = cuda_graph_memory_pool_size_gb
-        
+
         self.cuda_graph_enable_performance_monitoring = cuda_graph_enable_performance_monitoring
         self.cuda_graph_fallback_enabled = cuda_graph_fallback_enabled
-        
+
         self.cuda_graph_dualffn_separate_graphs = cuda_graph_dualffn_separate_graphs
         self.cuda_graph_dualffn_audio_text_ratio_threshold = cuda_graph_dualffn_audio_text_ratio_threshold
-        
+
         self.cuda_graph_delay_pattern_max_codebooks = cuda_graph_delay_pattern_max_codebooks
         self.cuda_graph_delay_pattern_optimization_enabled = cuda_graph_delay_pattern_optimization_enabled
-        
+
         self.cuda_graph_validation_enabled = cuda_graph_validation_enabled
-                
+
         super().__init__(
             architecture=architecture,
             num_hidden_layers=num_hidden_layers,
@@ -293,7 +306,7 @@ class HiggsAudioConfig(PretrainedConfig):
             eos_token_id=eos_token_id,
             **kwargs,
         )
-        
+
     def to_dict(self):
         d = super().to_dict()
         # Nothing special beyond defaults; ensure custom fields are serialized

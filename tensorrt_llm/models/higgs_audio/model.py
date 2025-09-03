@@ -24,13 +24,11 @@ from tensorrt_llm.functional import (
     concat,
     constant,
     default_net,
-    expand,
     gather_last_token_logits,
     gelu,
     lt,
     recv,
     send,
-    unsqueeze,
     where,
 )
 from tensorrt_llm.layers import (
@@ -204,9 +202,6 @@ class HiggsAudioEncoder(Module):
         # Embedding scale factor
         scale_embedding = getattr(config, "scale_embedding", False)
         self.embed_scale = math.sqrt(self.embed_dim) if scale_embedding else 1.0
-
-        # Memory optimization: Only create layers when needed
-        # Skip audio tower if configured to reduce memory during engine build
 
         if not config.skip_audio_tower:
             # Convolutional feature extraction layers
@@ -1849,69 +1844,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
 
         return cls(cfg)
 
-    def _apply_audio_tower(self, audio_features, audio_feature_attention_mask):
-        """Apply the audio tower to the audio features - TensorRT-LLM compatible implementation."""
-        # Handle empty audio features case
-        if audio_features.shape[0] == 0:
-            # Return None for empty batch to avoid computation
-            return None, None
-
-        # Calculate attention mask if provided
-        audio_attention_mask = None
-        audio_feat_out_lengths = None
-
-        if audio_feature_attention_mask is not None:
-            # Calculate actual feature lengths from attention mask
-            audio_feat_lengths = audio_feature_attention_mask.sum(dim=-1)
-
-            # Calculate output lengths after conv layers (stride=2 from conv2)
-            # Mel-spectrogram length -> conv1 (no stride) -> conv2 (stride=2) -> final length
-            audio_feat_out_lengths = (audio_feat_lengths - 1) // 2 + 1
-
-            batch_size, max_mel_seq_len = audio_feature_attention_mask.shape
-            max_seq_len = (max_mel_seq_len - 1) // 2 + 1
-
-            # Create sequence range tensor for masking
-            seq_range = arange(0, max_seq_len, dtype="int32")
-            seq_range = unsqueeze(seq_range, 0)  # [1, max_seq_len]
-            seq_range = expand(seq_range, [batch_size, max_seq_len])  # [batch, max_seq_len]
-
-            # Expand lengths for comparison
-            lengths_expand = unsqueeze(audio_feat_out_lengths, 1)  # [batch, 1]
-            lengths_expand = expand(
-                lengths_expand, [batch_size, max_seq_len]
-            )  # [batch, max_seq_len]
-
-            # Create padding mask (True where valid tokens)
-            padding_mask = lt(seq_range, lengths_expand)  # [batch, max_seq_len]
-
-            # For bidirectional attention in encoder, use simple padding mask
-            audio_attention_mask = padding_mask
-
-        # Apply audio encoder
-        audio_outputs = self.audio_tower(
-            audio_features,
-            attention_mask=audio_attention_mask,
-            output_attentions=False,
-            output_hidden_states=False,
-            return_dict=True,
-            check_seq_length=False,  # Skip length validation for flexibility
-        )
-
-        # Extract last hidden state
-        if isinstance(audio_outputs, dict):
-            selected_audio_feature = audio_outputs["last_hidden_state"]
-        else:
-            # Handle tuple output
-            selected_audio_feature = (
-                audio_outputs[0] if isinstance(audio_outputs, tuple) else audio_outputs
-            )
-
-        # Project audio features to text model dimension
-        audio_features_embed = self.audio_encoder_proj(selected_audio_feature)
-
-        return audio_features_embed, audio_feat_out_lengths
-
     def forward(
         self,
         input_ids: Tensor,
@@ -1946,26 +1878,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
         """
         if audio_out_mask is not None:
             self.transformer.audio_out_mask = audio_out_mask
-
-        # Audio tower integration - TensorRT-LLM compatible implementation
-        audio_features_embed = None
-        audio_features_length = None
-
-        # Check if audio features are provided and audio tower is enabled
-        if (
-            hasattr(self, "audio_features")
-            and self.audio_features is not None
-            and not self.config.skip_audio_tower
-        ):
-            # Apply audio tower processing
-            audio_features_embed, audio_features_length = self._apply_audio_tower(
-                self.audio_features, self.audio_feature_attention_mask
-            )
-            # Integrate audio features with text embeddings if needed
-            # This would typically happen in the transformer layers through attention mechanisms
-
-        # Use the transformer backbone for forward pass
-        # output = self.transformer(input_ids, attention_mask=attention_mask, use_cache=True)
 
         # Call parent forward method with standard arguments
         return super().forward(
@@ -2029,7 +1941,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM, TopModelMixin):
             - 'generation_info': Additional generation metadata
         """
         batch_size = input_ids.shape[0]
-        device = input_ids.device if hasattr(input_ids, "device") else None
 
         # Initialize generation state
         if not hasattr(self, "_generation_state"):
