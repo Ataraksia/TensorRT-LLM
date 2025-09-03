@@ -1,385 +1,574 @@
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from __future__ import annotations
+"""Configuration classes for HiggsAudio multimodal model.
 
-from re import S
-from typing import Optional, Union, Dict, Any, List
-from tensorrt_llm.mapping import Mapping
-from tensorrt_llm.models.convert_utils import infer_dtype
+HiggsAudio combines text generation with audio processing through a dual-FFN architecture.
+The model includes:
+- HiggsAudioConfig: Main configuration for the multimodal model
+- HiggsAudioEncoderConfig: Configuration for the Whisper-based audio encoder
+"""
+
+from typing import Dict, Optional, Union
+
 from ..modeling_utils import PretrainedConfig
 
+__all__ = [
+    "HiggsAudioConfig",
+    "HiggsAudioEncoderConfig",
+]
 
-class HiggsAudioConfig(PretrainedConfig):
-    """TensorRT-LLM configuration for Higgs Audio multimodal TTS model.
 
-    This configuration class manages parameters for the Higgs Audio text-to-speech model,
-    which combines a Llama 3.2 3B text backbone with Whisper-like audio processing
-    capabilities. The configuration flattens multimodal parameters into a single
-    unified config for simplified engine building and runtime management.
+class HiggsAudioEncoderConfig(PretrainedConfig):
+    """Configuration class for the HiggsAudio audio encoder (Whisper-based).
 
-    The underlying architecture consists of:
-    - Text backbone: Llama-like transformer for language modeling
-    - Audio encoder: Whisper-like architecture for audio feature extraction
-    - Fusion mechanism: Prompt table integration for audio-text generation
-    - TTS optimizations: Real-time performance and streaming support
-
-    Attributes:
-        Text Backbone Parameters:
-            architecture (str): Model architecture type (default: "LlamaForCausalLM")
-            num_hidden_layers (int): Number of transformer layers (default: 32)
-            num_attention_heads (int): Number of attention heads (default: 32)
-            num_key_value_heads (Optional[int]): Number of KV heads for GQA
-            hidden_size (int): Hidden dimension size (default: 4096)
-            intermediate_size (int): FFN intermediate size (default: 11008)
-            head_size (Optional[int]): Attention head dimension
-            vocab_size (int): Vocabulary size (default: 128256)
-            max_position_embeddings (int): Maximum sequence length (default: 8192)
-
-        Audio Encoder Parameters:
-            audio_num_mel_bins (int): Mel spectrogram bins (default: 128)
-            audio_encoder_layers (int): Audio encoder layers (default: 32)
-            audio_encoder_heads (int): Audio attention heads (default: 20)
-            audio_encoder_ffn_dim (int): Audio FFN dimension (default: 5120)
-            audio_d_model (int): Audio model dimension (default: 1280)
-            audio_max_source_positions (int): Max audio sequence length (default: 1500)
-
-        Audio-Text Fusion Parameters:
-            audio_adapter_type (str): Adapter architecture type (default: "stack")
-            audio_dual_ffn_layers (Optional[List[int]]): DualFFN layer indices
-            encode_whisper_embed (bool): Use Whisper embeddings (default: True)
-            use_delay_pattern (bool): Enable delay pattern for streaming (default: False)
-            audio_num_codebooks (int): Number of RVQ codebooks (default: 12)
-            audio_codebook_size (int): Codebook vocabulary size (default: 1024)
-
-        TTS-Specific Parameters:
-            audio_delay_pattern_strategy (str): Delay pattern strategy ('linear', 'exponential', 'custom', 'none') (default: 'linear')
-            audio_delay_pattern_stride (int): Delay pattern stride (default: 1)
-            audio_delay_pattern_custom_delays (Optional[List[int]]): Custom delays for 'custom' strategy (default: None)
-            audio_delay_pattern_max_delay (Optional[int]): Maximum allowed delay (default: None)
-
-    Example:
-        >>> config = HiggsAudioConfig.from_hugging_face("path/to/higgs/model")
-        >>> model = HiggsAudioForCausalLM(config)
+    This configuration class stores the configuration parameters for the
+    audio encoder component of the HiggsAudio multimodal model. The encoder is based
+    on a Whisper architecture and processes mel-spectrogram audio features.
     """
 
     def __init__(
         self,
         *,
-        # Text (LLM) backbone parameters
-        architecture: str = "LlamaForCausalLM",
-        num_hidden_layers: int = 28,
-        num_attention_heads: int = 24,
-        num_key_value_heads: Optional[int] = 8,
-        hidden_size: int = 4096,
-        intermediate_size: int = 8192,
-        head_size: Optional[int] = 128,
-        vocab_size: int = 128256,
-        max_position_embeddings: int = 8192,
-        position_embedding_type: str = "rope_gpt_neox",
-        rotary_embedding_dim: Optional[int] = None,
-        rotary_base: float = 100000.0,
-        rotary_scaling: Optional[Dict[str, Any]] = None,
-        hidden_act: str = "silu",
-        norm_epsilon: float = 1e-5,
-        attn_bias: bool = False,
-        seq_length: int = 1024,
-        # Audio encoder (Whisper-like) parameters
-        audio_num_mel_bins: int = 128,
-        audio_encoder_layers: int = 32,
-        audio_encoder_heads: int = 24,
-        audio_encoder_ffn_dim: int = 5120,
-        audio_d_model: int = 1280,
-        audio_max_source_positions: int = 1500,
-        # Audio-text fusion and token parameters
-        audio_adapter_type: str = "dual_ffn_fast_forward",
-        audio_embed_avg: bool = False,
-        audio_dual_ffn_layers: Optional[List[int]] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27],
+        # Audio encoder specific parameters
+        num_mel_bins: int = 128,
+        encoder_layers: int = 32,
+        encoder_attention_heads: int = 20,
+        encoder_ffn_dim: int = 5120,
+        encoder_layerdrop: float = 0.0,
+        d_model: int = 1280,
+        dropout: float = 0.0,
+        attention_dropout: float = 0.0,
+        activation_function: str = "gelu",
+        activation_dropout: float = 0.0,
+        scale_embedding: bool = False,
+        init_std: float = 0.02,
+        max_source_positions: int = 1500,
+        pad_token_id: int = 128001,
+        **kwargs,
+    ):
+        # Initialize base config first
+        super().__init__(
+            architecture="higgs_audio_encoder",
+            dtype="float16",
+            hidden_size=d_model,
+            num_hidden_layers=encoder_layers,
+            num_attention_heads=encoder_attention_heads,
+            vocab_size=None,  # Audio encoder doesn't use text vocab
+            hidden_act=activation_function,
+            max_position_embeddings=max_source_positions,
+            intermediate_size=encoder_ffn_dim,
+        )
+
+        # Audio encoder specific attributes
+        self.num_mel_bins = num_mel_bins
+        self.d_model = d_model
+        self.encoder_layers = encoder_layers
+        self.encoder_attention_heads = encoder_attention_heads
+        self.encoder_ffn_dim = encoder_ffn_dim
+        self.dropout = dropout
+        self.attention_dropout = attention_dropout
+        self.activation_function = activation_function
+        self.activation_dropout = activation_dropout
+        self.encoder_layerdrop = encoder_layerdrop
+        self.init_std = init_std
+        self.scale_embedding = scale_embedding
+        self.max_source_positions = max_source_positions
+        self.pad_token_id = pad_token_id
+
+        # Validate configuration
+        self.validate()
+
+    def validate(self):
+        """Validate audio encoder configuration parameters."""
+        # Core architecture validation
+        if not isinstance(self.encoder_layers, int) or self.encoder_layers <= 0:
+            raise ValueError(
+                f"encoder_layers must be a positive integer, got {self.encoder_layers}"
+            )
+
+        if not isinstance(self.encoder_attention_heads, int) or self.encoder_attention_heads <= 0:
+            raise ValueError(
+                f"encoder_attention_heads must be a positive integer, got {self.encoder_attention_heads}"
+            )
+
+        if not isinstance(self.d_model, int) or self.d_model <= 0:
+            raise ValueError(f"d_model must be a positive integer, got {self.d_model}")
+
+        if self.d_model % self.encoder_attention_heads != 0:
+            raise ValueError(
+                f"d_model ({self.d_model}) must be divisible by "
+                f"encoder_attention_heads ({self.encoder_attention_heads})"
+            )
+
+        if not isinstance(self.encoder_ffn_dim, int) or self.encoder_ffn_dim <= 0:
+            raise ValueError(
+                f"encoder_ffn_dim must be a positive integer, got {self.encoder_ffn_dim}"
+            )
+
+        if not isinstance(self.num_mel_bins, int) or self.num_mel_bins <= 0:
+            raise ValueError(f"num_mel_bins must be a positive integer, got {self.num_mel_bins}")
+
+        if not isinstance(self.max_source_positions, int) or self.max_source_positions <= 0:
+            raise ValueError(
+                f"max_source_positions must be a positive integer, got {self.max_source_positions}"
+            )
+
+        # Dropout validation
+        if not 0.0 <= self.dropout <= 1.0:
+            raise ValueError(f"dropout must be between 0 and 1, got {self.dropout}")
+
+        if not 0.0 <= self.attention_dropout <= 1.0:
+            raise ValueError(
+                f"attention_dropout must be between 0 and 1, got {self.attention_dropout}"
+            )
+
+        if not 0.0 <= self.activation_dropout <= 1.0:
+            raise ValueError(
+                f"activation_dropout must be between 0 and 1, got {self.activation_dropout}"
+            )
+
+        if not 0.0 <= self.encoder_layerdrop <= 1.0:
+            raise ValueError(
+                f"encoder_layerdrop must be between 0 and 1, got {self.encoder_layerdrop}"
+            )
+
+        # Initialization and scaling validation
+        if not isinstance(self.init_std, (int, float)) or self.init_std <= 0:
+            raise ValueError(f"init_std must be a positive number, got {self.init_std}")
+
+        if not isinstance(self.scale_embedding, bool):
+            raise ValueError(f"scale_embedding must be a boolean, got {type(self.scale_embedding)}")
+
+        # Token ID validation
+        if not isinstance(self.pad_token_id, int) or self.pad_token_id < 0:
+            raise ValueError(
+                f"pad_token_id must be a non-negative integer, got {self.pad_token_id}"
+            )
+
+        # Activation function validation
+        valid_activations = ["relu", "gelu", "silu", "swish", "gelu_new", "mish", "tanh"]
+        if self.activation_function not in valid_activations:
+            import warnings
+
+            warnings.warn(
+                f"activation_function '{self.activation_function}' is not in common list "
+                f"{valid_activations}. Please ensure it's supported by your implementation.",
+                UserWarning,
+            )
+
+
+class HiggsAudioConfig(PretrainedConfig):
+    """Configuration class for HiggsAudio multimodal model.
+
+    HiggsAudio is a multimodal model combining text generation with audio processing
+    capabilities. It uses a dual-FFN architecture that can process both text and
+    audio tokens through separate processing paths.
+    """
+
+    def __init__(
+        self,
+        *,
+        # Core configurations
+        text_config: Optional[Union[PretrainedConfig, Dict]] = None,
+        audio_encoder_config: Optional[Union[HiggsAudioEncoderConfig, Dict]] = None,
+        audio_tokenizer_config: Optional[Dict] = None,
+        # Adapter configuration
+        audio_adapter_type: str = "stack",
+        audio_ffn_hidden_size: int = 4096,
+        audio_ffn_intermediate_size: int = 14336,
+        audio_dual_ffn_layers: Optional[list] = None,
         audio_decoder_proj_num_layers: int = 0,
-        encode_whisper_embed: bool = True,
-        encode_audio_in_tokens: bool = True,
-        use_delay_pattern: bool = True,
+        # Processing flags
+        encode_audio_in_tokens: bool = False,
+        use_delay_pattern: bool = False,
         skip_audio_tower: bool = False,
         use_audio_out_embed_projector: bool = False,
         use_audio_out_self_attention: bool = False,
+        # Audio codebook configuration
         audio_num_codebooks: int = 8,
         audio_codebook_size: int = 1024,
-        audio_in_token_idx: int = 128015,
-        audio_out_token_idx: int = 128016,
-        audio_in_token: str = "<|AUDIO|>",
-        audio_out_token: str = "<|AUDIO_OUT|>",
         audio_stream_bos_id: int = 1024,
         audio_stream_eos_id: int = 1025,
-        audio_bos_token_id: int = 128011,
-        audio_out_bos_token_id: int = 128013,
-        audio_eos_token_id: int = 128012,
+        # Special tokens
         audio_bos_token: str = "<|audio_bos|>",
-        audio_out_bos_token: str = "<|audio_out_bos|>",
+        audio_bos_token_id: int = 128011,
         audio_eos_token: str = "<|audio_eos|>",
-        bos_token_id: int = 128000,
-        eos_token_id: int = 128001,
+        audio_eos_token_id: int = 128012,
+        audio_out_bos_token: str = "<|audio_out_bos|>",
+        audio_out_bos_token_id: int = 128013,
+        audio_in_token: str = "<|AUDIO|>",
+        audio_out_token: str = "<|AUDIO_OUT|>",
+        audio_in_token_idx: int = 128015,
+        audio_out_token_idx: int = 128016,
         pad_token_id: int = 128001,
-        # CUDA Graph optimization parameters for TTS workloads
-        # Enable/disable CUDA graphs for different TTS components
-        cuda_graph_enable: bool = True,
-        cuda_graph_enable_streaming: bool = True,
-        cuda_graph_enable_delay_patterns: bool = True,
+        **kwargs,
+    ):
+        # Handle nested configurations
+        if audio_encoder_config is None:
+            audio_encoder_config = HiggsAudioEncoderConfig()
+        elif isinstance(audio_encoder_config, dict):
+            audio_encoder_config = HiggsAudioEncoderConfig(**audio_encoder_config)
 
-        # TTS-specific batch sizes and sequence lengths for graph optimization
-        cuda_graph_tts_batch_sizes: List[int] = [1],
-        cuda_graph_tts_sequence_lengths: List[int] = [1024],
-        cuda_graph_streaming_chunk_sizes: List[int] = [32],
-        cuda_graph_max_cache_size: int = 32,
-        cuda_graph_memory_pool_size_gb: int = 2,
-        # Performance optimization settings
-        cuda_graph_enable_performance_monitoring: bool = True,
-        cuda_graph_fallback_enabled: bool = True,
+        # For text_config, we'll use a default LLaMA-like config if none provided
+        if text_config is None:
+            # Default LLaMA-3.2-3B configuration
+            text_config = {
+                "architecture": "llama",
+                "hidden_size": 3072,
+                "num_hidden_layers": 28,
+                "num_attention_heads": 24,
+                "intermediate_size": 8192,
+                "vocab_size": 128256,
+                "max_position_embeddings": 131072,
+                "num_key_value_heads": 8,
+            }
+        elif isinstance(text_config, dict) and "architecture" not in text_config:
+            text_config["architecture"] = "llama"
 
-        # DualFFN-specific graph optimization
-        cuda_graph_dualffn_separate_graphs: bool = True,
-        cuda_graph_dualffn_audio_text_ratio_threshold: float = 0.3,
+        # Determine base configuration parameters from text config
+        if isinstance(text_config, dict):
+            hidden_size = text_config.get("hidden_size", 3072)
+            num_layers = text_config.get("num_hidden_layers", 28)
+            vocab_size = text_config.get("vocab_size", 128256)
+        else:
+            hidden_size = getattr(text_config, "hidden_size", 3072)
+            num_layers = getattr(text_config, "num_hidden_layers", 28)
+            vocab_size = getattr(text_config, "vocab_size", 128256)
 
-        # Delay pattern optimization for RVQ multi-codebook coordination
-        cuda_graph_delay_pattern_max_codebooks: int = 16,
-        cuda_graph_delay_pattern_optimization_enabled: bool = True,
+        # Initialize base PretrainedConfig
+        super().__init__(
+            architecture="higgs_audio",
+            dtype="float16",
+            hidden_size=hidden_size,
+            num_hidden_layers=num_layers,
+            num_attention_heads=24,  # Default for LLaMA-3.2-3B
+            vocab_size=vocab_size,
+            hidden_act="silu",
+        )
 
-        cuda_graph_validation_enabled: bool = True,
-        # TensorRT-LLM common parameters
-        memory_efficient_build: bool = True,
-        dtype: str = "bfloat16",
-        mapping: Optional[Mapping] = Mapping(world_size=1, rank=0, tp_size=1, pp_size=1),
-        quantization: Optional[QuantConfig] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize HiggsAudioConfig with comprehensive parameter validation.
+        # Store nested configurations
+        self.text_config = text_config
+        self.audio_encoder_config = audio_encoder_config
+        self.audio_tokenizer_config = audio_tokenizer_config
 
-        Args:
-            architecture: Model architecture identifier
-            num_hidden_layers: Number of transformer decoder layers
-            num_attention_heads: Number of attention heads in each layer
-            num_key_value_heads: Number of key-value heads (for GQA), defaults to num_attention_heads
-            hidden_size: Hidden state dimension
-            intermediate_size: FFN intermediate dimension
-            head_size: Individual attention head dimension, computed if not provided
-            vocab_size: Text vocabulary size
-            max_position_embeddings: Maximum supported sequence length
-            position_embedding_type: Type of positional encoding
-            rotary_embedding_dim: RoPE embedding dimension
-            rotary_base: RoPE base frequency
-            rotary_scaling: RoPE scaling configuration
-            hidden_act: Activation function for FFN
-            norm_epsilon: Layer normalization epsilon
-            attn_bias: Whether to use bias in attention layers
-            seq_length: Default sequence length
-            audio_num_mel_bins: Number of mel-frequency bins for audio processing
-            audio_encoder_layers: Number of audio encoder transformer layers
-            audio_encoder_heads: Number of attention heads in audio encoder
-            audio_encoder_ffn_dim: Audio encoder FFN dimension
-            audio_d_model: Audio encoder model dimension
-            audio_max_source_positions: Maximum audio sequence length
-            audio_adapter_type: Type of audio adapter ("stack", "concat", etc.)
-            audio_embed_avg: Whether to average audio embeddings
-            audio_dual_ffn_layers: Layer indices for DualFFN audio adaptation
-            audio_decoder_proj_num_layers: Number of decoder projection layers
-            encode_whisper_embed: Whether to encode Whisper embeddings
-            encode_audio_in_tokens: Whether to encode audio as input tokens
-            use_delay_pattern: Enable delay pattern for streaming generation
-            skip_audio_tower: Skip audio tower processing
-            use_audio_out_embed_projector: Use output embedding projector
-            use_audio_out_self_attention: Use output self-attention
-            audio_num_codebooks: Number of RVQ codebooks for audio tokenization
-            audio_codebook_size: Size of each audio codebook
-            audio_in_token_idx: Special token index for audio input
-            audio_out_token_idx: Special token index for audio output
-            audio_stream_bos_id: Beginning-of-stream token for audio
-            audio_stream_eos_id: End-of-stream token for audio
-            audio_out_bos_token_id: Beginning-of-output token for audio
-            audio_eos_token_id: End-of-sequence token for audio
-            bos_token_id: Beginning-of-sequence token for text
-            eos_token_id: End-of-sequence token for text
-            pad_token_id: Padding token for text
-            dtype: Data type for model weights
-            mapping: TensorRT-LLM tensor/pipeline parallelism mapping
-            quantization: Quantization configuration
-            **kwargs: Additional configuration parameters
-
-        Raises:
-            ValueError: If configuration parameters are invalid or incompatible
-        """
-        self.num_hidden_layers = num_hidden_layers
-        self.num_attention_heads = num_attention_heads
-        self.num_key_value_heads = num_key_value_heads or num_attention_heads
-        self.hidden_size = hidden_size
-        self.intermediate_size = intermediate_size
-        self.head_size = head_size or (hidden_size // num_attention_heads)
-        self.vocab_size = vocab_size
-        self.max_position_embeddings = max_position_embeddings
-        self.position_embedding_type = position_embedding_type
-        self.rotary_embedding_dim = rotary_embedding_dim
-        self.rotary_base = rotary_base
-        self.rotary_scaling = rotary_scaling
-        self.hidden_act = hidden_act
-        self.norm_epsilon = norm_epsilon
-        self.attn_bias = attn_bias
-        self.seq_length = seq_length
-        self.architecture = architecture
-
-        # Audio encoder essentials
-        self.audio_num_mel_bins = audio_num_mel_bins
-        self.audio_encoder_layers = audio_encoder_layers
-        self.audio_encoder_heads = audio_encoder_heads
-        self.audio_encoder_ffn_dim = audio_encoder_ffn_dim
-        self.audio_d_model = audio_d_model
-        self.audio_max_source_positions = audio_max_source_positions
-
-        # Audio/text fusion + tokens
+        # Adapter configuration
         self.audio_adapter_type = audio_adapter_type
-        self.audio_embed_avg = audio_embed_avg
-        self.audio_dual_ffn_layers = audio_dual_ffn_layers or []
+        self.audio_ffn_hidden_size = audio_ffn_hidden_size
+        self.audio_ffn_intermediate_size = audio_ffn_intermediate_size
+        self.audio_dual_ffn_layers = audio_dual_ffn_layers
         self.audio_decoder_proj_num_layers = audio_decoder_proj_num_layers
-        self.encode_whisper_embed = encode_whisper_embed
+
+        # Processing flags
         self.encode_audio_in_tokens = encode_audio_in_tokens
         self.use_delay_pattern = use_delay_pattern
         self.skip_audio_tower = skip_audio_tower
         self.use_audio_out_embed_projector = use_audio_out_embed_projector
         self.use_audio_out_self_attention = use_audio_out_self_attention
+
+        # Audio codebook parameters
         self.audio_num_codebooks = audio_num_codebooks
         self.audio_codebook_size = audio_codebook_size
-        self.audio_in_token_idx = audio_in_token_idx
-        self.audio_out_token_idx = audio_out_token_idx
-        self.audio_in_token = audio_in_token
-        self.audio_out_token = audio_out_token
         self.audio_stream_bos_id = audio_stream_bos_id
         self.audio_stream_eos_id = audio_stream_eos_id
-        self.audio_out_bos_token_id = audio_out_bos_token_id
-        self.audio_out_bos_token = audio_out_bos_token
-        self.audio_eos_token = audio_eos_token
+
+        # Special tokens
         self.audio_bos_token = audio_bos_token
-        self.audio_out_bos_token_id = audio_bos_token_id
+        self.audio_bos_token_id = audio_bos_token_id
+        self.audio_eos_token = audio_eos_token
         self.audio_eos_token_id = audio_eos_token_id
+        self.audio_out_bos_token = audio_out_bos_token
+        self.audio_out_bos_token_id = audio_out_bos_token_id
+        self.audio_in_token = audio_in_token
+        self.audio_out_token = audio_out_token
+        self.audio_in_token_idx = audio_in_token_idx
+        self.audio_out_token_idx = audio_out_token_idx
+        self.pad_token_id = pad_token_id
 
-        # Set CUDA graph parameters as instance attributes
-        self.cuda_graph_enable = cuda_graph_enable
-        self.cuda_graph_enable_streaming = cuda_graph_enable_streaming
-        self.cuda_graph_enable_delay_patterns = cuda_graph_enable_delay_patterns
+        # Validate configuration
+        self.validate()
 
-        self.cuda_graph_tts_batch_sizes = cuda_graph_tts_batch_sizes
-        self.cuda_graph_tts_sequence_lengths = cuda_graph_tts_sequence_lengths
-        self.cuda_graph_streaming_chunk_sizes = cuda_graph_streaming_chunk_sizes
+    def validate(self):
+        """Validate configuration parameters comprehensively."""
+        import warnings
 
-        self.cuda_graph_max_cache_size = cuda_graph_max_cache_size
-        self.cuda_graph_memory_pool_size_gb = cuda_graph_memory_pool_size_gb
-
-        self.cuda_graph_enable_performance_monitoring = cuda_graph_enable_performance_monitoring
-        self.cuda_graph_fallback_enabled = cuda_graph_fallback_enabled
-
-        self.cuda_graph_dualffn_separate_graphs = cuda_graph_dualffn_separate_graphs
-        self.cuda_graph_dualffn_audio_text_ratio_threshold = cuda_graph_dualffn_audio_text_ratio_threshold
-
-        self.cuda_graph_delay_pattern_max_codebooks = cuda_graph_delay_pattern_max_codebooks
-        self.cuda_graph_delay_pattern_optimization_enabled = cuda_graph_delay_pattern_optimization_enabled
-
-        self.cuda_graph_validation_enabled = cuda_graph_validation_enabled
-
-        super().__init__(
-            architecture=architecture,
-            num_hidden_layers=num_hidden_layers,
-            num_attention_heads=num_attention_heads,
-            hidden_size=hidden_size,
-            intermediate_size=intermediate_size,
-            head_size=head_size,
-            vocab_size=vocab_size,
-            max_position_embeddings=max_position_embeddings,
-            position_embedding_type=position_embedding_type,
-            rotary_embedding_dim=rotary_embedding_dim,
-            rotary_base=rotary_base,
-            rotary_scaling=rotary_scaling,
-            hidden_act=hidden_act,
-            norm_epsilon=norm_epsilon,
-            attn_bias=attn_bias,
-            seq_length=seq_length,
-            dtype=dtype,
-            mapping=mapping,
-            quantization=quantization,
-            pad_token_id=pad_token_id,
-            bos_token_id=bos_token_id,
-            eos_token_id=eos_token_id,
-            **kwargs,
-        )
-
-    def to_dict(self):
-        d = super().to_dict()
-        # Nothing special beyond defaults; ensure custom fields are serialized
-        for k, v in self.__dict__.items():
-            if k not in d:
-                d[k] = v
-        return d
-
-    @classmethod
-    def from_hugging_face(
-        cls,
-        hf_config_or_dir: Union[str, "transformers.PretrainedConfig"],
-        dtype: str = "auto",
-        mapping: Optional[Mapping] = None,
-        quant_config: Optional[QuantConfig] = None,
-        **kwargs,
-    ) -> "HiggsAudioConfig":
-        import transformers
-        trust_remote_code = kwargs.pop("trust_remote_code", True)
-
-        if isinstance(hf_config_or_dir, transformers.PretrainedConfig):
-            hf_config = hf_config_or_dir
-        else:
-            hf_config = transformers.AutoConfig.from_pretrained(
-                str(hf_config_or_dir), trust_remote_code=trust_remote_code
+        # 1. Validate adapter type and related configurations
+        valid_adapter_types = ["stack", "dual_ffn", "dual_ffn_fast_forward"]
+        if self.audio_adapter_type not in valid_adapter_types:
+            raise ValueError(
+                f"Invalid audio_adapter_type: {self.audio_adapter_type}. "
+                f"Must be one of {valid_adapter_types}"
             )
 
-        # The HF HiggsAudio config is a composition; pull out text and audio encoder parts
-        text_cfg = getattr(hf_config, "text_config", None)
-        audio_enc_cfg = getattr(hf_config, "audio_encoder_config", None)
-        assert text_cfg is not None and audio_enc_cfg is not None, (
-            "Expected HiggsAudio HF config to contain text_config and audio_encoder_config"
-        )
+        # Validate dual FFN configuration
+        if self.audio_adapter_type.startswith("dual_ffn"):
+            if self.audio_dual_ffn_layers is None:
+                raise ValueError(
+                    f"audio_dual_ffn_layers must be specified when using "
+                    f"audio_adapter_type='{self.audio_adapter_type}'"
+                )
+            if not isinstance(self.audio_dual_ffn_layers, (list, tuple)):
+                raise ValueError(
+                    f"audio_dual_ffn_layers must be a list or tuple, got {type(self.audio_dual_ffn_layers)}"
+                )
 
-        inferred_dtype = infer_dtype(dtype, getattr(text_cfg, "torch_dtype", None))
+        # 2. Validate audio parameters - core requirements
+        if not isinstance(self.audio_num_codebooks, int) or self.audio_num_codebooks <= 0:
+            raise ValueError(
+                f"audio_num_codebooks must be a positive integer, got {self.audio_num_codebooks}"
+            )
 
-        num_key_value_heads = getattr(
-            text_cfg, "num_key_value_heads", text_cfg.num_attention_heads
-        )
-        rotary_scaling = getattr(text_cfg, "rope_scaling", None)
-        rotary_base = getattr(text_cfg, "rope_theta", 100000.0)
-        seq_length = getattr(text_cfg, "seq_length", getattr(text_cfg, "max_position_embeddings", 8192))
-        attn_bias = getattr(text_cfg, "attn_bias", False)
-        hidden_act = getattr(text_cfg, "hidden_act", "silu")
+        if not isinstance(self.audio_codebook_size, int) or self.audio_codebook_size <= 0:
+            raise ValueError(
+                f"audio_codebook_size must be a positive integer, got {self.audio_codebook_size}"
+            )
 
-        return cls(
-            architecture=getattr(text_cfg, "architectures", ["LlamaForCausalLM"])[0],
-            dtype=inferred_dtype,
-            num_hidden_layers=text_cfg.num_hidden_layers,
-            num_attention_heads=text_cfg.num_attention_heads,
-            num_key_value_heads=num_key_value_heads,
-            hidden_size=text_cfg.hidden_size,
-            intermediate_size=text_cfg.intermediate_size,
-            head_size=getattr(text_cfg, "head_dim", None),
-            vocab_size=text_cfg.vocab_size,
-            position_embedding_type="rope_gpt_neox",
-            rotary_embedding_dim=getattr(text_cfg, "rotary_dim", None),
-            rotary_base=rotary_base,
-            rotary_scaling=rotary_scaling,
-            hidden_act=hidden_act,
-            norm_epsilon=getattr(text_cfg, "rms_norm_eps", 1e-5),
-            attn_bias=attn_bias,
-            seq_length=seq_length,
-            # Audio encoder
-            audio_num_mel_bins=audio_enc_cfg.num_mel_bins,
-            audio_encoder_layers=audio_enc_cfg.encoder_layers,
-            audio_encoder_heads=audio_enc_cfg.encoder_attention_heads,
-            audio_encoder_ffn_dim=audio_enc_cfg.encoder_ffn_dim,
-            audio_d_model=audio_enc_cfg.d_model,
-            audio_max_source_positions=audio_enc_cfg.max_source_positions,
-            # Keep TRT-LLM bookkeeping
-            mapping=mapping,
-            quantization=quant_config,
-            **kwargs,
-        )
+        # Optional: Check if codebook size is a power of two (common requirement)
+        if self.audio_codebook_size & (self.audio_codebook_size - 1) != 0:
+            warnings.warn(
+                f"audio_codebook_size ({self.audio_codebook_size}) is not a power of two. "
+                f"This may impact performance in some implementations.",
+                UserWarning,
+            )
 
+        # 3. Validate all token IDs are non-negative integers
+        token_ids = [
+            ("audio_bos_token_id", self.audio_bos_token_id),
+            ("audio_eos_token_id", self.audio_eos_token_id),
+            ("audio_out_bos_token_id", self.audio_out_bos_token_id),
+            ("audio_in_token_idx", self.audio_in_token_idx),
+            ("audio_out_token_idx", self.audio_out_token_idx),
+            ("pad_token_id", self.pad_token_id),
+            ("audio_stream_bos_id", self.audio_stream_bos_id),
+            ("audio_stream_eos_id", self.audio_stream_eos_id),
+        ]
+
+        for name, token_id in token_ids:
+            if not isinstance(token_id, int) or token_id < 0:
+                raise ValueError(f"{name} must be a non-negative integer, got {token_id}")
+
+        # 4. Validate FFN dimensions are positive integers
+        if not isinstance(self.audio_ffn_hidden_size, int) or self.audio_ffn_hidden_size <= 0:
+            raise ValueError(
+                f"audio_ffn_hidden_size must be a positive integer, got {self.audio_ffn_hidden_size}"
+            )
+
+        if (
+            not isinstance(self.audio_ffn_intermediate_size, int)
+            or self.audio_ffn_intermediate_size <= 0
+        ):
+            raise ValueError(
+                f"audio_ffn_intermediate_size must be a positive integer, got {self.audio_ffn_intermediate_size}"
+            )
+
+        if (
+            not isinstance(self.audio_decoder_proj_num_layers, int)
+            or self.audio_decoder_proj_num_layers < 0
+        ):
+            raise ValueError(
+                f"audio_decoder_proj_num_layers must be a non-negative integer, "
+                f"got {self.audio_decoder_proj_num_layers}"
+            )
+
+        # 5. Validate nested configurations are proper types
+        if self.text_config is not None:
+            if not isinstance(self.text_config, (dict, PretrainedConfig)):
+                raise ValueError(
+                    f"text_config must be a dict or PretrainedConfig instance, got {type(self.text_config)}"
+                )
+
+        if self.audio_encoder_config is not None:
+            if not isinstance(self.audio_encoder_config, (dict, HiggsAudioEncoderConfig)):
+                raise ValueError(
+                    f"audio_encoder_config must be a dict or HiggsAudioEncoderConfig instance, "
+                    f"got {type(self.audio_encoder_config)}"
+                )
+
+        if self.audio_tokenizer_config is not None:
+            if not isinstance(self.audio_tokenizer_config, dict):
+                raise ValueError(
+                    f"audio_tokenizer_config must be a dict, got {type(self.audio_tokenizer_config)}"
+                )
+
+        # 6. Cross-validation: Check consistency between configs
+        # Check hidden size consistency between text config and audio FFN
+        if isinstance(self.text_config, dict):
+            text_hidden_size = self.text_config.get("hidden_size")
+        elif hasattr(self.text_config, "hidden_size"):
+            text_hidden_size = self.text_config.hidden_size
+        else:
+            text_hidden_size = None
+
+        if text_hidden_size is not None:
+            if text_hidden_size != self.audio_ffn_hidden_size:
+                warnings.warn(
+                    f"text_config.hidden_size ({text_hidden_size}) differs from "
+                    f"audio_ffn_hidden_size ({self.audio_ffn_hidden_size}). "
+                    f"This may cause dimension mismatch issues.",
+                    UserWarning,
+                )
+
+        # Check audio encoder output size consistency
+        if isinstance(self.audio_encoder_config, HiggsAudioEncoderConfig):
+            if hasattr(self.audio_encoder_config, "d_model") and text_hidden_size is not None:
+                if self.audio_encoder_config.d_model != text_hidden_size:
+                    warnings.warn(
+                        f"audio_encoder_config.d_model ({self.audio_encoder_config.d_model}) "
+                        f"differs from text_config.hidden_size ({text_hidden_size}). "
+                        f"This may require projection layers for compatibility.",
+                        UserWarning,
+                    )
+
+        # 7. Validate boolean flags
+        boolean_flags = [
+            ("encode_audio_in_tokens", self.encode_audio_in_tokens),
+            ("use_delay_pattern", self.use_delay_pattern),
+            ("skip_audio_tower", self.skip_audio_tower),
+            ("use_audio_out_embed_projector", self.use_audio_out_embed_projector),
+            ("use_audio_out_self_attention", self.use_audio_out_self_attention),
+        ]
+
+        for name, flag in boolean_flags:
+            if not isinstance(flag, bool):
+                raise ValueError(f"{name} must be a boolean, got {type(flag)}")
+
+        # 8. Validate string tokens are non-empty
+        string_tokens = [
+            ("audio_bos_token", self.audio_bos_token),
+            ("audio_eos_token", self.audio_eos_token),
+            ("audio_out_bos_token", self.audio_out_bos_token),
+            ("audio_in_token", self.audio_in_token),
+            ("audio_out_token", self.audio_out_token),
+        ]
+
+        for name, token in string_tokens:
+            if not isinstance(token, str) or len(token.strip()) == 0:
+                raise ValueError(f"{name} must be a non-empty string, got '{token}'")
+
+        # 9. Range validation for stream IDs vs codebook size
+        if self.audio_stream_bos_id >= self.audio_codebook_size:
+            warnings.warn(
+                f"audio_stream_bos_id ({self.audio_stream_bos_id}) is >= "
+                f"audio_codebook_size ({self.audio_codebook_size}). "
+                f"This may indicate a configuration issue.",
+                UserWarning,
+            )
+
+        if self.audio_stream_eos_id >= self.audio_codebook_size:
+            warnings.warn(
+                f"audio_stream_eos_id ({self.audio_stream_eos_id}) is >= "
+                f"audio_codebook_size ({self.audio_codebook_size}). "
+                f"This may indicate a configuration issue.",
+                UserWarning,
+            )
+
+        # 10. Validate audio encoder config if present and callable
+        if hasattr(self.audio_encoder_config, "validate"):
+            self.audio_encoder_config.validate()
+
+    def to_dict(self) -> Dict:
+        """Convert configuration to dictionary."""
+        # Validate before serialization
+        self.validate()
+
+        output = super().to_dict()
+
+        # Handle nested configs
+        if hasattr(self.audio_encoder_config, "to_dict"):
+            output["audio_encoder_config"] = self.audio_encoder_config.to_dict()
+        else:
+            output["audio_encoder_config"] = self.audio_encoder_config
+
+        # Ensure text_config is JSON-serializable
+        if hasattr(self.text_config, "to_dict"):
+            output["text_config"] = self.text_config.to_dict()
+        else:
+            output["text_config"] = self.text_config
+
+        # Add all our custom attributes
+        custom_attrs = [
+            "audio_tokenizer_config",
+            "audio_adapter_type",
+            "audio_ffn_hidden_size",
+            "audio_ffn_intermediate_size",
+            "audio_dual_ffn_layers",
+            "audio_decoder_proj_num_layers",
+            "encode_audio_in_tokens",
+            "use_delay_pattern",
+            "skip_audio_tower",
+            "use_audio_out_embed_projector",
+            "use_audio_out_self_attention",
+            "audio_num_codebooks",
+            "audio_codebook_size",
+            "audio_stream_bos_id",
+            "audio_stream_eos_id",
+            "audio_bos_token",
+            "audio_bos_token_id",
+            "audio_eos_token",
+            "audio_eos_token_id",
+            "audio_out_bos_token",
+            "audio_out_bos_token_id",
+            "audio_in_token",
+            "audio_out_token",
+            "audio_in_token_idx",
+            "audio_out_token_idx",
+            "pad_token_id",
+        ]
+
+        for attr in custom_attrs:
+            if hasattr(self, attr):
+                output[attr] = getattr(self, attr)
+
+        return output
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict) -> "HiggsAudioConfig":
+        """Create configuration from dictionary."""
+        return cls(**config_dict)
+
+    def to_json_string(self, indent: int = 2) -> str:
+        """Convert configuration to JSON string."""
+        import json
+
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def save_pretrained(self, save_directory: str, **kwargs):
+        """Save configuration to a directory."""
+        import os
+
+        os.makedirs(save_directory, exist_ok=True)
+        config_file = os.path.join(save_directory, "config.json")
+        self.to_json_file(config_file)
+
+    @classmethod
+    def from_pretrained(cls, model_name_or_path: str, **kwargs) -> "HiggsAudioConfig":
+        """Load configuration from a pretrained model path."""
+        import os
+
+        if os.path.isdir(model_name_or_path):
+            config_file = os.path.join(model_name_or_path, "config.json")
+            if os.path.isfile(config_file):
+                return cls.from_json_file(config_file)
+        # If it's not a directory or config.json doesn't exist,
+        # assume it's the model_name_or_path itself is the config file
+        if os.path.isfile(model_name_or_path):
+            return cls.from_json_file(model_name_or_path)
+
+        raise ValueError(f"Could not find config.json in {model_name_or_path}")
+
+    @property
+    def model_type(self) -> str:
+        """Return model type for HuggingFace compatibility."""
+        return self.architecture

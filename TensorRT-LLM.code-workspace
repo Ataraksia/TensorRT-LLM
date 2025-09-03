@@ -4,9 +4,6 @@
 			"path": "."
 		},
 		{
-			"path": "../higgs-audio"
-		},
-		{
 			"path": "../vllm-custom"
 		}
 	],

@@ -97,9 +97,10 @@ node_modules/
 # OS specific
 .DS_Store
 
-# Task files
-tasks.json
-tasks/ 
 .taskmaster
 AussieGirl.wav
 .gitignore
+
+# Task files
+# tasks.json
+# tasks/ 
