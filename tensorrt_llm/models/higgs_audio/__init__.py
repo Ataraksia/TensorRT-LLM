@@ -13,9 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .audio_encoder import HiggsAudioEncoder, HiggsAudioFeatureProjector
+from .audio_tokenizer import HiggsAudioTokenizer
 from .config import HiggsAudioConfig, HiggsAudioEncoderConfig
+from .custom_modules import PartiallyFrozenEmbedding, PartiallyFrozenLinear
 
 __all__ = [
     "HiggsAudioConfig",
     "HiggsAudioEncoderConfig",
+    "HiggsAudioEncoder",
+    "HiggsAudioFeatureProjector",
+    "HiggsAudioTokenizer",
+    "PartiallyFrozenEmbedding",
+    "PartiallyFrozenLinear",
 ]

@@ -15,7 +15,7 @@
 import inspect
 import json
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 import torch
@@ -52,6 +52,28 @@ def revert_delay_pattern(data):
     for i in range(num_codebooks):
         out_l.append(data[i : (i + 1), i : (data.shape[1] - num_codebooks + 1 + i)])
     return np.concatenate(out_l, axis=0)
+
+
+def apply_delay_pattern(codes: np.ndarray, pad_value: int = 0) -> np.ndarray:
+    """Apply delay pattern across codebooks for causal scheduling.
+
+    Given codes shaped (num_codebooks, T), produce an array of shape
+    (num_codebooks, T + num_codebooks - 1) where each codebook i is delayed by
+    i frames.
+
+    Args:
+        codes: np.ndarray of shape (C, T).
+        pad_value: value to use for padded positions introduced by shifting.
+
+    Returns:
+        np.ndarray of shape (C, T + C - 1) with delay offsets applied.
+    """
+    assert codes.ndim == 2, f"codes must be 2D [C,T], got {codes.shape}"
+    C, T = codes.shape
+    out = np.full((C, T + C - 1), pad_value, dtype=codes.dtype)
+    for i in range(C):
+        out[i, i : i + T] = codes[i]
+    return out
 
 
 def xcodec_get_output_length(input_length: int):
@@ -198,7 +220,11 @@ class HiggsAudioTokenizer(Module):
             loudness_threshold: loudness threshold for normalization
 
         Returns:
-            A dictionary containing the token codes, frames per second (fps), and metadata.
+            A dictionary containing at minimum:
+            - "codes": np.ndarray or torch.Tensor shaped [num_codebooks, T]
+            - "tps": frames-per-second for the codes (e.g., 25)
+            - "sample_rate": original sample rate
+            - additional backend-specific metadata
         """
         return self.audio_tokenizer_model.encode(
             audio_path_or_wv, sr, loudness_normalize, loudness_threshold
@@ -230,3 +256,60 @@ class HiggsAudioTokenizer(Module):
 
             sampling_rate = self.sampling_rate
             return torch.from_numpy(decoded_wv), sampling_rate
+
+    def encode_streaming(
+        self,
+        audio_path_or_wv,
+        sr: Optional[int] = None,
+        frames_per_chunk: int = 50,
+        loudness_normalize: bool = False,
+        loudness_threshold: float = -23.0,
+        apply_delay: bool = False,
+        pad_value: int = 0,
+    ):
+        """Simple streaming interface that yields code chunks by frames.
+
+        Notes:
+            This implementation encodes the full audio then yields it in chunks
+            of frames. It is suitable for integration testing and offline
+            streaming simulation. For true real-time, wire the upstream backend
+            with chunked encoding once available.
+        """
+        result = self.encode(
+            audio_path_or_wv,
+            sr=sr,
+            loudness_normalize=loudness_normalize,
+            loudness_threshold=loudness_threshold,
+        )
+        codes = result.get("codes")
+        if isinstance(codes, torch.Tensor):
+            codes = codes.detach().cpu().numpy()
+        assert codes.ndim == 2, f"codes must be [C,T], got {codes.shape}"
+
+        if apply_delay:
+            codes = apply_delay_pattern(codes, pad_value=pad_value)
+
+        C, T = codes.shape
+        for start in range(0, T, frames_per_chunk):
+            end = min(start + frames_per_chunk, T)
+            yield {
+                "codes": codes[:, start:end],
+                "tps": result.get("tps", self.tps),
+                "sample_rate": result.get("sample_rate", self.sampling_rate),
+                "offset": start,
+            }
+
+    def decode_streaming(self, code_chunks: Sequence[np.ndarray]) -> np.ndarray:
+        """Decode a sequence of code chunks and concatenate waveforms.
+
+        Each element in code_chunks should be shaped [C, t]. A minimal overlap
+        smoothing could be added if chunks are known to overlap, but here we
+        simply concatenate decoding results for a straightforward baseline.
+        """
+        wavs = []
+        for codes in code_chunks:
+            wav, _ = self.decode(codes)
+            wavs.append(wav)
+        if not wavs:
+            return np.array([], dtype=np.float32)
+        return np.concatenate(wavs, axis=0)
