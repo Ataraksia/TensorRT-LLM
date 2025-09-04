@@ -256,7 +256,9 @@ class HiggsAudioModel(Module):
         # Performance optimization flags
         self.use_static_cache = True
         self.use_flash_attention = True
-        self.fast_forward_layers = getattr(config, "audio_dual_ffn_layers", list(range(self.num_layers)))
+        self.fast_forward_layers = getattr(
+            config, "audio_dual_ffn_layers", list(range(self.num_layers))
+        )
 
     def set_generation_mode(self, mode: GenerationMode):
         """Set the current generation mode."""
@@ -309,7 +311,11 @@ class HiggsAudioModel(Module):
             attention_mask = causal_mask.unsqueeze(0).expand(batch_size, -1, -1)
 
         # No special masking if not in audio mode or no audio tokens
-        if self.generation_mode == GenerationMode.TEXT or audio_out_mask is None or not audio_out_mask.any():
+        if (
+            self.generation_mode == GenerationMode.TEXT
+            or audio_out_mask is None
+            or not audio_out_mask.any()
+        ):
             return attention_mask
 
         # TODO: Implement full RVQ delay pattern causality here.
@@ -405,30 +411,27 @@ class HiggsAudioModel(Module):
 
             # Merge with text embeddings where audio tokens are present
             audio_mask_expanded = audio_out_mask.unsqueeze(-1).expand_as(hidden_states)
-            text_mask_expanded = ~audio_mask_expanded
-            hidden_states = (
-                hidden_states * text_mask_expanded + audio_out_embedded * audio_mask_expanded
-            )
+            hidden_states = torch.where(audio_mask_expanded, audio_out_embedded, hidden_states)
 
         # ========== 2.5. Merge Audio Input Features ==========
 
         if audio_features_embedded is not None:
-            # Find audio input token positions in input_ids
-            audio_input_mask = (input_ids == self.audio_in_token_idx)
-
+            # Find audio input token positions in input_ids.
+            # This is a placeholder implementation. A more robust solution would handle
+            # sequence length changes and attention mask adjustments by concatenating
+            # audio features into the sequence.
+            audio_input_mask = input_ids == self.audio_in_token_idx
             if audio_input_mask.any():
-                # Get positions where audio features should be inserted
-                audio_positions = torch.where(audio_input_mask)
+                # For simplicity, we replace the embedding of the audio token
+                # with the mean-pooled audio features.
+                audio_feature_summary = audio_features_embedded.mean(
+                    dim=1, keepdim=True
+                )  # -> [batch, 1, hidden_size]
 
-                if len(audio_positions[0]) > 0:
-                    # For simplicity, replace audio input tokens with mean-pooled audio features
-                    # In a full implementation, this would be more sophisticated sequence alignment
-                    audio_feature_summary = audio_features_embedded.mean(dim=1)  # [batch_size, hidden_size]
-
-                    # Broadcast to match positions
-                    for batch_idx, seq_idx in zip(audio_positions[0], audio_positions[1]):
-                        if batch_idx < audio_feature_summary.shape[0]:
-                            hidden_states[batch_idx, seq_idx] = audio_feature_summary[batch_idx]
+                # Use `where` for a clean replacement.
+                hidden_states = torch.where(
+                    audio_input_mask.unsqueeze(-1), audio_feature_summary, hidden_states
+                )
 
         # ========== 4. Generate Position IDs and Attention Masks ==========
 
@@ -437,18 +440,8 @@ class HiggsAudioModel(Module):
             position_ids = torch.arange(seq_len, dtype=torch.long, device=input_ids.device)
             position_ids = position_ids.unsqueeze(0).expand(batch_size, -1)
 
-        # Generate attention mask for causal modeling
-        if attention_mask is None:
-            # Create causal attention mask with proper device placement
-            attention_mask = torch.tril(
-                torch.ones(seq_len, seq_len, dtype=torch.bool, device=input_ids.device)
-            ).unsqueeze(0).expand(batch_size, -1, -1)
-
-        # Handle audio-specific attention masking for different generation modes
-        if self.generation_mode != GenerationMode.TEXT and audio_out_mask is not None:
-            # Apply audio-specific masking logic
-            # For audio generation, we may need different causal constraints
-            pass
+        # Prepare attention mask with audio-specific causality
+        attention_mask = self._prepare_attention_mask(input_ids, attention_mask, audio_out_mask)
 
         # ========== 5. Transformer Decoder Layers ==========
 
@@ -504,47 +497,78 @@ class HiggsAudioModel(Module):
     def prepare_inputs_for_generation(
         self,
         input_ids: Tensor,
+        past_key_values: Optional[ModuleList] = None,
+        attention_mask: Optional[Tensor] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """Prepare inputs for generation step.
+        """Prepare inputs for the next generation step."""
+        # Handle KV cache state
+        if past_key_values:
+            # In a cached scenario, we only need the last token
+            input_ids = input_ids[:, -1].unsqueeze(-1)
+            # The `past_key_values` are passed directly to the forward method
+            # via the `kv_cache_params` argument.
 
-        This method is called during incremental generation to prepare
-        the inputs for the next forward pass.
-        """
-        # TODO: Implement input preparation logic for generation
-        # This should handle KV cache updates, position IDs, etc.
-
+        # Other arguments like `position_ids` and `attention_mask` will be
+        # dynamically handled within the forward pass based on cache state.
         return {
             "input_ids": input_ids,
+            "kv_cache_params": KeyValueCacheParams(
+                past_key_values=past_key_values,
+                host_past_key_value_lengths=kwargs.get("host_past_key_value_lengths"),
+            ),
+            "use_cache": kwargs.get("use_cache", True),
+            "attention_mask": attention_mask,
             **kwargs,
         }
 
     def sample(
         self,
-        hidden_states: Tensor,
         logits: Tensor,
         audio_logits: Optional[Tensor] = None,
         **sampling_kwargs,
     ) -> Tensor:
-        """Sample next tokens from logits.
+        """Sample next tokens from logits with mode-aware strategies.
 
         Args:
-            hidden_states: Current hidden states
-            logits: Text logits for sampling
-            audio_logits: Audio logits for sampling (if in audio mode)
-            **sampling_kwargs: Additional sampling parameters
+            logits: Text logits for sampling [batch_size, vocab_size]
+            audio_logits: Audio logits for sampling [batch_size, num_codebooks, codebook_size+2]
+            **sampling_kwargs: Additional sampling parameters (temperature, top_k, etc.)
 
         Returns:
-            Next token IDs
+            Next token IDs (text or audio)
         """
-        # TODO: Implement sampling logic with support for:
-        # - Text token sampling with temperature/top-k/top-p
-        # - Audio token sampling with delay pattern coordination
-        # - Mode-aware sampling strategies
+        # In text mode, use standard text sampling
+        if self.generation_mode == GenerationMode.TEXT:
+            # TODO: Implement full sampling logic (temp, top-k, top-p)
+            # For now, greedy sampling on text logits
+            if logits.dim() == 3:
+                logits = logits[:, -1, :]
+            return torch.argmax(logits, dim=-1)
 
-        # For now, just do greedy sampling on text logits
-        if logits.dim() == 3:  # [batch, seq_len, vocab]
-            logits = logits[:, -1, :]  # Take last position
+        # In audio mode, handle coordinated audio token sampling
+        elif self.generation_mode in [GenerationMode.AUDIO_INIT, GenerationMode.AUDIO_IN_PROGRESS]:
+            if audio_logits is None:
+                raise ValueError("Audio logits are required for audio generation sampling.")
 
-        next_tokens = torch.argmax(logits, dim=-1)
-        return next_tokens
+            # TODO: Implement full RVQ delay pattern sampling.
+            # This requires state management to track which codebook to sample from
+            # at each step. For now, we'll sample from all codebooks greedily
+            # and return a placeholder. This is NOT a functional implementation.
+
+            # Greedy sample from each codebook
+            # audio_logits shape: [batch, seq, num_codebooks, codebook_size]
+            if audio_logits.dim() == 4:
+                audio_logits = audio_logits[:, -1, :, :]  # Get last sequence position
+
+            # Sample from each codebook independently
+            # -> [batch, num_codebooks]
+            sampled_audio_tokens = torch.argmax(audio_logits, dim=-1)
+
+            # In a real implementation, we would return one token from one codebook
+            # based on the current step in the delay pattern.
+            # As a placeholder, we return the sample from the first codebook.
+            return sampled_audio_tokens[:, 0]
+
+        else:
+            raise RuntimeError(f"Unknown generation mode: {self.generation_mode}")
