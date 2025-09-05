@@ -24,6 +24,4 @@ __all__ = [
     "HiggsAudioEncoder",
     "HiggsAudioFeatureProjector",
     "HiggsAudioTokenizer",
-    "PartiallyFrozenEmbedding",
-    "PartiallyFrozenLinear",
 ]

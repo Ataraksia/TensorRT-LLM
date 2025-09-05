@@ -225,14 +225,6 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_adapter_type: str = "stack",
         audio_ffn_hidden_size: int = 4096,
         audio_ffn_intermediate_size: int = 14336,
-        audio_dual_ffn_layers: Optional[list] = None,
-        audio_decoder_proj_num_layers: int = 0,
-        # Processing flags
-        encode_audio_in_tokens: bool = False,
-        use_delay_pattern: bool = False,
-        skip_audio_tower: bool = False,
-        use_audio_out_embed_projector: bool = False,
-        use_audio_out_self_attention: bool = False,
         # Audio codebook configuration
         audio_num_codebooks: int = 8,
         audio_codebook_size: int = 1024,
@@ -304,15 +296,6 @@ class HiggsAudioConfig(PretrainedConfig):
         self.audio_adapter_type = audio_adapter_type
         self.audio_ffn_hidden_size = audio_ffn_hidden_size
         self.audio_ffn_intermediate_size = audio_ffn_intermediate_size
-        self.audio_dual_ffn_layers = audio_dual_ffn_layers
-        self.audio_decoder_proj_num_layers = audio_decoder_proj_num_layers
-
-        # Processing flags
-        self.encode_audio_in_tokens = encode_audio_in_tokens
-        self.use_delay_pattern = use_delay_pattern
-        self.skip_audio_tower = skip_audio_tower
-        self.use_audio_out_embed_projector = use_audio_out_embed_projector
-        self.use_audio_out_self_attention = use_audio_out_self_attention
 
         # Audio codebook parameters
         self.audio_num_codebooks = audio_num_codebooks
@@ -347,18 +330,6 @@ class HiggsAudioConfig(PretrainedConfig):
                 f"Invalid audio_adapter_type: {self.audio_adapter_type}. "
                 f"Must be one of {valid_adapter_types}"
             )
-
-        # Validate dual FFN configuration
-        if self.audio_adapter_type.startswith("dual_ffn"):
-            if self.audio_dual_ffn_layers is None:
-                raise ValueError(
-                    f"audio_dual_ffn_layers must be specified when using "
-                    f"audio_adapter_type='{self.audio_adapter_type}'"
-                )
-            if not isinstance(self.audio_dual_ffn_layers, (list, tuple)):
-                raise ValueError(
-                    f"audio_dual_ffn_layers must be a list or tuple, got {type(self.audio_dual_ffn_layers)}"
-                )
 
         # 2. Validate audio parameters - core requirements
         if not isinstance(self.audio_num_codebooks, int) or self.audio_num_codebooks <= 0:
@@ -409,15 +380,6 @@ class HiggsAudioConfig(PretrainedConfig):
                 f"audio_ffn_intermediate_size must be a positive integer, got {self.audio_ffn_intermediate_size}"
             )
 
-        if (
-            not isinstance(self.audio_decoder_proj_num_layers, int)
-            or self.audio_decoder_proj_num_layers < 0
-        ):
-            raise ValueError(
-                f"audio_decoder_proj_num_layers must be a non-negative integer, "
-                f"got {self.audio_decoder_proj_num_layers}"
-            )
-
         # 5. Validate nested configurations are proper types
         if self.text_config is not None:
             if not isinstance(self.text_config, (dict, PretrainedConfig)):
@@ -466,19 +428,6 @@ class HiggsAudioConfig(PretrainedConfig):
                         f"This may require projection layers for compatibility.",
                         UserWarning,
                     )
-
-        # 7. Validate boolean flags
-        boolean_flags = [
-            ("encode_audio_in_tokens", self.encode_audio_in_tokens),
-            ("use_delay_pattern", self.use_delay_pattern),
-            ("skip_audio_tower", self.skip_audio_tower),
-            ("use_audio_out_embed_projector", self.use_audio_out_embed_projector),
-            ("use_audio_out_self_attention", self.use_audio_out_self_attention),
-        ]
-
-        for name, flag in boolean_flags:
-            if not isinstance(flag, bool):
-                raise ValueError(f"{name} must be a boolean, got {type(flag)}")
 
         # 8. Validate string tokens are non-empty
         string_tokens = [
@@ -539,13 +488,6 @@ class HiggsAudioConfig(PretrainedConfig):
             "audio_adapter_type",
             "audio_ffn_hidden_size",
             "audio_ffn_intermediate_size",
-            "audio_dual_ffn_layers",
-            "audio_decoder_proj_num_layers",
-            "encode_audio_in_tokens",
-            "use_delay_pattern",
-            "skip_audio_tower",
-            "use_audio_out_embed_projector",
-            "use_audio_out_self_attention",
             "audio_num_codebooks",
             "audio_codebook_size",
             "audio_stream_bos_id",
