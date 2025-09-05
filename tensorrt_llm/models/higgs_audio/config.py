@@ -24,7 +24,7 @@ The model includes:
 import json
 from typing import Dict, Optional, Union
 
-from ..modeling_utils import PretrainedConfig
+from ..modeling_utils import PretrainedConfig, QuantConfig
 
 __all__ = [
     "HiggsAudioConfig",
@@ -63,7 +63,7 @@ class HiggsAudioEncoderConfig(PretrainedConfig):
         # Initialize base config first
         super().__init__(
             architecture="higgs_audio_encoder",
-            dtype="float16",
+            dtype="bfloat16",
             hidden_size=d_model,
             num_hidden_layers=encoder_layers,
             num_attention_heads=encoder_attention_heads,
@@ -71,6 +71,7 @@ class HiggsAudioEncoderConfig(PretrainedConfig):
             hidden_act=activation_function,
             max_position_embeddings=max_source_positions,
             intermediate_size=encoder_ffn_dim,
+            **kwargs,
         )
 
         # Audio encoder specific attributes
@@ -220,6 +221,7 @@ class HiggsAudioConfig(PretrainedConfig):
         # Core configurations
         text_config: Optional[Union[PretrainedConfig, Dict]] = None,
         audio_encoder_config: Optional[Union[HiggsAudioEncoderConfig, Dict]] = None,
+        quant_config: Optional[Union[QuantConfig, Dict]] = None,
         audio_tokenizer_config: Optional[Dict] = None,
         # Adapter configuration
         audio_adapter_type: str = "stack",
@@ -276,15 +278,21 @@ class HiggsAudioConfig(PretrainedConfig):
             num_layers = getattr(text_config, "num_hidden_layers", 28)
             vocab_size = getattr(text_config, "vocab_size", 128256)
 
+        if quant_config is None:
+            quant_config = QuantConfig()
+        elif isinstance(quant_config, dict):
+            quant_config = QuantConfig(**quant_config)
+
         # Initialize base PretrainedConfig
         super().__init__(
             architecture="higgs_audio",
-            dtype="float16",
+            dtype="bfloat16",
             hidden_size=hidden_size,
             num_hidden_layers=num_layers,
             num_attention_heads=24,  # Default for LLaMA-3.2-3B
             vocab_size=vocab_size,
             hidden_act="silu",
+            **kwargs,
         )
 
         # Store nested configurations
