@@ -13,17 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ctypes
-from ctypes import (
-    CFUNCTYPE,
-    POINTER,
-    c_int,
-    c_int64,
-    c_size_t,
-    c_uint8,
-    c_uint16,
-    c_void_p,
-    pointer,
-)
+from ctypes import (CFUNCTYPE, POINTER, c_int, c_int64, c_size_t, c_uint8,
+                    c_uint16, c_void_p, pointer)
 
 import torch
 
@@ -33,14 +24,14 @@ class DLDataType(ctypes.Structure):
     _fields_ = [
         ("code", c_uint8),  # Data type code, e.g., 2 for float
         ("bits", c_uint8),  # Number of bits per element, e.g., 32
-        ("lanes", c_uint16),  # Number of lanes, usually 1
+        ("lanes", c_uint16)  # Number of lanes, usually 1
     ]
 
 
 class DLDevice(ctypes.Structure):
     _fields_ = [
         ("device_type", c_int),  # Device type, typically 2 for GPU
-        ("device_id", c_int),  # Device ID, usually 0 for default GPU
+        ("device_id", c_int)  # Device ID, usually 0 for default GPU
     ]
 
 
@@ -52,15 +43,15 @@ class DLTensor(ctypes.Structure):
         ("dtype", DLDataType),  # Data type
         ("shape", POINTER(c_int64)),  # Pointer to array of dimension sizes
         (
-            "strides",
-            POINTER(c_int64),
+            "strides", POINTER(c_int64)
         ),  # Pointer to strides array (can be NULL for default contiguous layout)
-        ("byte_offset", c_size_t),  # Byte offset (usually 0)
+        ("byte_offset", c_size_t)  # Byte offset (usually 0)
     ]
 
 
 # Deleter type for DLManagedTensor
-DLManagedTensorDeleter = CFUNCTYPE(None, POINTER(ctypes.c_void_p))  # Not used directly here
+DLManagedTensorDeleter = CFUNCTYPE(None, POINTER(
+    ctypes.c_void_p))  # Not used directly here
 
 
 # Define DLManagedTensor structure, with deleter prototype void(*deleter)(DLManagedTensor*)
@@ -68,11 +59,9 @@ class DLManagedTensor(ctypes.Structure):
     pass
 
 
-DLManagedTensor._fields_ = [
-    ("dl_tensor", DLTensor),
-    ("manager_ctx", c_void_p),
-    ("deleter", CFUNCTYPE(None, POINTER(DLManagedTensor))),
-]
+DLManagedTensor._fields_ = [("dl_tensor", DLTensor), ("manager_ctx", c_void_p),
+                            ("deleter", CFUNCTYPE(None,
+                                                  POINTER(DLManagedTensor)))]
 
 
 # A no-op deleter that doesn't perform any operation
@@ -106,7 +95,8 @@ class CapsuleWrapper:
         self._managed_tensor = managed_tensor  # Keep reference to prevent garbage collection
 
 
-def create_dlpack_capsule(ptr, segment_size, segment_stride, num_segments, torch_dtype, dev_id):
+def create_dlpack_capsule(ptr, segment_size, segment_stride, num_segments,
+                          torch_dtype, dev_id):
     """
     Parameters:
       ptr: GPU memory address obtained from cudaMalloc (Python int)
@@ -116,19 +106,14 @@ def create_dlpack_capsule(ptr, segment_size, segment_stride, num_segments, torch
       torch_dtype: torch dtype
       dev_id: device id.
     Returns:
-      A PyCapsule object compliant with DLPack specification, which can be directly converted to a
-      tensor using torch.utils.dlpack.from_dlpack
+      A PyCapsule object compliant with DLPack specification, which can be directly converted to a tensor using torch.utils.dlpack.from_dlpack
     """
     bits_per_elements = 0
     dldata_type_code = 0
     # refer to https://github.com/dmlc/dlpack/blob/main/include/dlpack/dlpack.h#L160
     if torch_dtype in [
-        torch.float8_e5m2,
-        torch.float8_e4m3fn,
-        torch.bfloat16,
-        torch.float16,
-        torch.float32,
-        torch.float64,
+            torch.float8_e5m2, torch.float8_e4m3fn, torch.bfloat16,
+            torch.float16, torch.float32, torch.float64
     ]:
         bits_per_elements = torch.finfo(torch_dtype).bits
         dldata_type_code = 2
@@ -143,7 +128,8 @@ def create_dlpack_capsule(ptr, segment_size, segment_stride, num_segments, torch
     bytes_per_element = bits_per_elements // 8
     # Allocate space for shape (constructing a one-dimensional tensor here)
     ShapeArrayType = c_int64 * 2  # 1 dimension
-    shape_array = ShapeArrayType(num_segments, segment_size // bytes_per_element)
+    shape_array = ShapeArrayType(num_segments,
+                                 segment_size // bytes_per_element)
     stride_array = ShapeArrayType(segment_stride // bytes_per_element, 1)
     # Set device information: GPU (device_type=2) and device_id=dev_id (modify as needed)
     device = DLDevice(device_type=2, device_id=dev_id)
@@ -180,9 +166,8 @@ def create_dlpack_capsule(ptr, segment_size, segment_stride, num_segments, torch
     return capsule_wrapper
 
 
-def pack_strided_memory(
-    ptr: int, segment_size: int, segment_stride: int, num_segments: int, dtype: torch.dtype, dev_id
-):
+def pack_strided_memory(ptr: int, segment_size: int, segment_stride: int,
+                        num_segments: int, dtype: torch.dtype, dev_id):
     """
     Pack GPU memory into a PyTorch tensor with specified stride.
 
@@ -202,9 +187,8 @@ def pack_strided_memory(
         even with the same pointer. Each capsule is consumed only once.
     """
     # Create a new capsule each time
-    capsule_wrapper = create_dlpack_capsule(
-        ptr, segment_size, segment_stride, num_segments, dtype, dev_id
-    )
+    capsule_wrapper = create_dlpack_capsule(ptr, segment_size, segment_stride,
+                                            num_segments, dtype, dev_id)
     torch_tensor = torch.utils.dlpack.from_dlpack(capsule_wrapper.capsule)
     torch_tensor._capsule_wrapper = capsule_wrapper
     return torch_tensor

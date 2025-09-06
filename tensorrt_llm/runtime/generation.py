@@ -29,10 +29,7 @@ import numpy as np
 import torch
 import tensorrt as trt
 # isort: on
-try:
-    from cuda.bindings import runtime as cudart
-except ImportError:
-    from cuda import cudart
+from cuda import cudart
 
 from tensorrt_llm.runtime.memory_pools.memory_pools_allocator import \
     MemoryPoolsAllocator

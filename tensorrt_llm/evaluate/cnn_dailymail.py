@@ -18,9 +18,8 @@ import click
 import datasets
 import evaluate
 
-from .. import LLM as PyTorchLLM
-from .._tensorrt_engine import LLM
-from ..llmapi import RequestOutput
+from .._torch import LLM as PyTorchLLM
+from ..llmapi import LLM, RequestOutput
 from ..logger import logger
 from ..sampling_params import SamplingParams
 from .interface import Evaluator
@@ -29,17 +28,15 @@ from .interface import Evaluator
 class CnnDailymail(Evaluator):
 
     def __init__(self,
-                 dataset_path: Optional[str] = None,
+                 dataset_path: str = "ccdv/cnn_dailymail",
                  num_samples: Optional[int] = None,
                  random_seed: int = 0,
-                 rouge_path: Optional[str] = None,
+                 rouge_path: str = "rouge",
                  apply_chat_template: bool = False,
                  system_prompt: Optional[str] = None):
         super().__init__(random_seed=random_seed,
                          apply_chat_template=apply_chat_template,
                          system_prompt=system_prompt)
-        if dataset_path is None:
-            dataset_path = "ccdv/cnn_dailymail"
         self.data = datasets.load_dataset(dataset_path,
                                           "3.0.0",
                                           split="test",
@@ -49,8 +46,6 @@ class CnnDailymail(Evaluator):
             self.num_samples = self.data.num_rows
         else:
             self.num_samples = min(num_samples, self.data.num_rows)
-        if rouge_path is None:
-            rouge_path = "rouge"
         self.rouge = evaluate.load(rouge_path)
 
     def generate_samples(self) -> Iterable[tuple]:
@@ -59,7 +54,7 @@ class CnnDailymail(Evaluator):
                 break
             prompt = sample["article"] + " TL;DR:"
             prompt = prompt.strip().replace(" n't", "n't")
-            yield prompt, None, sample["highlights"]
+            yield prompt, sample["highlights"]
 
     def compute_score(self, outputs: List[RequestOutput],
                       references: List[str]) -> float:
@@ -77,7 +72,7 @@ class CnnDailymail(Evaluator):
     @click.command("cnn_dailymail")
     @click.option("--dataset_path",
                   type=str,
-                  default=None,
+                  default="ccdv/cnn_dailymail",
                   help="The path to CNN Dailymail dataset. "
                   "If unspecified, the dataset is downloaded from HF hub.")
     @click.option(
@@ -92,7 +87,7 @@ class CnnDailymail(Evaluator):
                   help="Random seed for dataset processing.")
     @click.option("--rouge_path",
                   type=str,
-                  default=None,
+                  default="rouge",
                   help="The path to rouge repository."
                   "If unspecified, the repository is downloaded from HF hub.")
     @click.option("--apply_chat_template",
@@ -100,7 +95,7 @@ class CnnDailymail(Evaluator):
                   default=False,
                   help="Whether to apply chat template.")
     @click.option("--system_prompt",
-                  type=str,
+                  type=Optional[str],
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -113,10 +108,10 @@ class CnnDailymail(Evaluator):
                   help="Maximum generation length.")
     @click.pass_context
     @staticmethod
-    def command(ctx, dataset_path: Optional[str], num_samples: int,
-                random_seed: int, rouge_path: Optional[str],
-                apply_chat_template: bool, system_prompt: Optional[str],
-                max_input_length: int, max_output_length: int) -> None:
+    def command(ctx, dataset_path: str, num_samples: int, random_seed: int,
+                rouge_path: str, apply_chat_template: bool,
+                system_prompt: Optional[str], max_input_length: int,
+                max_output_length: int) -> None:
         llm: Union[LLM, PyTorchLLM] = ctx.obj
         sampling_params = SamplingParams(
             max_tokens=max_output_length,

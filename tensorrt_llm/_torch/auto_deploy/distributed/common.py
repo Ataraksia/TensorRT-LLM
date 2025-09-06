@@ -89,7 +89,7 @@ def get_rank_world_size() -> Tuple[int, int]:
 
 def initialize_or_skip(*args, **kwargs) -> Tuple[int, int]:
     if not dist.is_initialized():
-        return initialize(*args, **kwargs)
+        initialize(*args, **kwargs)
     return get_rank(), get_world_size()
 
 
@@ -241,7 +241,6 @@ def spawn_multiprocess_job(job: Callable[[int, int], None], size: Optional[int] 
     processes = _start_multiprocess_job(job, size)
     if processes:
         _join_multiprocess_job(processes)
-    cleanup()
 
 
 class MultiProcessExecutor:

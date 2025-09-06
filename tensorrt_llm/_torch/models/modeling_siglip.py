@@ -23,9 +23,7 @@ class SiglipVisionTransformer(nn.Module):
     For example, it is different from the regular SiglipVisionTransformer in the sense that it does not return a pooled output.
     """
 
-    def __init__(self,
-                 model_config: ModelConfig[SiglipVisionConfig],
-                 use_post_layernorm: bool = False):
+    def __init__(self, model_config: ModelConfig[SiglipVisionConfig]):
         super().__init__()
         config = model_config.pretrained_config
         self.config = config
@@ -34,9 +32,6 @@ class SiglipVisionTransformer(nn.Module):
         self.encoder = SiglipEncoder(model_config)
         if hasattr(config, "vision_use_head"):
             assert not config.vision_use_head, "Currently, we only support vision_use_head = False"
-        self.post_layernorm = nn.LayerNorm(
-            config.hidden_size,
-            eps=config.layer_norm_eps) if use_post_layernorm else nn.Identity()
 
     def forward(
         self,
@@ -57,23 +52,16 @@ class SiglipVisionTransformer(nn.Module):
             attn_metadata=attn_metadata,
         )
 
-        encoder_outputs_list = list(encoder_outputs)
-        encoder_outputs_list[-1] = self.post_layernorm(encoder_outputs_list[-1])
-        encoder_outputs = tuple(encoder_outputs_list)
-
         return encoder_outputs
 
 
 @register_auto_model("SiglipVisionModel")
 class SiglipVisionModel(nn.Module):
 
-    def __init__(self,
-                 model_config: ModelConfig[SiglipVisionConfig],
-                 use_post_layernorm: bool = False):
+    def __init__(self, model_config: ModelConfig[SiglipVisionConfig]):
         super().__init__()
         self.config = model_config.pretrained_config
-        self.vision_model = SiglipVisionTransformer(
-            model_config, use_post_layernorm=use_post_layernorm)
+        self.vision_model = SiglipVisionTransformer(model_config)
         self.model_config = model_config
         self.metadata_cls = get_attention_backend(
             model_config.attn_backend).Metadata
@@ -120,4 +108,4 @@ class SiglipVisionModel(nn.Module):
             r'(.*?)fc1(.*)': r'\1up_proj\2',
             r'(.*?)fc2(.*)': r'\1down_proj\2',
         }
-        _load_weights_impl(self, weights, params_map=pattern_mapping)
+        _load_weights_impl(self, weights, pattern_mapping)

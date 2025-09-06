@@ -28,7 +28,54 @@ from ..modeling_utils import PretrainedConfig, QuantConfig
 
 __all__ = [
     "HiggsAudioConfig",
+    "HiggsAudioEncoderConfig",
 ]
+
+
+class HiggsAudioEncoderConfig(PretrainedConfig):
+    """Configuration for the audio encoder used by HiggsAudio.
+
+    This models the Whisper-style encoder shape parameters that the HiggsAudio
+    pipeline expects when computing audio feature lengths and embeddings.
+
+    Attributes:
+    - d_model: Hidden size of the encoder outputs (projected to text hidden size later if needed)
+    - n_mels: Number of mel bins in input features
+    - downsample_factor: Total temporal downsampling factor from raw features to encoder outputs
+    - use_whisper_tokenizer: Whether to follow Whisper feature conventions
+    """
+
+    def __init__(
+        self,
+        *,
+        d_model: int = 3072,
+        n_mels: int = 128,
+        downsample_factor: int = 4,
+        use_whisper_tokenizer: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            architecture="higgs_audio_encoder",
+            dtype=kwargs.pop("dtype", "bfloat16"),
+            hidden_size=d_model,
+            num_hidden_layers=kwargs.pop("encoder_layers", 12),
+            num_attention_heads=kwargs.pop("encoder_attention_heads", 12),
+            **kwargs,
+        )
+        self.d_model = d_model
+        self.n_mels = n_mels
+        self.downsample_factor = downsample_factor
+        self.use_whisper_tokenizer = use_whisper_tokenizer
+
+    def validate(self) -> None:
+        if not isinstance(self.d_model, int) or self.d_model <= 0:
+            raise ValueError(f"d_model must be positive int, got {self.d_model}")
+        if not isinstance(self.n_mels, int) or self.n_mels <= 0:
+            raise ValueError(f"n_mels must be positive int, got {self.n_mels}")
+        if not isinstance(self.downsample_factor, int) or self.downsample_factor <= 0:
+            raise ValueError(
+                f"downsample_factor must be positive int, got {self.downsample_factor}"
+            )
 
 
 class HiggsAudioConfig(PretrainedConfig):
@@ -47,8 +94,9 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_encoder_config: Optional[Union[HiggsAudioEncoderConfig, Dict]] = None,
         quant_config: Optional[Union[QuantConfig, Dict]] = None,
         audio_tokenizer_config: Optional[Dict] = None,
+        dtype: str = "bfloat16",  # Add dtype parameter
         # Adapter configuration
-        audio_adapter_type: str = "stack",
+        audio_adapter_type: str = "dual_ffn_fast_forward",
         audio_ffn_hidden_size: int = 4096,
         audio_ffn_intermediate_size: int = 14336,
         # Audio codebook configuration
@@ -110,7 +158,7 @@ class HiggsAudioConfig(PretrainedConfig):
         # Initialize base PretrainedConfig
         super().__init__(
             architecture="higgs_audio",
-            dtype="bfloat16",
+            dtype=dtype,  # Use the passed dtype parameter
             hidden_size=hidden_size,
             num_hidden_layers=num_layers,
             num_attention_heads=24,  # Default for LLaMA-3.2-3B
@@ -123,6 +171,65 @@ class HiggsAudioConfig(PretrainedConfig):
         self.text_config = text_config
         self.audio_encoder_config = audio_encoder_config
         self.audio_tokenizer_config = audio_tokenizer_config
+
+        # Additional attributes required by TensorRT-LLM layers
+        self.layer_idx_offset = (
+            getattr(text_config, "layer_idx_offset", 0)
+            if not isinstance(text_config, dict)
+            else text_config.get("layer_idx_offset", 0)
+        )
+        self.max_position_embeddings = (
+            getattr(text_config, "max_position_embeddings", 2048)
+            if not isinstance(text_config, dict)
+            else text_config.get("max_position_embeddings", 2048)
+        )
+
+        # LLaMA-specific attributes
+        self.use_input_layernorm_in_first_layer = (
+            getattr(text_config, "use_input_layernorm_in_first_layer", True)
+            if not isinstance(text_config, dict)
+            else text_config.get("use_input_layernorm_in_first_layer", True)
+        )
+        self.rms_norm_eps = (
+            getattr(text_config, "rms_norm_eps", 1e-6)
+            if not isinstance(text_config, dict)
+            else text_config.get("rms_norm_eps", 1e-6)
+        )
+        self.intermediate_size = (
+            getattr(text_config, "intermediate_size", 11008)
+            if not isinstance(text_config, dict)
+            else text_config.get("intermediate_size", 11008)
+        )
+        self.num_key_value_heads = (
+            getattr(text_config, "num_key_value_heads", self.num_attention_heads)
+            if not isinstance(text_config, dict)
+            else text_config.get("num_key_value_heads", self.num_attention_heads)
+        )
+        self.rope_theta = (
+            getattr(text_config, "rope_theta", 10000.0)
+            if not isinstance(text_config, dict)
+            else text_config.get("rope_theta", 10000.0)
+        )
+        self.rotary_base = (
+            getattr(text_config, "rotary_base", 10000.0)
+            if not isinstance(text_config, dict)
+            else text_config.get("rotary_base", 10000.0)
+        )
+        self.mlp_bias = (
+            getattr(text_config, "mlp_bias", False)
+            if not isinstance(text_config, dict)
+            else text_config.get("mlp_bias", False)
+        )
+        self.attention_bias = (
+            getattr(text_config, "attention_bias", False)
+            if not isinstance(text_config, dict)
+            else text_config.get("attention_bias", False)
+        )
+        self.attn_bias = (
+            getattr(text_config, "attn_bias", False)
+            if not isinstance(text_config, dict)
+            else text_config.get("attn_bias", False)
+        )
 
         # Adapter configuration
         self.audio_adapter_type = audio_adapter_type
@@ -409,7 +516,12 @@ import torch.nn.functional as F
 import torchaudio
 from huggingface_hub import snapshot_download
 from transformers import AutoModel
-from vector_quantize_pytorch import ResidualFSQ, ResidualVectorQuantizer
+
+try:
+    from vector_quantize_pytorch import ResidualFSQ, ResidualVectorQuantizer
+except Exception:  # pragma: no cover - optional dependency for tokenizer path
+    ResidualFSQ = None
+    ResidualVectorQuantizer = None
 
 
 class EncodedResult:
@@ -502,6 +614,8 @@ class HiggsAudioTokenizer(nn.Module):
         )
 
         self.quantizer_dim = int((D + self.encoder_semantic_dim) // vq_scale)
+        # Minimal semantic encoder/decoder to satisfy construction; in real
+        # usage, these come from the tokenizer components defined below.
         self.encoder_semantic = Encoder(
             input_channels=self.semantic_dim, encode_channels=self.encoder_semantic_dim
         )
@@ -512,14 +626,19 @@ class HiggsAudioTokenizer(nn.Module):
         )
 
         # out_D=D+768
-        if isinstance(bins, int):  # RVQ
+        if isinstance(bins, int) and ResidualVectorQuantizer is not None:  # RVQ
             self.quantizer = ResidualVectorQuantizer(
                 dimension=self.quantizer_dim, codebook_dim=codebook_dim, n_q=n_q, bins=bins
             )
             self.quantizer_type = "RVQ"
-        else:  # RFSQ
+        elif ResidualFSQ is not None:  # RFSQ
             self.quantizer = ResidualFSQ(dim=self.quantizer_dim, levels=bins, num_quantizers=n_q)
             self.quantizer_type = "RFSQ"
+        else:
+            raise ImportError(
+                "vector_quantize_pytorch is required for HiggsAudioTokenizer; "
+                "install it or provide compatible quantizer."
+            )
 
         self.fc_prior = nn.Linear(D + self.encoder_semantic_dim, self.quantizer_dim)
         self.fc_post1 = nn.Linear(self.quantizer_dim, self.encoder_semantic_dim)
@@ -647,8 +766,8 @@ class HiggsAudioTokenizer(nn.Module):
             import pyloudnorm as pyln
 
             meter = pyln.Meter(sr)
-            l = meter.integrated_loudness(wv)
-            wv = pyln.normalize.loudness(wv, l, loudness_threshold)
+            loud = meter.integrated_loudness(wv)
+            wv = pyln.normalize.loudness(wv, loud, loudness_threshold)
         if sr != self.sampling_rate:
             wv = librosa.resample(wv, orig_sr=sr, target_sr=self.sampling_rate)
         if self.audio_tokenizer_feature_extractor is not None:
@@ -732,3 +851,30 @@ def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
     model.to(device)
     model.eval()
     return model
+
+
+class Encoder(nn.Module):
+    """Lightweight 1D conv encoder used in tokenizer pipeline.
+
+    This is a minimal stub to satisfy construction in environments where the
+    full tokenizer submodules are not material to inference via TRT runner.
+    """
+
+    def __init__(self, input_channels: int, encode_channels: int):
+        super().__init__()
+        self.proj = nn.Conv1d(input_channels, encode_channels, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.proj(x)
+
+
+class Decoder(nn.Module):
+    """Lightweight 1D conv decoder used in tokenizer pipeline."""
+
+    def __init__(self, code_dim: int, output_channels: int, decode_channels: int):
+        super().__init__()
+        self.proj = nn.Conv1d(code_dim, decode_channels, kernel_size=1)
+        self.out = nn.Conv1d(decode_channels, output_channels, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.out(torch.relu(self.proj(x)))

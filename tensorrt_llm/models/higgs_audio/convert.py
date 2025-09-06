@@ -11,7 +11,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.import functools
+# limitations under the License.
 
 import copy
 import functools
@@ -19,7 +19,7 @@ import json
 import os
 import time
 from collections import defaultdict
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import safetensors
@@ -29,8 +29,7 @@ from tqdm import tqdm
 from transformers import AutoConfig, AutoTokenizer
 from transformers.pytorch_utils import Conv1D
 
-from ..._utils import pad_vocab_size, str_dtype_to_torch
-from ...logger import logger
+from ..._utils import pad_vocab_size
 from ...mapping import Mapping
 from ...quantization import QuantAlgo
 from ..convert_utils import (
@@ -47,8 +46,40 @@ from ..convert_utils import (
     split_qkv_bias_tp,
     split_qkv_tp,
 )
-from .config import QWenConfig
-from .utils import get_qwen_key_list, make_context
+from .config import HiggsAudioConfig
+
+
+def get_higgs_audio_key_list():
+    """Return key mapping for HiggsAudio model layers."""
+    return [
+        "self_attn.",  # attention layers
+        "self_attn.o_proj",  # attention output projection
+        "mlp.gate_proj",  # standard MLP gate projection
+        "mlp.up_proj",  # standard MLP up projection
+        "mlp.down_proj",  # standard MLP down projection
+        "input_layernorm",  # input layer norm
+        "post_attention_layernorm",  # post attention layer norm
+        "embed_tokens",  # token embeddings
+        "norm",  # final layer norm
+        "audio_mlp.gate_proj",  # audio MLP gate projection
+        "audio_mlp.up_proj",  # audio MLP up projection
+        "audio_mlp.down_proj",  # audio MLP down projection
+        "audio_input_layernorm",  # audio input layer norm
+        "audio_post_attention_layernorm",  # audio post attention layer norm
+        "audio_codebook_embeddings",  # audio codebook embeddings
+        "audio_decoder_proj.audio_lm_head",  # audio language model head
+        "audio_decoder_proj.text_lm_head",  # text language model head
+    ]
+
+
+def make_context_higgs_audio(tokenizer, query, history=None, system=None, max_input_length=512):
+    """Create context for HiggsAudio model."""
+    # Simple context creation for HiggsAudio - just tokenize the query
+    if system:
+        query = f"{system}\n{query}"
+
+    tokens = tokenizer.encode(query, max_length=max_input_length, truncation=True)
+    return None, tokens
 
 
 @torch.no_grad()
@@ -248,12 +279,11 @@ def capture_activation_range(
         line = line.strip()
         line = line.replace(" n't", "n't")
         if qwen_type == "qwen":
-            _, input_id_list = make_context(
+            _, input_id_list = make_context_higgs_audio(
                 tokenizer=tokenizer,
                 query=line,
                 history=[],
                 system=system_prompt,
-                chat_format=chat_format,
                 max_input_length=seq_len,
             )
             line_encoded = (
@@ -451,7 +481,7 @@ def get_tllm_linear_sq_weight(
     return results
 
 
-def load_hf_qwen(model_dir: str, load_model_on_cpu: bool = False):
+def load_hf_higgs_audio(model_dir: str, load_model_on_cpu: bool = False):
     config_path = os.path.join(model_dir, "config.json")
     with open(config_path, "r") as f:
         config = json.load(f)
@@ -528,8 +558,8 @@ def convert_hf_qwen(
     mha_mode = num_key_value_heads == num_attention_heads
     layers_range = mapping.pp_layers(hf_config.num_hidden_layers)
 
-    layer_prefix = "transformer.h." if qwen_type == "qwen" else "model.layers."
-    key_list = get_qwen_key_list(qwen_type)
+    layer_prefix = "model.layers."  # HiggsAudio uses model.layers. prefix
+    key_list = get_higgs_audio_key_list()
 
     for l in layers_range:
         prefix = layer_prefix + f"{l}."
@@ -962,6 +992,63 @@ def convert_hf_qwen(
                     )
                 )
 
+        # HiggsAudio dual FFN layers - Handle audio_mlp components
+        # Check if audio_mlp exists for this layer
+        audio_mlp_gate_key = prefix + "audio_mlp.gate_proj.weight"
+        if audio_mlp_gate_key in model_params:
+            # Audio MLP gate projection
+            audio_mlp_gate_weight = get_weight(model_params, prefix + "audio_mlp.gate_proj", dtype)
+            audio_mlp_up_weight = get_weight(model_params, prefix + "audio_mlp.up_proj", dtype)
+
+            # Combine gate and up projections for audio MLP
+            audio_gate_up = torch.concat([audio_mlp_gate_weight, audio_mlp_up_weight], dim=-2)
+            split_v = split_matrix_tp(audio_gate_up, tensor_parallel, mapping.tp_rank, dim=0)
+
+            weights.update(
+                get_tllm_linear_weight(
+                    split_v,
+                    tllm_prex + "audio_mlp.gate_up_proj.",
+                    None,
+                    use_weight_only,
+                    plugin_weight_only_quant_type,
+                    dtype,
+                    use_gemm_woq_plugin,
+                )
+            )
+
+            # Audio MLP down projection
+            audio_mlp_down_weight = get_weight(model_params, prefix + "audio_mlp.down_proj", dtype)
+            split_v = split_matrix_tp(
+                audio_mlp_down_weight, tensor_parallel, mapping.tp_rank, dim=1
+            )
+
+            weights.update(
+                get_tllm_linear_weight(
+                    split_v,
+                    tllm_prex + "audio_mlp.proj.",
+                    None,
+                    use_weight_only,
+                    plugin_weight_only_quant_type,
+                    dtype,
+                    use_gemm_woq_plugin,
+                )
+            )
+
+        # HiggsAudio audio-specific layer norms (if they exist)
+        audio_input_ln_key = prefix + "audio_input_layernorm.weight"
+        if audio_input_ln_key in model_params:
+            audio_input_ln_weight = get_weight(
+                model_params, prefix + "audio_input_layernorm", dtype
+            )
+            weights[tllm_prex + "audio_input_layernorm.weight"] = audio_input_ln_weight
+
+        audio_post_ln_key = prefix + "audio_post_attention_layernorm.weight"
+        if audio_post_ln_key in model_params:
+            audio_post_ln_weight = get_weight(
+                model_params, prefix + "audio_post_attention_layernorm", dtype
+            )
+            weights[tllm_prex + "audio_post_attention_layernorm.weight"] = audio_post_ln_weight
+
         # Layer norms do not use tensor parallelism
         input_ln_weight = get_weight(model_params, prefix + key_list[5], dtype)
         weights[tllm_prex + "input_layernorm.weight"] = input_ln_weight
@@ -1001,6 +1088,55 @@ def convert_hf_qwen(
     if mapping.is_first_pp_rank():
         weights["transformer.vocab_embedding.weight"] = v
 
+    # HiggsAudio specific components
+    # Audio codebook embeddings
+    audio_codebook_key = "audio_codebook_embeddings.weight"
+    if audio_codebook_key in model_params:
+        audio_codebook_weight = get_weight(model_params, "audio_codebook_embeddings", dtype)
+        weights["audio_codebook_embeddings.weight"] = audio_codebook_weight
+
+    # Audio decoder projection with dual heads
+    audio_decoder_proj_key = "audio_decoder_proj"
+    if f"{audio_decoder_proj_key}.audio_lm_head.weight" in model_params:
+        # Audio LM head
+        audio_lm_head_weight = get_weight(
+            model_params, f"{audio_decoder_proj_key}.audio_lm_head", dtype
+        )
+        if vocab_size % mapping.tp_size != 0:
+            vocab_size_padded = pad_vocab_size(vocab_size, mapping.tp_size)
+            pad_width = vocab_size_padded - vocab_size
+            audio_lm_head_weight = torch.from_numpy(
+                np.pad(
+                    audio_lm_head_weight.detach().cpu().numpy(),
+                    ((0, pad_width), (0, 0)),
+                    "constant",
+                    constant_values=0,
+                )
+            )
+        weights["audio_decoder_proj.audio_lm_head.weight"] = split_matrix_tp(
+            audio_lm_head_weight, tensor_parallel, mapping.tp_rank, dim=0
+        )
+
+    if f"{audio_decoder_proj_key}.text_lm_head.weight" in model_params:
+        # Text LM head
+        text_lm_head_weight = get_weight(
+            model_params, f"{audio_decoder_proj_key}.text_lm_head", dtype
+        )
+        if vocab_size % mapping.tp_size != 0:
+            vocab_size_padded = pad_vocab_size(vocab_size, mapping.tp_size)
+            pad_width = vocab_size_padded - vocab_size
+            text_lm_head_weight = torch.from_numpy(
+                np.pad(
+                    text_lm_head_weight.detach().cpu().numpy(),
+                    ((0, pad_width), (0, 0)),
+                    "constant",
+                    constant_values=0,
+                )
+            )
+        weights["audio_decoder_proj.text_lm_head.weight"] = split_matrix_tp(
+            text_lm_head_weight, tensor_parallel, mapping.tp_rank, dim=0
+        )
+
     if mapping.is_last_pp_rank():
         ln_f_w = get_weight(model_params, key_list[8], dtype)
         weights["transformer.ln_f.weight"] = ln_f_w
@@ -1015,8 +1151,10 @@ def convert_hf_qwen(
     return weights
 
 
-def quantize(hf_model_dir: str, output_dir: str, config: QWenConfig, calib_dataset="cnn_dailymail"):
-    """Quantize the save the model as TRT-LLM checkpoint to output_dir"""
+def quantize(
+    hf_model_dir: str, output_dir: str, config: HiggsAudioConfig, calib_dataset="cnn_dailymail"
+):
+    """Quantize the save the model as TRT-LLM checkpoint to output_dir."""
     os.makedirs(output_dir, exist_ok=True)
     config.to_json_file(os.path.join(output_dir, "config.json"))
 
@@ -1080,7 +1218,7 @@ def quantize(hf_model_dir: str, output_dir: str, config: QWenConfig, calib_datas
 
 def load_weights_from_hf_model(
     hf_model,
-    config: QWenConfig,
+    config: HiggsAudioConfig,
     act_range: Optional[dict] = None,
     qkv_para: Optional[dict] = None,
     smoother: Optional[dict] = None,
@@ -1127,191 +1265,4 @@ def load_weights_from_hf_model(
         smoother=smoother,
         moe_config=moe_config,
     )
-    return weights
-
-
-def load_weights_from_hf_gptq_model(hf_model, config: QWenConfig):
-    logger.info("loading weights from groupwise GPTQ QWen safetensors...")
-    weights = {}
-    tik = time.time()
-
-    qwen_type = config.qwen_type
-    num_hidden_layers = config.num_hidden_layers
-    mapping = config.mapping
-    dtype = config.dtype
-
-    model_params = {k: v for k, v in hf_model.state_dict().items()}
-    torch.cuda.empty_cache()
-    valid_types = ("qwen", "qwen2", "qwen2_vl", "qwen3", "qwen3_moe")
-    assert qwen_type in valid_types, (
-        f"Unsupported Qwen type: {qwen_type}, only {valid_types} are supported for GPTQ."
-    )
-    layer_prefix = "transformer.h." if qwen_type == "qwen" else "model.layers."
-    key_list = get_qwen_key_list(qwen_type)
-
-    def torch_split(v, dim):
-        if v.shape[dim] % mapping.tp_size != 0:
-            logger.error(
-                "Current weight shape is invalid for mapping.tp_size=" + str(mapping.tp_size)
-            )
-            assert False, "Invalid TP size"
-        return v.split(v.shape[dim] // mapping.tp_size, dim=dim)[mapping.tp_rank]
-
-    def unpack_int32_into_int8(w_packed):
-        # unpack inputs packed in int32/float32 into uint4 and store them in int8 format
-        w_packed_int4x2 = w_packed.contiguous().view(torch.uint8)
-        w_unpacked = torch.zeros(
-            w_packed_int4x2.shape[0], w_packed_int4x2.shape[1] * 2, dtype=torch.int8
-        )
-        w_unpacked[:, ::2] = w_packed_int4x2 % 16
-        w_unpacked[:, 1::2] = w_packed_int4x2 // 16
-        return w_unpacked.contiguous()
-
-    def process_and_assign_weight(v: List[torch.Tensor], tllm_prex: str, tp_dim: int = -1):
-        if tp_dim == -1:
-            qweight_int32, qzeros_int32, scales_fp16 = [item.cpu() for item in v]
-        else:
-            qweight_int32, qzeros_int32, scales_fp16 = [
-                torch_split(item, tp_dim).cpu() for item in v
-            ]
-
-        USE_UINT4_INPUT = 1  # Set to true if checkpoint store UINT4 weights
-        USE_GPTQ_FOR_QWEN = 1  # GPTQ-for-QWEN added 1 to zeros
-
-        qweight_unpacked_int8 = unpack_int32_into_int8(qweight_int32.T).T.contiguous() - 8
-        qweight_interleaved = preprocessor(
-            packer(qweight_unpacked_int8), torch.quint4x2, torch.float16
-        ).view(torch.float16)
-        # zeros = zeros * scales
-        qzeros_unpacked_int32 = unpack_int32_into_int8(qzeros_int32)
-        if not USE_UINT4_INPUT:
-            # Correcting UINT4 values back to INT4 order
-            mask_negative = qzeros_unpacked_int32[qzeros_unpacked_int32 < 0]
-            mask_positive = qzeros_unpacked_int32[qzeros_unpacked_int32 >= 0]
-            qzeros_unpacked_int32 = qzeros_unpacked_int32 + 16 * mask_negative - 16 * mask_positive
-        zeros_x_scales_fp16 = (
-            -qzeros_unpacked_int32 + 8 * USE_UINT4_INPUT - USE_GPTQ_FOR_QWEN
-        ) * scales_fp16
-        zeros_x_scales_fp16 = zeros_x_scales_fp16.half()
-
-        results = {
-            f"{tllm_prex}.weight": qweight_interleaved,
-            f"{tllm_prex}.weights_scaling_factor": scales_fp16,
-            f"{tllm_prex}.zero": zeros_x_scales_fp16,
-        }
-        return results
-
-    packer = torch.ops.trtllm.pack_int8_tensor_to_packed_int4
-    preprocessor = torch.ops.trtllm.preprocess_weights_for_mixed_gemm
-    torch_dtype = str_dtype_to_torch(dtype)
-
-    # Load weights from GPTQ checkpoint into TRT-LLM module
-    # 1. vocab_embedding
-    v = model_params[key_list[7] + ".weight"]
-    if mapping.is_first_pp_rank():
-        weights["transformer.vocab_embedding.weight"] = v.to(torch_dtype)
-
-    # 2. ln_f
-    v = model_params[key_list[8] + ".weight"]
-    if mapping.is_last_pp_rank():
-        weights["transformer.ln_f.weight"] = v.to(torch_dtype)
-
-    # 3. lm_head
-    v = model_params["lm_head.weight"]
-    if mapping.is_last_pp_rank():
-        weights["lm_head.weight"] = torch_split(v, 0).to(torch_dtype)
-
-    # 4. Weights inside each layer
-    layers_per_pipeline_stage = num_hidden_layers // mapping.pp_size
-    layers_range = list(
-        range(
-            mapping.pp_rank * layers_per_pipeline_stage,
-            (mapping.pp_rank + 1) * layers_per_pipeline_stage,
-            1,
-        )
-    )
-    suffixs = [".qweight", ".qzeros", ".scales"]
-
-    for l in tqdm(layers_range, desc="loading weight in each layer..."):
-        layer_idx = l - mapping.pp_rank * layers_per_pipeline_stage
-        prefix = layer_prefix + str(layer_idx) + "."
-        tllm_prex = f"transformer.layers.{l - layers_range[0]}"
-        # 4.1 attention.qkv
-        qkv_weight_list = []
-        if qwen_type == "qwen":
-            for suf in suffixs:
-                qkv_part = model_params[prefix + key_list[0] + suf]
-                q_emb = qkv_part.shape[1] // 3
-                model_emb = qkv_part.shape[0]
-                qkv_part = qkv_part.reshape(model_emb, 3, q_emb)
-                qkv_part = torch_split(qkv_part, 2)
-                qkv_part = qkv_part.reshape(model_emb, 3 * (q_emb // mapping.tp_size))
-                qkv_weight_list.append(qkv_part)
-        else:
-            for suf in suffixs:
-                qkv_list = []
-                for comp in ["q_proj", "k_proj", "v_proj"]:
-                    comp_part = model_params[prefix + key_list[0] + comp + suf]
-                    comp_part = torch_split(comp_part, 1)
-                    qkv_list.append(comp_part)
-                qkv_weight_list.append(torch.cat(qkv_list, dim=1))
-        weights.update(process_and_assign_weight(qkv_weight_list, f"{tllm_prex}.attention.qkv"))
-        # 4.2 attention.bias
-        suf = ".bias"
-        if qwen_type == "qwen":
-            qkv_bias = model_params[prefix + key_list[0] + suf].to(torch_dtype).cpu().contiguous()
-            q_emb = qkv_bias.shape[0] // 3
-            qkv_bias = qkv_bias.reshape(3, q_emb)
-            split_v = split(qkv_bias, mapping.tp_size, mapping.rank, dim=1)
-            qkv_bias = split_v.reshape(3 * (q_emb // mapping.tp_size))
-        else:
-            qkv_bias_list = []
-            for comp in ["q_proj", "k_proj", "v_proj"]:
-                comp_part = (
-                    model_params[prefix + key_list[0] + comp + suf]
-                    .to(torch_dtype)
-                    .cpu()
-                    .contiguous()
-                )
-                comp_part = torch_split(comp_part, dim=0)
-                qkv_bias_list.append(comp_part)
-            qkv_bias = torch.cat(qkv_bias_list, dim=0)
-        weights[tllm_prex + ".attention.qkv.bias"] = qkv_bias
-        # 4.3 attention.dense
-        qkv_dense_list = []
-        for suf in suffixs:
-            qkv_dense_part = model_params[prefix + key_list[1] + suf]
-            qkv_dense_list.append(qkv_dense_part)
-        weights.update(
-            process_and_assign_weight(qkv_dense_list, f"{tllm_prex}.attention.dense", tp_dim=0)
-        )
-        # 4.4 mlp.gate
-        mlp_gate_list = []
-        for suf in suffixs:
-            mlp_gate_part = model_params[prefix + key_list[2] + suf]
-            mlp_gate_list.append(mlp_gate_part)
-        weights.update(process_and_assign_weight(mlp_gate_list, f"{tllm_prex}.mlp.gate", tp_dim=1))
-        # 4.5 mlp.fc
-        mlp_fc_list = []
-        for suf in suffixs:
-            mlp_fc_part = model_params[prefix + key_list[3] + suf]
-            mlp_fc_list.append(mlp_fc_part)
-        weights.update(process_and_assign_weight(mlp_fc_list, f"{tllm_prex}.mlp.fc", tp_dim=1))
-        # 4.6 mlp.proj
-        mlp_proj_list = []
-        for suf in suffixs:
-            mlp_proj_part = model_params[prefix + key_list[4] + suf]
-            mlp_proj_list.append(mlp_proj_part)
-        weights.update(process_and_assign_weight(mlp_proj_list, f"{tllm_prex}.mlp.proj", tp_dim=0))
-        # 4.7 input_layernorm
-        v = model_params[prefix + key_list[5] + ".weight"]
-        weights[f"{tllm_prex}.input_layernorm.weight"] = v.to(torch_dtype)
-        # 4.8 post_layernorm
-        v = model_params[prefix + key_list[6] + ".weight"]
-        weights[f"{tllm_prex}.post_layernorm.weight"] = v.to(torch_dtype)
-
-    tok = time.time()
-    t = time.strftime("%H:%M:%S", time.gmtime(tok - tik))
-    logger.info(f"weights loaded. total time: {t}")
-
     return weights

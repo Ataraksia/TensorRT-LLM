@@ -20,7 +20,6 @@ from functools import partial
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import torch
 
 # isort: off
 import tensorrt as trt
@@ -30,9 +29,9 @@ from . import graph_rewriting as gw
 from ._common import default_net, default_trtnet, precision
 from ._utils import (QuantModeWrapper, bf16_array, bool_array,
                      dim_resolve_negative, dim_to_trt_axes, dims_array,
-                     fp16_array, fp32_array, get_sm_version, int32_array,
-                     int64_array, np_dtype_to_trt, str_dtype_to_trt,
-                     trt_dtype_to_np, trt_dtype_to_str)
+                     fp16_array, fp32_array, int32_array, int64_array,
+                     np_dtype_to_trt, str_dtype_to_trt, trt_dtype_to_np,
+                     trt_dtype_to_str)
 from .network import PluginInfo, set_np_weight, set_plugin_info
 from .plugin import TRT_LLM_PLUGIN_NAMESPACE, current_all_reduce_helper
 from .quantization import QuantMode
@@ -3881,8 +3880,6 @@ class AllReduceStrategy(IntEnum):
     ONESHOT = 4
     TWOSHOT = 5
     LOWPRECISION = 6
-    MNNVL = 7
-    NCCL_SYMMETRIC = 8
 
 
 class AllReduceFusionOp(IntEnum):
@@ -3894,7 +3891,7 @@ class AllReduceFusionOp(IntEnum):
     RESIDUAL_RMS_NORM_QUANT_NVFP4 = 5
     RESIDUAL_RMS_NORM_OUT_QUANT_FP8 = 6
     RESIDUAL_RMS_NORM_OUT_QUANT_NVFP4 = 7
-    MOE_FINALIZE_ALLREDUCE_RESIDUAL_RMS_NORM = 8
+    MOE_ALLREDUCE_RESIDUAL_RMS_NORM = 8
 
 
 class AllReduceParams():
@@ -3908,8 +3905,7 @@ class AllReduceParams():
                  scale: Optional[Tensor] = None,
                  norm_pre_residual_weight: Optional[Tensor] = None,
                  eps: float = 1e-06,
-                 enable_allreduce: bool = True,
-                 trigger_completion_at_end: bool = True):
+                 enable_allreduce: bool = True):
         self.strategy = strategy
         self.fusion_op = fusion_op
         self.bias = bias
@@ -3920,7 +3916,6 @@ class AllReduceParams():
         self.eps = eps
         # For torch path only, has no effect on TRT path
         self.enable_allreduce = enable_allreduce
-        self.trigger_completion_at_end = trigger_completion_at_end
         assert fusion_op == AllReduceFusionOp.NONE.value or (residual
                                                              is not None)
 
@@ -3937,45 +3932,6 @@ class AllReduceParams():
         if self.strategy == AllReduceStrategy.AUTO and default_net(
         ).plugin_config.user_buffer:
             self.strategy = AllReduceStrategy.UB
-
-
-class MoEAllReduceParams(AllReduceParams):
-
-    def __init__(self,
-                 device_num_experts: Optional[Tensor] = None,
-                 expert_scale_factor: Optional[Tensor] = None,
-                 expanded_idx_to_permuted_idx: Optional[Tensor] = None,
-                 shared_expert_output: Optional[Tensor] = None,
-                 bias: Optional[Tensor] = None,
-                 residual: Optional[Tensor] = None,
-                 norm_weight: Optional[Tensor] = None,
-                 scale: Optional[Tensor] = None,
-                 norm_pre_residual_weight: Optional[Tensor] = None,
-                 eps: float = 1e-06,
-                 enable_allreduce: bool = True,
-                 is_cutlass_min_latency: bool = False):
-        super().__init__(
-            bias=bias,
-            residual=residual,
-            norm_weight=norm_weight,
-            scale=scale,
-            norm_pre_residual_weight=norm_pre_residual_weight,
-            eps=eps,
-            enable_allreduce=enable_allreduce,
-        )
-        self.device_num_experts = device_num_experts
-        self.expert_scale_factor = expert_scale_factor
-        self.expanded_idx_to_permuted_idx = expanded_idx_to_permuted_idx
-        self.shared_expert_output = shared_expert_output
-        self.is_cutlass_min_latency = is_cutlass_min_latency
-
-    def is_valid(self):
-        if self.is_cutlass_min_latency:
-            return (self.device_num_experts is not None
-                    and self.expert_scale_factor is not None
-                    and self.shared_expert_output is not None)
-        else:
-            return (self.expanded_idx_to_permuted_idx is not None)
 
 
 def create_allreduce_plugin(
@@ -4734,15 +4690,6 @@ class RopeEmbeddingUtils:
             inv_freq = 1.0 / (theta**(np.arange(0, dim, 2) / dim)).astype(dtype)
             inv_freq = RopeEmbeddingUtils.apply_llama3_scaling(
                 inv_freq, rope_scaling_config)
-        elif scale_type == RotaryScalingType.dynamic:
-            # Make sure scaling_alpha exists in rope_scaling
-            # Ref: https://huggingface.co/tencent/Hunyuan-A13B-Instruct-FP8/blob/main/modeling_hunyuan.py#L346
-            assert rope_scaling_config[
-                "alpha"] is not None, "rope_scaling_config.alpha must be provided."
-            scaling_alpha = rope_scaling_config["alpha"]
-            adjusted_base = theta * (scaling_alpha**(dim / (dim - 2)))
-            inv_freq = 1.0 / (adjusted_base**(
-                np.arange(0, dim, 2, dtype=dtype) / dim)).astype(dtype)
         else:
             inv_freq = scale / (theta
                                 **(np.arange(0, dim, 2) / dim)).astype(dtype)
@@ -4789,7 +4736,7 @@ class RopeEmbeddingUtils:
 
         return inv_freq, concat.reshape(1, -1).astype(dtype)
 
-    def create_sinusoidal_positions_long_rope_for_attention_plugin(
+    def create_sinusoidal_positions_long_rope(
             num_pos: int,
             num_orig_pos: int,
             dim: int,
@@ -4845,49 +4792,9 @@ class RopeEmbeddingUtils:
                         scaling_long_factors, False, True), short_mscale
 
     @staticmethod
-    def create_sinusoidal_positions_long_rope(
-            num_pos: int,
-            dim: int,
-            theta: float,
-            original_max_pos: int,
-            short_factor: List[float],
-            long_factor: List[float],
-            dtype=np.float32,
-            max_seq_len: Optional[int] = None):
-        short_factor = np.array(short_factor, dtype=np.float32)
-        long_factor = np.array(long_factor, dtype=np.float32)
-
-        inv_freq = 1.0 / (theta**(np.arange(0, dim, 2, dtype=np.float32) / dim))
-        t_pos = np.arange(np.max([num_pos, original_max_pos]), dtype=np.float32)
-
-        # Choose proper freqs based on max_seq_len.
-        factor = long_factor if max_seq_len is None or max_seq_len > original_max_pos else short_factor
-        inv_freq = inv_freq / factor
-        freqs = np.einsum("i,j->ij", t_pos, inv_freq)
-        sinusoid_inp = freqs.astype(np.float32)[..., np.newaxis]
-
-        # Apply scaling
-        scale = num_pos / original_max_pos
-        if scale <= 1.0:
-            scaling_factor = 1.0
-        else:
-            scaling_factor = np.sqrt(1.0 +
-                                     np.log(scale) / np.log(original_max_pos))
-
-        # fuse cos/sin into float2 (cos, sin).
-        concat = np.concatenate(
-            (np.cos(sinusoid_inp) * scaling_factor,
-             np.sin(sinusoid_inp) * scaling_factor),
-            axis=-1,
-        )
-
-        return None, concat.reshape(1, -1).astype(dtype)
-
-    @staticmethod
     def create_fake_weight(dim: int, dtype=np.half):
         return np.random.rand(dim).astype(dtype)
 
-    # Note: When not using deepseek_yarn, make sure to set mscale_all_dim to 0.0.
     @staticmethod
     def create_sinusoidal_positions_yarn(
             num_pos: int,
@@ -4900,19 +4807,24 @@ class RopeEmbeddingUtils:
             mscale: float = 1.0,
             mscale_all_dim: float = 1.0,
             duplicate_data: bool = True,
-            dtype=torch.float32):
+            dtype=np.float32):
 
         # Copy from https://huggingface.co/deepseek-ai/DeepSeek-V2/blob/main/modeling_deepseek.py
         # Inverse dim formula to find dim based on number of rotations
-        def yarn_find_correction_dim(num_rotations, dim, base,
-                                     max_position_embeddings):
+        def yarn_find_correction_dim(num_rotations,
+                                     dim,
+                                     base=10000,
+                                     max_position_embeddings=2048):
             return (dim * math.log(max_position_embeddings /
                                    (num_rotations * 2 * math.pi))) / (
                                        2 * math.log(base))
 
         # Find dim range bounds based on rotations
-        def yarn_find_correction_range(low_rot, high_rot, dim, base,
-                                       max_position_embeddings):
+        def yarn_find_correction_range(low_rot,
+                                       high_rot,
+                                       dim,
+                                       base=10000,
+                                       max_position_embeddings=2048):
             low = math.floor(
                 yarn_find_correction_dim(low_rot, dim, base,
                                          max_position_embeddings))
@@ -4925,7 +4837,7 @@ class RopeEmbeddingUtils:
                 high = dim - 1
             return low, high  # Clamp values just in case
 
-        def yarn_get_mscale(scale, mscale):
+        def yarn_get_mscale(scale=1, mscale=1):
             if scale <= 1:
                 return 1.0
             return 0.1 * mscale * math.log(scale) + 1.0
@@ -4934,13 +4846,13 @@ class RopeEmbeddingUtils:
             if min == max:
                 max += 0.001  # Prevent singularity
 
-            linear_func = (torch.arange(dim, dtype=dtype) - min) / (max - min)
-            ramp_func = torch.clamp(linear_func, 0, 1)
+            linear_func = (np.arange(dim, dtype=dtype) - min) / (max - min)
+            ramp_func = np.clip(linear_func, 0, 1)
             return ramp_func
 
-        pos_freqs = base**(torch.arange(0, dim, 2, dtype=dtype) / dim)
-        freq_extra = 1.0 / pos_freqs
-        freq_inter = 1.0 / (scaling_factor * pos_freqs)
+        freq_extra = 1.0 / (base**(np.arange(0, dim, 2, dtype=dtype) / dim))
+        freq_inter = 1.0 / (scaling_factor *
+                            base**(np.arange(0, dim, 2, dtype=dtype) / dim))
 
         low, high = yarn_find_correction_range(
             beta_fast,
@@ -4949,23 +4861,28 @@ class RopeEmbeddingUtils:
             base,
             original_max_position_embeddings,
         )
-        inv_freq_mask = (1 - yarn_linear_ramp_mask(low, high, dim // 2))
+        inv_freq_mask = 1.0 - yarn_linear_ramp_mask(low, high,
+                                                    dim // 2).astype(dtype)
         inv_freq = freq_inter * (1 - inv_freq_mask) + freq_extra * inv_freq_mask
-        t = torch.arange(num_pos, dtype=dtype)
-        sinusoid_inp = torch.einsum("i,j -> ij", t, inv_freq).unsqueeze(-1)
+        sinusoid_inp = np.expand_dims(np.einsum("i , j -> i j",
+                                                np.arange(num_pos, dtype=dtype),
+                                                inv_freq,
+                                                dtype=dtype),
+                                      axis=-1)
 
         _mscale = float(
             yarn_get_mscale(scaling_factor, mscale) /
             yarn_get_mscale(scaling_factor, mscale_all_dim))
 
         if duplicate_data:
-            emb = torch.cat((sinusoid_inp, sinusoid_inp), dim=-2)
+            emb = np.concatenate((sinusoid_inp, sinusoid_inp), axis=-2)
         else:
             emb = sinusoid_inp
 
-        concat = torch.cat((torch.cos(emb) * _mscale, torch.sin(emb) * _mscale),
-                           dim=-1)
-        return inv_freq.numpy(), concat.reshape((1, -1)).to(dtype).numpy()
+        concat = np.concatenate((np.cos(emb) * _mscale, np.sin(emb) * _mscale),
+                                axis=-1)
+
+        return inv_freq, concat.reshape((1, -1)).astype(dtype)
 
     @staticmethod
     def rotate_every_two(tensor: Tensor) -> Tensor:
@@ -5728,8 +5645,7 @@ def gpt_attention(
     if (attention_mask is not None) or (attention_packed_mask is not None):
         # context fmha needs packed mask.
         assert attention_packed_mask is not None
-        if get_sm_version() < 100:
-            mask_type = AttentionMaskType.custom_mask
+        mask_type = AttentionMaskType.custom_mask
 
     mask_type_filed = trt.PluginField("mask_type",
                                       np.array([int(mask_type)], np.int32),
@@ -5854,7 +5770,7 @@ def gpt_attention(
     if attention_mask is not None and mask_type == AttentionMaskType.custom_mask:
         # useFullCustomMask
         plug_inputs += [attention_mask]
-    if attention_packed_mask is not None and get_sm_version() < 100:
+    if attention_packed_mask is not None:
         # usePackedCustomMask
         plug_inputs += [attention_packed_mask]
     if use_cache:

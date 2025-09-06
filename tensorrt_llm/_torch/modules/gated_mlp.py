@@ -7,12 +7,22 @@ from torch import nn
 
 from tensorrt_llm.mapping import Mapping
 
+from ..custom_ops import IS_FLASHINFER_AVAILABLE
 from ..distributed import AllReduceParams
 from ..model_config import ModelConfig
 from ..peft.lora.layer import LoraLayer, LoraModuleType
 from ..utils import Fp4QuantizedTensor
 from .linear import Linear, TensorParallelMode, WeightMode, WeightsLoadingConfig
-from .swiglu import swiglu
+
+
+def swiglu(x):
+    if IS_FLASHINFER_AVAILABLE:
+        # WAR for flashinfer activation since it does not support custom op properly
+        from ..custom_ops import flashinfer_silu_and_mul
+        return flashinfer_silu_and_mul(x)
+    else:
+        gate, x = x.chunk(2, dim=-1)
+        return F.silu(gate) * x
 
 
 class GatedMLP(nn.Module):
@@ -27,8 +37,7 @@ class GatedMLP(nn.Module):
                  config: Optional[ModelConfig] = None,
                  overridden_tp_size: Optional[int] = None,
                  reduce_output: bool = True,
-                 layer_idx: Optional[int] = None,
-                 use_cute_dsl_blockscaling_mm: bool = False):
+                 layer_idx: Optional[int] = None):
         super().__init__()
         self.layer_idx = layer_idx
         self.hidden_size = hidden_size
@@ -42,15 +51,17 @@ class GatedMLP(nn.Module):
             tp_size = overridden_tp_size
             # "Misuse" pp_size here to perform all-reduce within smaller groups
             pp_size = config.mapping.pp_size * config.mapping.tp_size // overridden_tp_size
-            mapping = Mapping(
-                world_size=tp_size * pp_size,
-                rank=self.mapping.rank,
-                gpus_per_node=self.mapping.gpus_per_node,
-                tp_size=tp_size,
-                pp_size=pp_size,
-            )
         else:
-            mapping = config.mapping
+            tp_size = config.mapping.tp_size
+            pp_size = config.mapping.pp_size
+
+        mapping = Mapping(
+            world_size=tp_size * pp_size,
+            rank=self.mapping.rank,
+            gpus_per_node=self.mapping.gpus_per_node,
+            tp_size=tp_size,
+            pp_size=pp_size,
+        )
 
         self.gate_up_proj = Linear(
             self.hidden_size,
@@ -64,10 +75,7 @@ class GatedMLP(nn.Module):
             quant_config=config.get_quant_config(),
             reduce_output=False,
             skip_create_weights_in_init=config.skip_create_weights_in_init,
-            allreduce_strategy=config.allreduce_strategy,
-            force_dynamic_quantization=config.force_dynamic_quantization,
-            use_cute_dsl_blockscaling_mm=use_cute_dsl_blockscaling_mm)
-
+        )
         self.down_lora = LoraLayer([LoraModuleType.MLP_4H_TO_H],
                                    [self.hidden_size])
 
@@ -82,9 +90,7 @@ class GatedMLP(nn.Module):
             reduce_output=reduce_output,
             skip_create_weights_in_init=config.skip_create_weights_in_init,
             lora=self.down_lora,
-            allreduce_strategy=config.allreduce_strategy,
-            force_dynamic_quantization=config.force_dynamic_quantization,
-            use_cute_dsl_blockscaling_mm=use_cute_dsl_blockscaling_mm)
+        )
 
         # These two modules are mutually exclusive - either splitted_gate_up_lora or fused_gate_up_lora will be used,
         # but never both at the same time. splitted_gate_up_lora handles gate and up separately while fused_gate_up_lora
@@ -98,23 +104,6 @@ class GatedMLP(nn.Module):
             [LoraModuleType.MLP_GATE_UP],
             [2 * self.intermediate_size // mapping.tp_size])
 
-    def _apply_activation(self, x):
-        if self.activation == F.silu:
-            if self.down_proj.has_fp8_qdq:
-                return swiglu(x,
-                              quant_scale=self.down_proj.input_scale,
-                              quant_type=torch.float8_e4m3fn)
-            else:
-                return swiglu(x)
-        elif callable(self.activation):
-            return self.activation(x)
-        elif self.activation is None:
-            return x
-        else:
-            raise NotImplementedError(
-                f"Activation {self.activation} not yet implemented for fused GatedMLP"
-            )
-
     def forward(
         self,
         x: Union[torch.Tensor, Fp4QuantizedTensor],
@@ -127,12 +116,18 @@ class GatedMLP(nn.Module):
             return self.forward_lora(x, all_rank_num_tokens,
                                      final_all_reduce_params, lora_params)
 
-        h1 = self.gate_up_proj(x)
-        h2 = self._apply_activation(h1)
-        output = self.down_proj(h2,
-                                all_reduce_params=final_all_reduce_params,
-                                layer_idx=self.layer_idx)
-        return output
+        if self.activation == F.silu:
+            h1 = self.gate_up_proj(x)
+
+            h2 = swiglu(h1)
+            output = self.down_proj(h2,
+                                    all_reduce_params=final_all_reduce_params,
+                                    layer_idx=self.layer_idx)
+            return output
+        else:
+            raise NotImplementedError(
+                f"Activation {self.activation} not yet implemented for fused GatedMLP"
+            )
 
     def forward_lora(
         self,
@@ -143,6 +138,7 @@ class GatedMLP(nn.Module):
     ) -> torch.Tensor:
         assert lora_params is not None
         assert self.layer_idx is not None, "layer_idx is required for lora"
+        assert self.activation == F.silu
 
         h1 = self.gate_up_proj(x)
 
@@ -155,7 +151,7 @@ class GatedMLP(nn.Module):
         if h1_lora is not None:
             h1 = h1 + h1_lora
 
-        h2 = self._apply_activation(h1)
+        h2 = swiglu(h1)
         output = self.down_proj(h2,
                                 all_reduce_params=final_all_reduce_params,
                                 lora_params=lora_params,

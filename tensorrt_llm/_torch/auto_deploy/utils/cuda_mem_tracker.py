@@ -1,4 +1,3 @@
-import gc
 from contextlib import contextmanager
 
 import torch
@@ -19,7 +18,6 @@ def cuda_memory_tracker(logger=ad_logger):
         yield
     finally:
         torch.cuda.empty_cache()
-        gc.collect()
         mem_after = torch.cuda.memory_allocated()
         leaked = mem_after - mem_before
         if leaked > 0:

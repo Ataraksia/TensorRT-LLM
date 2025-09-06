@@ -160,8 +160,7 @@ def chat_stream_post_processor(rsp: GenerationResultBase, args: ChatPostprocArgs
 
         choice = ChatCompletionResponseStreamChoice(index=i,
                                                     delta=delta_message,
-                                                    finish_reason=None,
-                                                    avg_decoded_tokens_per_iter=getattr(rsp, 'avg_decoded_tokens_per_iter', None))
+                                                    finish_reason=None)
         if args.return_logprobs:
             logprobs = output.logprobs_diff
             token_ids = output.token_ids_diff
@@ -225,7 +224,6 @@ def chat_response_post_processor(rsp: GenerationResultBase, args: ChatPostprocAr
             finish_reason=output.finish_reason,
             stop_reason=output.stop_reason,
             disaggregated_params=disaggregated_params,
-            avg_decoded_tokens_per_iter=getattr(rsp, 'avg_decoded_tokens_per_iter', None),
         )
 
         if args.return_logprobs:
@@ -259,7 +257,6 @@ class CompletionPostprocArgs(PostprocArgs):
     model: str = None
     num_choices: int = 1
     prompt_idx: int = 0
-    detokenize: bool = True
     prompt: Optional[str] = None
     stream_options: Optional[StreamOptions] = None
 
@@ -270,7 +267,6 @@ class CompletionPostprocArgs(PostprocArgs):
             model=request.model,
             num_choices=request.n if request.n else 1,
             stream_options=request.stream_options,
-            detokenize=request.detokenize,
         )
 
 
@@ -291,11 +287,9 @@ def completion_stream_post_processor(rsp: DetokenizedGenerationResultBase, args:
             delta_text = args.prompt + delta_text
         choice = CompletionResponseStreamChoice(
             index=args.prompt_idx * args.num_choices + output.index,
-            text=delta_text if args.detokenize else "",
-            token_ids=None if args.detokenize else output.token_ids_diff,
+            text=delta_text,
             finish_reason = output.finish_reason,
             stop_reason = output.stop_reason,
-            avg_decoded_tokens_per_iter=getattr(rsp, 'avg_decoded_tokens_per_iter', None),
         )
         chunk = CompletionStreamResponse(model=args.model, choices=[choice])
         if include_continuous_usage:
@@ -333,14 +327,12 @@ def completion_response_post_processor(rsp: GenerationResult, args: CompletionPo
             text = args.prompt + text
         disaggregated_params = to_disaggregated_params(output.disaggregated_params)
         choice = CompletionResponseChoice(
-            text=text if args.detokenize else "",
-            token_ids=None if args.detokenize else output.token_ids,
+            text=text,
             index=args.prompt_idx * args.num_choices + output.index,
             disaggregated_params=disaggregated_params,
             context_logits=None if rsp.context_logits is None else rsp.context_logits.tolist(),
             stop_reason=output.stop_reason,
             finish_reason=output.finish_reason,
-            avg_decoded_tokens_per_iter=getattr(rsp, 'avg_decoded_tokens_per_iter', None),
         )
 
         completion_tokens += output.length

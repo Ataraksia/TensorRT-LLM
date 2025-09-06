@@ -37,18 +37,12 @@ class LMHead(Linear):
         mapping = mapping or Mapping()
         tp_size = mapping.tp_size
 
-        # Attention DP doesn't work with embedding parallelization.
-        if mapping.enable_attention_dp:
-            tensor_parallel_mode = None
-
         if tensor_parallel_mode == TensorParallelMode.ROW:
             local_in_features = math.ceil(embedding_dim / tp_size)
             self.padding_size = tp_size * local_in_features - embedding_dim
         elif tensor_parallel_mode == TensorParallelMode.COLUMN:
             local_out_features = math.ceil(num_embeddings / tp_size)
             self.padding_size = tp_size * local_out_features - num_embeddings
-        else:
-            self.padding_size = 0
 
         super().__init__(
             local_in_features * tp_size,
@@ -126,41 +120,6 @@ def get_masked_input_and_mask(
     return input_, ~vocab_mask.unsqueeze(-1)
 
 
-def pre_comm_embedding_ops(
-    input_: torch.Tensor,
-    weight: torch.Tensor,
-    tp_size: int,
-    tp_rank: int,
-    tp_mode: TensorParallelMode,
-    vocab_start_index: int,
-    vocab_end_index: int,
-    gather_output: bool,
-    padding_size: int,
-):
-    # Generate the mask for the input if needed.
-    if tp_size > 1:
-        if tp_mode == TensorParallelMode.COLUMN:
-            input_, input_mask = get_masked_input_and_mask(
-                input_,
-                vocab_start_index,
-                vocab_end_index,
-            )
-
-    # Get the embeddings.
-    output = F.embedding(input_, weight)
-
-    # Mask or pad the output if needed.
-    if tp_size > 1:
-        if tp_mode == TensorParallelMode.COLUMN:
-            output.masked_fill_(input_mask, 0)
-        elif tp_mode == TensorParallelMode.ROW:
-            if gather_output:
-                if tp_rank == tp_size - 1 and padding_size > 0:
-                    output = F.pad(output, (0, padding_size))
-
-    return output
-
-
 class Embedding(LMHead):
     """Embedding layer.
 
@@ -182,7 +141,6 @@ class Embedding(LMHead):
         mapping: Optional[Mapping] = None,
         tensor_parallel_mode: Optional[TensorParallelMode] = None,
         gather_output: bool = False,
-        enable_torch_compile_for_embedding: Optional[bool] = False,
     ):
         super().__init__(
             embedding_dim=embedding_dim,
@@ -192,41 +150,34 @@ class Embedding(LMHead):
             tensor_parallel_mode=tensor_parallel_mode,
             gather_output=gather_output,
         )
-
-        self.enable_torch_compile_for_embedding = enable_torch_compile_for_embedding
-
         if self.tp_size > 1:
             slice_width = math.ceil(num_embeddings / self.tp_size)
             self.vocab_start_index = self.tp_rank * slice_width
             self.vocab_end_index = min((self.tp_rank + 1) * slice_width,
                                        num_embeddings)
-        else:
-            self.vocab_start_index = 0
-            self.vocab_end_index = num_embeddings
 
     def forward(self, input):
-        # Run the ops before all_reduce/all_gather.
-        # We use torch.compile() to fuse the tiny pointwise ops before all_reduce/all_gather for Embedding module.
-        embedding_ops_func = torch.compile(
-            pre_comm_embedding_ops,
-            options={"max-autotune": True},
-            disable=not self.enable_torch_compile_for_embedding)
-        output = embedding_ops_func(input, self.weight, self.tp_size,
-                                    self.tp_rank, self.tp_mode,
-                                    self.vocab_start_index,
-                                    self.vocab_end_index, self.gather_output,
-                                    self.padding_size)
-
-        # Run the all_reduce/all_gather.
         if self.tp_size > 1:
             if self.tp_mode == TensorParallelMode.COLUMN:
+                # Build the mask.
+                input, input_mask = get_masked_input_and_mask(
+                    input,
+                    self.vocab_start_index,
+                    self.vocab_end_index,
+                )
+        # Get the embeddings.
+        output = F.embedding(input, self.weight)
+        # Mask the output embedding.
+        if self.tp_size > 1:
+            if self.tp_mode == TensorParallelMode.COLUMN:
+                output.masked_fill_(input_mask, 0)
                 # Reduce across all the model parallel GPUs.
                 output = self.all_reduce(output)
             elif self.tp_mode == TensorParallelMode.ROW:
                 if self.gather_output:
-                    # Run allgather.
+                    if self.tp_rank == self.tp_size - 1 and self.padding_size > 0:
+                        output = F.pad(output, (0, self.padding_size))
                     output = allgather(output, self.mapping)
-                    # Remove the padding.
                     if self.padding_size > 0:
                         output = output[..., :-self.padding_size]
 

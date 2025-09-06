@@ -1,4 +1,3 @@
-import contextlib
 from typing import Callable, List, Union
 
 import torch
@@ -31,43 +30,14 @@ def is_call_function(node: Node, target: Union[List[Callable], Callable]):
         return node.op == "call_function" and node.target == target
 
 
-_enable_piecewise_cuda_graph_capture = False
+_enable_piecewise_cuda_graph_capture = True
 
 
-def set_capture_piecewise_cuda_graph_flag(enable: bool):
+def set_enable_piecewise_cuda_graph_capture_flag(enable: bool):
     global _enable_piecewise_cuda_graph_capture
     _enable_piecewise_cuda_graph_capture = enable
 
 
-def get_capture_piecewise_cuda_graph_flag() -> bool:
+def get_enable_piecewise_cuda_graph_capture_flag() -> bool:
     global _enable_piecewise_cuda_graph_capture
     return _enable_piecewise_cuda_graph_capture
-
-
-@contextlib.contextmanager
-def capture_piecewise_cuda_graph(enable: bool):
-    prev_enable = get_capture_piecewise_cuda_graph_flag()
-    set_capture_piecewise_cuda_graph_flag(enable)
-    try:
-        yield
-    finally:
-        set_capture_piecewise_cuda_graph_flag(prev_enable)
-
-
-def inplace_info():
-    inplace_map = {
-        torch.ops.trtllm.flashinfer_fused_add_rmsnorm.default: {
-            1: "input",
-            2: "residual"
-        },
-        torch.ops.trtllm.attn_custom_op_inplace.default: {
-            1: "output",
-        },
-        torch.ops.trtllm.mla_custom_op_inplace.default: {
-            1: "output"
-        },
-        torch.ops.trtllm.fused_qk_norm_rope.default: {
-            1: "qkv"
-        }
-    }
-    return inplace_map

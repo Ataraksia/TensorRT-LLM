@@ -40,17 +40,14 @@ import click
 import numpy as np
 import pandas as pd
 
-from .. import LLM as PyTorchLLM
-from .._tensorrt_engine import LLM
-from ..llmapi import RequestOutput
+from .._torch import LLM as PyTorchLLM
+from ..llmapi import LLM, RequestOutput
 from ..logger import logger
 from ..sampling_params import SamplingParams
 from .interface import Evaluator
 
 
 class MMLU(Evaluator):
-    DATASET_URL = "https://people.eecs.berkeley.edu/~hendrycks/data.tar"
-
     CHOICES = ["A", "B", "C", "D"]
     SUBJECT_TO_SUBCATEGORIES = {
         "abstract_algebra": ["math"],
@@ -132,7 +129,7 @@ class MMLU(Evaluator):
     }
 
     def __init__(self,
-                 dataset_path: Optional[str] = None,
+                 dataset_path: str,
                  num_samples: Optional[int] = None,
                  num_fewshot: int = 5,
                  random_seed: int = 0,
@@ -141,8 +138,6 @@ class MMLU(Evaluator):
         super().__init__(random_seed=random_seed,
                          apply_chat_template=apply_chat_template,
                          system_prompt=system_prompt)
-        if dataset_path is None:
-            dataset_path = self.dowload_dataset()
         self.dataset_path = dataset_path
         if num_samples is None:
             self.num_samples_per_subject = None
@@ -150,30 +145,6 @@ class MMLU(Evaluator):
             self.num_samples_per_subject = math.ceil(
                 num_samples / len(self.SUBJECT_TO_SUBCATEGORIES))
         self.num_fewshot = num_fewshot
-
-    def dowload_dataset(self):
-        import os
-        import tarfile
-        from tempfile import TemporaryDirectory
-
-        import requests
-
-        self.tempdir = TemporaryDirectory()
-        workspace = self.tempdir.name
-
-        response = requests.get(self.DATASET_URL, timeout=60)
-        with open(f"{workspace}/data.tar", "wb") as f:
-            f.write(response.content)
-
-        with tarfile.open(f"{workspace}/data.tar") as tar:
-            for member in tar.getmembers():
-                member_path = os.path.abspath(f"{workspace}/{member.name}")
-                if not member_path.startswith(workspace):
-                    raise ValueError(
-                        f"Insecure member found in tar file: {member.name}")
-                tar.extract(member, path=workspace, filter=tarfile.data_filter)
-
-        return f"{workspace}/data"
 
     def format_subject(self, subject):
         line = subject.split("_")
@@ -219,7 +190,7 @@ class MMLU(Evaluator):
                                                  include_answer=False)
                 prompt = train_prompt + prompt_end
                 label = test_df.iloc[i, test_df.shape[1] - 1]
-                yield prompt, None, label, subject
+                yield prompt, label, subject
 
     def compute_score(self, outputs: List[RequestOutput], references: List[str],
                       subjects: List[str]) -> float:
@@ -274,10 +245,10 @@ class MMLU(Evaluator):
     @click.option(
         "--dataset_path",
         type=str,
-        default=None,
+        required=True,
         help="The path to MMLU dataset. The commands to prepare the dataset: "
-        "wget https://people.eecs.berkeley.edu/~hendrycks/data.tar && tar -xf data.tar. "
-        "If unspecified, the dataset is downloaded automatically.")
+        "wget https://people.eecs.berkeley.edu/~hendrycks/data.tar && tar -xf data.tar"
+    )
     @click.option(
         "--num_samples",
         type=int,
@@ -297,7 +268,7 @@ class MMLU(Evaluator):
                   default=False,
                   help="Whether to apply chat template.")
     @click.option("--system_prompt",
-                  type=str,
+                  type=Optional[str],
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -312,8 +283,8 @@ class MMLU(Evaluator):
     @click.option("--accuracy_threshold", type=float, default=30)
     @click.pass_context
     @staticmethod
-    def command(ctx, dataset_path: Optional[str], num_samples: int,
-                num_fewshot: int, random_seed: int, apply_chat_template: bool,
+    def command(ctx, dataset_path: str, num_samples: int, num_fewshot: int,
+                random_seed: int, apply_chat_template: bool,
                 system_prompt: Optional[str], max_input_length: int,
                 max_output_length: int, check_accuracy: bool,
                 accuracy_threshold: float) -> None:

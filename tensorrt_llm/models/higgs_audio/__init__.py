@@ -14,12 +14,13 @@
 # limitations under the License.
 
 from .config import HiggsAudioConfig, HiggsAudioEncoderConfig
-from .model import HiggsAudioEncoder, HiggsAudioFeatureProjector, HiggsAudioTokenizer
+
+# from .model import HiggsAudioEncoder, HiggsAudioFeatureProjector, HiggsAudioTokenizer
 
 __all__ = [
     "HiggsAudioConfig",
     "HiggsAudioEncoderConfig",
-    "HiggsAudioEncoder",
-    "HiggsAudioFeatureProjector",
-    "HiggsAudioTokenizer",
+    # "HiggsAudioEncoder",
+    # "HiggsAudioFeatureProjector",
+    # "HiggsAudioTokenizer",
 ]
