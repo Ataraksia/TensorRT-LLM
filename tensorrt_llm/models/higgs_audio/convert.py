@@ -765,11 +765,7 @@ def convert_hf_higgs(
     v = get_weight(model_params, key_list[7], dtype)
 
     if mapping.is_last_pp_rank():
-        if hf_config.tie_word_embeddings:
-            # lm_head.weight has the same weights as embedding
-            lm_head_weights = v.clone()
-        else:
-            lm_head_weights = get_weight(model_params, "lm_head", dtype)
+        lm_head_weights = get_weight(model_params, "audio_decoder_proj.audio_lm_head", dtype)
 
         if vocab_size % mapping.tp_size != 0:
             # padding
@@ -861,7 +857,7 @@ def quantize(
     hf_model_dir: str,
     output_dir: str,
     config: HiggsAudioConfig,
-    calib_dataset="MLCommons/peoples_speech",
+    calib_dataset="bosonai/EmergentTTS-Eval",
 ):
     """Quantize the save the model as TRT-LLM checkpoint to output_dir."""
     os.makedirs(output_dir, exist_ok=True)
@@ -890,7 +886,7 @@ def quantize(
     tokenizer = AutoTokenizer.from_pretrained(
         hf_model_dir, trust_remote_code=True, use_fast=False, padding_side="left"
     )
-    dataset = load_calib_dataset(calib_dataset, "test", "test", "text")
+    dataset = load_calib_dataset(calib_dataset, None, "train", "text_to_synthesize")
     act_range = capture_activation_range(hf_model, config.higgs_type, tokenizer, dataset)
     qkv_para = {}
     # smoother for inputs of self_attn.o_proj and mlp.down_proj
