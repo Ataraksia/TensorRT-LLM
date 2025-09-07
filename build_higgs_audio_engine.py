@@ -85,7 +85,6 @@ def main():
     )
     config = HiggsAudioConfig()
     model = HiggsAudioForCausalLM(config)
-    # model = HiggsAudioForCausalLM.from_hugging_face(args.model_dir, "bfloat16")
     engine = build(model, build_config)
     engine.save(args.output_dir)
 
