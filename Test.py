@@ -1,10 +1,7 @@
 from boson_multimodal import *  # noqa: F403  # noqa: F403
 
-from tensorrt_llm import logger
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM, HiggsAudioTRTRunner
-
-logger.set_level("verbose")
 
 # Create configuration
 config = HiggsAudioConfig()
@@ -14,6 +11,7 @@ model = HiggsAudioForCausalLM(config)
 
 # Set up TensorRT-LLM inference runner
 runner = HiggsAudioTRTRunner(
+    config=config,
     engine_dir="/home/me/TTS/TensorRT-LLM/higgs_audio_engine/",
     tokenizer_dir="bosonai/higgs-audio-v2-generation-3B-base",
     audio_tokenizer_dir="bosonai/higgs-audio-v2-tokenizer",

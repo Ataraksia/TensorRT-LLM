@@ -3,11 +3,10 @@
 
 import argparse
 
-from tensorrt_llm import logger
-from tensorrt_llm.bindings import KVCacheType
 from tensorrt_llm.builder import BuildConfig, build
-from tensorrt_llm.models.higgs_audio import HiggsAudioConfig
-from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM
+from tensorrt_llm.models import HiggsAudioForCausalLM
+from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
+from tensorrt_llm.models.modeling_utils import KVCacheType
 from tensorrt_llm.plugin import PluginConfig
 
 
@@ -56,24 +55,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def find_bytes_in_dict(d, path=""):
-    for key, value in d.items():
-        current_path = f"{path}.{key}" if path else key
-        if isinstance(value, bytes):
-            print(f"Found bytes at: {current_path}")
-        elif isinstance(value, dict):
-            find_bytes_in_dict(value, current_path)
-        elif isinstance(value, list):
-            for i, item in enumerate(value):
-                if isinstance(item, bytes):
-                    print(f"Found bytes at: {current_path}[{i}]")
-                elif isinstance(item, dict):
-                    find_bytes_in_dict(item, f"{current_path}[{i}]")
-
-
 def main():
     args = parse_args()
-    logger.set_level(args.log_level)
     num_mul_bins = 128
     max_mel_seq_len = 3000
     max_seq_len = (max_mel_seq_len - 2) // 2 + 1
@@ -102,6 +85,7 @@ def main():
     )
     config = HiggsAudioConfig()
     model = HiggsAudioForCausalLM(config)
+    # model = HiggsAudioForCausalLM.from_hugging_face(args.model_dir, "bfloat16")
     engine = build(model, build_config)
     engine.save(args.output_dir)
 

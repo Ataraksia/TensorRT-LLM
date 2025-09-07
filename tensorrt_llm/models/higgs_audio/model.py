@@ -2,108 +2,51 @@
 # ruff: noqa
 """TensorRT-LLM implementation of Higgs Audio multimodal model."""
 
-import copy
-import inspect
-import json
-import math
-import os
-import sys
-import tempfile
-import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from enum import Enum
 from functools import lru_cache
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Set, Tuple, TypedDict, Union
-
 import librosa
 import numpy as np
-import s3fs
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from boson_multimodal import HiggsAudioTokenizer
+from boson_multimodal import *
 from huggingface_hub import snapshot_download
-from omegaconf import OmegaConf
-import transformers
-from tensorrt_llm.logger import logger
+from tqdm import tqdm
+from transformers import AutoTokenizer
+import tensorrt_llm
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models.model_weights_loader import ModelWeightsLoader
-from tensorrt_llm.models.modeling_utils import QuantConfig
-from transformers import (
-    AutoConfig,
-    AutoFeatureExtractor,
-    AutoTokenizer,
-    BatchFeature,
-    ProcessorMixin,
-)
-from transformers.models.whisper import WhisperFeatureExtractor
-from transformers.tokenization_utils_base import PaddingStrategy, PreTokenizedInput, TextInput
-
-# TensorRT-LLM imports
-from .config import HiggsAudioConfig, HiggsAudioEncoderConfig
-from ..modeling_utils import (
-    DecoderModelForCausalLM,
-    PretrainedConfig,
-    PretrainedModel,
-    DecoderLayerList,
-)
-from ...functional import (
+from tensorrt_llm.models.modeling_utils import QuantConfig, DecoderModelForCausalLM, default_net
+from tensorrt_llm.module import Module, ModuleList
+from tensorrt_llm.quantization import QuantMode
+from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
+from tensorrt_llm.functional import (
     Tensor,
-    ACT2FN,
-    PositionEmbeddingType,
-    concat,
     constant,
-    gather_last_token_logits,
+    recv,
+    send,
     shape,
-    split,
     view,
-    rms_norm,
 )
-from ...layers import (
+from tensorrt_llm.layers import (
     MLP,
     Attention,
     AttentionMaskType,
     AttentionParams,
     ColumnLinear,
     Embedding,
-    GatedMLP,
     KeyValueCacheParams,
-    Linear,
-    LoraParams,
     RmsNorm,
-    RowLinear,
 )
-from ...mapping import Mapping
-from ...module import Module, ModuleList
-from ...parameter import Parameter
-from ...quantization import QuantMode
-from transformers import AutoConfig
-from ..modeling_utils import QuantConfig as DefaultQuantConfig
-import tensorrt_llm
 
-# from .convert import load_weights_from_hf_model
-from transformers import AutoModelForCausalLM
-from tensorrt_llm import logger
 
-try:
-    from tensorrt_llm.runtime import (
-        PYTHON_BINDINGS,
-        ModelRunnerCpp,
-        SamplingConfig,
-        ModelConfig,
-    )
-except ImportError:
-    PYTHON_BINDINGS = False
-    from tensorrt_llm.runtime import ModelRunner
-
-# Logger setup
-logger.info("HiggsAudio TensorRT-LLM model loaded")
-
-AutoConfig.register("higgs_audio", HiggsAudioConfig)
-AutoFeatureExtractor.register(HiggsAudioConfig, HiggsAudioTokenizer)
-transformers._modules.add("HiggsAudioTokenizer")
-transformers.HiggsAudioTokenizer = HiggsAudioTokenizer
+def get_feat_extract_output_lengths(input_lengths: torch.LongTensor):
+    """Computes the output length of the convolutional layers and the output length of the audio encoder"""
+    input_lengths = (input_lengths - 1) // 2 + 1
+    output_lengths = (input_lengths - 2) // 2 + 1
+    return input_lengths, output_lengths
 
 
 def revert_delay_pattern(data):
@@ -156,70 +99,115 @@ def _build_delay_pattern_mask(input_ids: torch.LongTensor, bos_token_id: int, pa
     return input_ids
 
 
-class HiggsAudioTokenizer:
-    """Common interface for audio tokenizers."""
+class DecoderLayerListWithAudio(ModuleList):
+    def __init__(self, cls, config):
+        self.num_hidden_layers = config.num_hidden_layers
+        self.layer_list = config.mapping.pp_layers(config.num_hidden_layers)
+        self.quant_mode = config.quant_mode
+        super().__init__([cls(config, idx) for idx in self.layer_list])
 
-    def __init__(self, model, device="cuda:0"):
-        self.model = model
-        self.device = device
+    def forward(
+        self,
+        hidden_states,
+        use_cache=False,
+        attention_mask=None,
+        kv_cache_params=None,
+        attention_params=None,
+        mrope_params=None,
+        position_ids=None,
+        lora_params=None,
+        spec_decoding_params=None,
+        vision_token_mask=None,
+        audio_token_mask=None,
+    ):
+        kv_cache_params.fill_none_tensor_list(len(self.layer_list))
 
-    @property
-    def sampling_rate(self):
-        return self.model.sampling_rate
+        if use_cache:
+            presents = []
 
-    @property
-    def hop_length(self):
-        return self.model.hop_length
+        for layer_idx, (layer, past) in enumerate(zip(self, kv_cache_params.past_key_value)):
+            lora_layer_params = None
+            if lora_params is not None and lora_params.lora_ranks is not None:
+                lora_layer_params = lora_params.get_layer_params(layer_idx)
 
-    @property
-    def chunk_length(self):
-        return self.model.chunk_length
+            kwargs = {}
+            if position_ids is not None:
+                kwargs["position_ids"] = position_ids
+            if vision_token_mask is not None:
+                kwargs["vision_token_mask"] = vision_token_mask
+            if audio_token_mask is not None:
+                kwargs["audio_token_mask"] = audio_token_mask
+            if lora_layer_params is not None:
+                kwargs["lora_layer_params"] = lora_layer_params
+            if spec_decoding_params is not None:
+                kwargs["spec_decoding_params"] = spec_decoding_params
+            if mrope_params is not None:
+                kwargs["mrope_params"] = mrope_params
 
-    @property
-    def n_fft(self):
-        return self.model.n_fft
+            if default_net().plugin_config.reduce_fusion:
+                if layer_idx + self.layer_list[0] < self.layer_list[-1]:
+                    qkv_activation_scaling_factor = None
+                    if default_net().plugin_config.user_buffer:
+                        qkv_linear = self[layer_idx + 1].attention.qkv
+                        if self.quant_mode.has_fp8_qdq():
+                            qkv_activation_scaling_factor = constant(
+                                qkv_linear.activation_scaling_factor.raw_value.copy()
+                            )
+                        elif self.quant_mode.has_nvfp4():
+                            qkv_activation_scaling_factor = constant(
+                                qkv_linear.activation_global_scaling_factor.raw_value.copy()
+                            )
+                    kwargs["next_layer_input_layernorm_args"] = (
+                        self[layer_idx + 1].input_layernorm.weight.value,
+                        self[layer_idx + 1].input_layernorm.eps,
+                        qkv_activation_scaling_factor,
+                    )
+                else:
+                    kwargs["next_layer_input_layernorm_args"] = None
+            elif default_net().plugin_config.norm_quant_fusion:
+                if layer_idx < self.layer_list[-1] - self.layer_list[0]:
+                    try:
+                        activation_scaling_factor = constant(
+                            self[
+                                layer_idx + 1
+                            ].attention.qkv.activation_global_scaling_factor.raw_value.copy()
+                        )
+                    except:
+                        activation_scaling_factor = None
+                    kwargs["next_layer_input_layernorm_args"] = (
+                        self[layer_idx + 1].input_layernorm.weight.value,
+                        self[layer_idx + 1].input_layernorm.eps,
+                        activation_scaling_factor,
+                    )
+                else:
+                    kwargs["next_layer_input_layernorm_args"] = None
 
-    @property
-    def feature_size(self):
-        return self.model.feature_size
+            hidden_states = layer(
+                hidden_states,
+                use_cache=use_cache,
+                attention_mask=attention_mask,
+                kv_cache_params=KeyValueCacheParams(
+                    past_key_value=[past],
+                    host_past_key_value_lengths=kv_cache_params.host_past_key_value_lengths,
+                    host_max_attention_window_sizes=kv_cache_params.host_max_attention_window_sizes,
+                    host_sink_token_length=kv_cache_params.host_sink_token_length,
+                    kv_cache_block_offsets=kv_cache_params.kv_cache_block_offsets,
+                    host_kv_cache_block_offsets=kv_cache_params.host_kv_cache_block_offsets,
+                    host_kv_cache_pool_pointers=kv_cache_params.host_kv_cache_pool_pointers,
+                    host_kv_cache_pool_mapping=kv_cache_params.host_kv_cache_pool_mapping,
+                    cache_indirection=kv_cache_params.cache_indirection,
+                ),
+                attention_params=attention_params,
+                **kwargs,
+            )
 
-    def encode(self, audio_path_or_wv, sr=None, loudness_normalize=False, loudness_threshold=-23.0):
-        return self.model.encode(audio_path_or_wv, sr, loudness_normalize, loudness_threshold)
+            if use_cache:
+                presents.append(hidden_states[1])
+                hidden_states = hidden_states[0]
 
-    def decode(self, vq_code, return_cuda_tensor=False):
-        return self.model.decode(vq_code, return_cuda_tensor)
-
-
-def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
-    is_local = os.path.exists(tokenizer_name_or_path)
-    if not is_local:
-        tokenizer_path = snapshot_download(tokenizer_name_or_path)
-    else:
-        tokenizer_path = tokenizer_name_or_path
-    config_path = os.path.join(tokenizer_path, "config.json")
-    if os.path.exists(config_path):
-        config = json.load(open(config_path))
-    elif os.path.exists(os.path.join(tokenizer_path, "config.yaml")):
-        config = OmegaConf.load(os.path.join(tokenizer_path, "config.yaml"))
-        config = OmegaConf.to_container(config, resolve=True)
-    else:
-        raise FileNotFoundError(f"No config found in {tokenizer_path}")
-    model_path = os.path.join(tokenizer_path, "model.pth")
-
-    # Dynamically get valid parameters from HiggsAudioTokenizer.__init__ method
-    init_signature = inspect.signature(HiggsAudioTokenizer.__init__)
-    valid_params = set(init_signature.parameters.keys()) - {"self"}  # exclude 'self'
-    filtered_config = {k: v for k, v in config.items() if k in valid_params}
-
-    model = HiggsAudioTokenizer(
-        **filtered_config,
-        device=device,
-    )
-    parameter_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(parameter_dict, strict=False)
-    model.to(device)
-    model.eval()
-    return model
+        if use_cache:
+            return hidden_states, presents
+        return hidden_states
 
 
 class HiggsAudioDualFFNDecoderLayer(Module):
@@ -368,14 +356,10 @@ class HiggsAudioTransformer(Module):
         super().__init__()
         self.config = config
 
-        # Text embedding
-        vocab_size_padded = config.vocab_size
-        if hasattr(config, "mapping") and config.mapping is not None:
-            if config.mapping.tp_size > 1:
-                vocab_size_padded = vocab_size_padded // config.mapping.tp_size
+        self.mapping = tensorrt_llm.Mapping()
 
         self.vocab_embedding = Embedding(
-            num_embeddings=vocab_size_padded,
+            num_embeddings=config.vocab_size,
             embedding_dim=config.hidden_size,
             dtype=config.dtype,
             tp_group=config.mapping.tp_group
@@ -397,7 +381,7 @@ class HiggsAudioTransformer(Module):
         )
 
         # Decoder layers - use dual FFN for all layers for simplicity
-        self.layers = DecoderLayerList(HiggsAudioDualFFNDecoderLayer, config)
+        self.layers = DecoderLayerListWithAudio(HiggsAudioDualFFNDecoderLayer, config)
 
         # Final layer norm
         self.ln_f = RmsNorm(
@@ -410,58 +394,57 @@ class HiggsAudioTransformer(Module):
         self,
         hidden_states: Optional[Tensor] = None,
         input_ids: Optional[Tensor] = None,
-        position_ids: Optional[Tensor] = None,
         use_cache: bool = False,
-        last_token_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         kv_cache_params: Optional[KeyValueCacheParams] = None,
         attention_params: Optional[AttentionParams] = None,
         prompt_embedding_table: Optional[Tensor] = None,
-        prompt_tasks: Optional[Tensor] = None,
-        prompt_vocab_size: Optional[Tensor] = None,
+        prompt_tasks: str = "",
+        prompt_vocab_size: int = 0,
+        position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer."""
 
-        # Process input embeddings
-        if audio_features is not None:
-            # Audio comprehension mode - process audio features
-            audio_embeddings = self.audio_tokenizer.encode(audio_features, sr=24000)
+        ptuning_args = (
+            [prompt_embedding_table, prompt_tasks, prompt_vocab_size]
+            if prompt_embedding_table is not None
+            else []
+        )
+        special_mask = input_ids == self.config.audio_in_token_idx
+        position = torch.where(special_mask)[-1].item()
+        position = int(prompt_tasks)
+        # Get text embeddings
+        input_ids_pre = [input_ids[:position]]
+        text_embeddings_pre = self.vocab_embedding(input_ids_pre, *ptuning_args)
+        input_ids_post = [input_ids[position + 1 :]]
+        text_embeddings_post = self.vocab_embedding(input_ids_post, *ptuning_args)
 
-            # Get text embeddings
-            text_embeddings = self.vocab_embedding(input_ids)
+        # Audio generation mode - use audio codebook embeddings
+        batch_size, num_codebooks, seq_len = prompt_embedding_table.shape
 
-            # Merge audio and text embeddings based on input_ids
-            # This would need custom logic to determine where audio tokens are
-            hidden_states = text_embeddings  # Simplified for now
+        # Flatten audio_out_ids to (batch_size, seq_len * num_codebooks)
+        audio_ids = view(prompt_embedding_table, [batch_size, seq_len * num_codebooks])
 
-        elif audio_out_ids is not None:
-            # Audio generation mode - use audio codebook embeddings
-            batch_size, seq_len, num_codebooks = (
-                shape(audio_out_ids, 0),
-                shape(audio_out_ids, 1),
-                shape(audio_out_ids, 2),
-            )
+        codebook_shift = (
+            torch.arange(self.audio_num_codebooks, device=audio_ids.device)
+            * self.audio_codebook_size
+        )
+        codebook_shift = codebook_shift.unsqueeze(-1)
+        audio_embeddings = self.audio_codebook_embeddings(audio_ids + codebook_shift)
 
-            # Flatten audio_out_ids to (batch_size, seq_len * num_codebooks)
-            flat_audio_ids = view(audio_out_ids, [batch_size, seq_len * num_codebooks])
+        # Reshape back to (batch_size, num_codebooks, seq_len, hidden_size)
+        audio_embeddings = view(
+            audio_embeddings, [batch_size, num_codebooks, seq_len, self.config.hidden_size]
+        )
+        # Combine codebook embeddings (e.g., sum or average)
+        audio_embeddings = audio_embeddings.sum(dim=1)
 
-            # Get audio codebook embeddings
-            audio_embeddings = self.audio_codebook_embeddings(flat_audio_ids)
-
-            # Reshape back to (batch_size, seq_len, num_codebooks, hidden_size)
-            audio_embeddings = view(
-                audio_embeddings, [batch_size, seq_len, num_codebooks, self.config.hidden_size]
-            )
-
-            # Combine codebook embeddings (e.g., sum or average)
-            hidden_states = audio_embeddings.sum(dim=2)  # Sum across codebooks
-
-        else:
-            # Text-only mode
-            hidden_states = self.vocab_embedding(
-                input_ids,
-            )
-
+        # Concatenate text and audio embeddings
+        text_embeddings_pre = text_embeddings_pre.unsqueeze(1)
+        text_embeddings_post = text_embeddings_post.unsqueeze(1)
+        hidden_states = torch.cat(
+            [text_embeddings_pre, audio_embeddings, text_embeddings_post], dim=1
+        )
         # Pass through decoder layers
         hidden_states = self.layers(
             hidden_states=hidden_states,
@@ -474,7 +457,6 @@ class HiggsAudioTransformer(Module):
         if use_cache:
             hidden_states, presents = hidden_states
 
-        # Final layer norm
         hidden_states = self.ln_f(hidden_states)
 
         if use_cache:
@@ -535,6 +517,12 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         loader = ModelWeightsLoader(hf_model_dir, custom_dict)
 
         model = cls(config)
+        loader.update_key_mapping(model)
+        tllm_weights = {}
+        for tllm_key, _ in tqdm(model.named_parameters()):
+            tllm_weights.update(loader.load(tllm_key))
+        loader.fill(tllm_weights)
+
         loader.generate_tllm_weights(model)
 
         return model
@@ -551,6 +539,12 @@ class HiggsAudioTRTRunner:
         audio_tokenizer_dir: str,
     ) -> None:
         """Initialize the TensorRT-LLM runner for HiggsAudio."""
+
+        from tensorrt_llm.runtime import (
+            ModelRunnerCpp,
+            SamplingConfig,
+        )
+
         self.config = config
         self.engine_dir = engine_dir
         self.tokenizer_dir = tokenizer_dir
@@ -561,12 +555,15 @@ class HiggsAudioTRTRunner:
         self.top_p = 0.95
         self.num_beams = 1
         self.use_py_session = False
-        self.gpu_weights_percent = None
+        self.gpu_weights_percent = 0.5
         self.max_new_tokens = 512
         self.enable_context_fmha_fp32_acc = False
 
+        self.pad_token_id = config.pad_token_id
+        self.audio_eos_token_id = config.audio_eos_token_id
         self.audio_in_token_idx = config.audio_in_token_idx
         self.vocab_size = config.vocab_size
+        self.max_seq_len = 1500
 
         # Set up device
         self.gpu_device = torch.device("cuda", 0)
@@ -585,7 +582,6 @@ class HiggsAudioTRTRunner:
         self.audio_tokenizer = load_higgs_audio_tokenizer(
             self.audio_tokenizer_dir, device=str(self.gpu_device)
         )
-        logger.info(f"Loaded tokenizer from {self.tokenizer_dir}")
 
         self.sampling_config = SamplingConfig(
             end_id=self.audio_eos_token_id,
@@ -596,27 +592,17 @@ class HiggsAudioTRTRunner:
             top_k=self.top_k,
             top_p=self.top_p,
         )
-        if PYTHON_BINDINGS and not self.use_py_session:
-            self.runner = ModelRunnerCpp().from_dir(
-                engine_dir=self.engine_dir,
-                gpu_weights_percent=self.gpu_weights_percent,
-                enable_context_fmha_fp32_acc=self.enable_context_fmha_fp32_acc,
-                use_gpu_direct_storage=True,
-                cuda_graph_mode=True,
-            )
-        else:
-            self.runner = ModelRunner.from_dir(
-                engine_dir=self.engine_dir,
-                gpu_weights_percent=self.gpu_weights_percent,
-            )
-
-        logger.info("Successfully set up TensorRT-LLM runner")
+        self.runner = ModelRunnerCpp.from_dir(
+            engine_dir=self.engine_dir,
+            use_gpu_direct_storage=True,
+            cuda_graph_mode=True,
+            kv_cache_free_gpu_memory_fraction=self.gpu_weights_percent,
+        )
 
     def generate(
         self,
         input_text: str,
         input_audio: str,
-        max_new_tokens: Optional[int] = None,
         **generation_kwargs,
     ) -> str:
         """Generate response integrating text and optional audio inputs."""
@@ -625,47 +611,19 @@ class HiggsAudioTRTRunner:
 
         input_ids = self.tokenizer.encode(input_text, return_tensors="pt").squeeze(0)
 
-        prompt_table = None
-        input_token_extra_ids = None
-
         if input_audio is not None and self.audio_tokenizer:
-            # Encode audio to features/embeddings (assume shape (num_tokens, hidden_size))
             audio_features = self.audio_tokenizer.encode(input_audio, sr=24000)
-            num_audio_tokens = audio_features.shape[0]
-
-            special_mask = input_ids == self.audio_in_token_idx
-            if special_mask.sum() != 1:
-                raise ValueError("Expected exactly one special audio token in input_ids")
-            position = torch.where(special_mask)[1].item()
-
-            fake_ids = torch.arange(
-                self.vocab_size,
-                self.vocab_size + num_audio_tokens,
-                device=input_ids.device,
-                dtype=input_ids.dtype,
-            )
-            input_ids = torch.cat([input_ids[:position], fake_ids, input_ids[position + 1 :]])
-
-            # Prepare prompt_table from audio_features
-            prompt_table = audio_features.to(
-                dtype=self.model_config.dtype, device=self.gpu_device
-            ).unsqueeze(0)
-
-            seq_extra_ids = torch.full(
-                (num_audio_tokens,), [1], dtype=torch.int64, device=self.gpu_device
-            )
-
-            # Insert into extra_ids at the fake positions
-            extra_ids = torch.zeros_like(input_ids, dtype=torch.int64)
-            extra_ids[position : position + num_audio_tokens] = seq_extra_ids
-            input_token_extra_ids = [extra_ids.tolist()]
+            prompt_table = audio_features.to(dtype=input_ids.dtype, device=self.gpu_device)
 
         # Prepare batch
         batch_input_ids = [input_ids.tolist()]
 
         # Update sampling config
-        if max_new_tokens is not None:
-            self.sampling_config.max_new_tokens = max_new_tokens
+        input_lengths = torch.tensor(
+            [input_ids.size(-1)], device=self.gpu_device, dtype=input_ids.dtype
+        )
+        max_input_length = torch.max(input_lengths).item()
+        self.sampling_config.max_new_tokens = self.max_seq_len - max_input_length
 
         # Run generation
         with torch.no_grad():
@@ -673,8 +631,6 @@ class HiggsAudioTRTRunner:
                 batch_input_ids=batch_input_ids,
                 sampling_config=self.sampling_config,
                 prompt_table=prompt_table,
-                prompt_tasks="0",
-                input_token_extra_ids=input_token_extra_ids,
                 **generation_kwargs,
             )
 
