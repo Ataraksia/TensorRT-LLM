@@ -75,10 +75,18 @@ from ...module import Module, ModuleList
 from ...parameter import Parameter
 from ...quantization import QuantMode
 
-# TensorRT-LLM runtime imports (imported in TRTRunner class to avoid circular imports)
-import tensorrt as trt  # type: ignore
 import tensorrt_llm
 from tensorrt_llm import logger
+
+try:
+    from tensorrt_llm.runtime import (
+        PYTHON_BINDINGS,
+        ModelRunnerCpp as ModelRunner,
+        SamplingConfig as TRTSamplingConfig,
+    )
+except ImportError:
+    PYTHON_BINDINGS = False
+    from tensorrt_llm.runtime import ModelRunner
 
 
 def revert_delay_pattern(data):
@@ -758,7 +766,7 @@ class HiggsAudioTRTRunner:
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.tokenizer_dir, trust_remote_code=True, use_fast=False
             )
-            self.audio_tokenizer = load_higgs_audio_tokenizer()
+            self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir, device=str(self.gpu_device))
             logger.info(f"Loaded tokenizer from {self.tokenizer_dir}")
         except Exception as e:
             logger.error(f"Failed to load tokenizer: {e}")
@@ -782,89 +790,119 @@ class HiggsAudioTRTRunner:
 
     def _setup_runner(self):
         """Set up the TensorRT-LLM model runner."""
-        try:
-            from tensorrt_llm.runtime import (
-                PYTHON_BINDINGS,
-                ModelRunner,
-                SamplingConfig as TRTSamplingConfig,
+        if PYTHON_BINDINGS and not self.use_py_session:
+            self.runner = ModelRunner.from_dir(
+                engine_dir=self.engine_dir,
+                lora_dir=self.lora_dir,
+                rank=tensorrt_llm.mpi_rank(),
+                debug_mode=self.debug_mode,
+                lora_ckpt_source=self.lora_ckpt_source,
+                gpu_weights_percent=self.gpu_weights_percent,
+                enable_context_fmha_fp32_acc=self.enable_context_fmha_fp32_acc,
+            )
+        else:
+            self.runner = ModelRunner.from_dir(
+                engine_dir=self.engine_dir,
+                lora_dir=self.lora_dir,
+                rank=tensorrt_llm.mpi_rank(),
+                debug_mode=self.debug_mode,
+                lora_ckpt_source=self.lora_ckpt_source,
+                gpu_weights_percent=self.gpu_weights_percent,
             )
 
-            if PYTHON_BINDINGS:
-                from tensorrt_llm.runtime import ModelRunnerCpp
+        # Set up sampling config
+        self.sampling_config = TRTSamplingConfig(
+            end_id=self.tokenizer.eos_token_id if self.tokenizer else None,
+            pad_id=self.tokenizer.pad_token_id if self.tokenizer else None,
+            num_beams=self.num_beams,
+            max_new_tokens=self.max_new_tokens,
+        )
 
-            if PYTHON_BINDINGS and not self.use_py_session:
-                self.runner = ModelRunnerCpp.from_dir(
-                    engine_dir=self.engine_dir,
-                    lora_dir=self.lora_dir,
-                    rank=tensorrt_llm.mpi_rank(),
-                    debug_mode=self.debug_mode,
-                    lora_ckpt_source=self.lora_ckpt_source,
-                    gpu_weights_percent=self.gpu_weights_percent,
-                    enable_context_fmha_fp32_acc=self.enable_context_fmha_fp32_acc,
-                )
-            else:
-                self.runner = ModelRunner.from_dir(
-                    engine_dir=self.engine_dir,
-                    lora_dir=self.lora_dir,
-                    rank=tensorrt_llm.mpi_rank(),
-                    debug_mode=self.debug_mode,
-                    lora_ckpt_source=self.lora_ckpt_source,
-                    gpu_weights_percent=self.gpu_weights_percent,
-                )
-
-            # Set up sampling config
-            self.sampling_config = TRTSamplingConfig(
-                end_id=self.tokenizer.eos_token_id if self.tokenizer else None,
-                pad_id=self.tokenizer.pad_token_id if self.tokenizer else None,
-                num_beams=self.num_beams,
-                max_new_tokens=self.max_new_tokens,
-            )
-
-            logger.info("Successfully set up TensorRT-LLM runner")
-        except Exception as e:
-            logger.error(f"Failed to set up runner: {e}")
-            raise
+        logger.info("Successfully set up TensorRT-LLM runner")
 
     def generate(
         self,
         input_text: str,
-        audio_data: Optional[np.ndarray] = None,
+        audio_data: Optional[Union[np.ndarray, str]] = None,
+        input_audio_ids: Optional[List[int]] = None,
         max_new_tokens: Optional[int] = None,
         **generation_kwargs,
     ) -> str:
-        """Generate text/audio response from input text and optional audio."""
+        """Generate response integrating text and optional audio inputs."""
         if not self.runner:
             raise RuntimeError("Runner not initialized")
 
-        pre_prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text, using the specified description.<|scene_desc_start|>Audio is recorded from a quiet room. Speaker is an enthusiastic young Australian woman in her early 20s with a bright, high-pitched voice.<|scene_desc_end|><|eot_id|><|start_header_id|>user<|end_header_id|>Can you believe just how realistic this sounds now?<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_bos|><|AUDIO|><|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>"  # noqa: E501
-        post_prompt = "<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
+        # Tokenize input text (assume input_text contains special audio placeholders like <|AUDIO|>)
+        input_ids = self.tokenizer.encode(input_text, return_tensors="pt").squeeze(0)
 
-        input_text = pre_prompt + input_text + post_prompt
+        prompt_table = None
+        input_token_extra_ids = None
 
-        # Tokenize input
-        input_ids = self.tokenizer.encode(input_text, return_tensors="pt")
-
-        # Process audio if provided
         if audio_data is not None and self.audio_tokenizer:
-            # Run audio encoder
-            input_audio_features = self.audio_tokenizer.encode(audio_data, sr=24000)
-            # TODO: Integrate audio features into prompt
+            # Load audio_data if path
+            if isinstance(audio_data, str):
+                audio_wav, _ = librosa.load(audio_data, sr=self.audio_tokenizer.sampling_rate)
+                audio_data = audio_wav
 
-        # Set up generation parameters
+            # Encode audio to features/embeddings (assume shape (num_tokens, hidden_size))
+            audio_features = self.audio_tokenizer.encode(audio_data)
+            num_audio_tokens = audio_features.shape[0]
+
+            # Identify special audio token position (assume single <|AUDIO|> per audio)
+            audio_token_str = "<|AUDIO|>"
+            if audio_token_str not in self.tokenizer.get_vocab():
+                raise ValueError(f"Special token {audio_token_str} not found in tokenizer vocab")
+            audio_token_id = self.tokenizer.convert_tokens_to_ids(audio_token_str)
+
+            special_mask = (input_ids == audio_token_id)
+            if special_mask.sum() != 1:
+                raise ValueError("Expected exactly one special audio token in input_ids")
+            position = torch.where(special_mask)[1].item()
+
+            # Replace with fake prompt ids
+            vocab_size = self.tokenizer.vocab_size
+            fake_start = vocab_size
+            fake_ids = torch.arange(fake_start, fake_start + num_audio_tokens, device=input_ids.device, dtype=input_ids.dtype)
+            input_ids = torch.cat([input_ids[:position], fake_ids, input_ids[position+1:]])
+
+            # Prepare prompt_table from audio_features
+            prompt_table = audio_features.to(dtype=self.model_config.dtype, device=self.gpu_device).unsqueeze(0)
+
+            # Build extra_ids from input_audio_ids (assume single audio, list with one int)
+            if input_audio_ids is None:
+                input_audio_ids = [1]
+            assert len(input_audio_ids) == 1, "Support single audio for now"
+            audio_id = input_audio_ids[0]
+            seq_extra_ids = torch.full((num_audio_tokens,), audio_id, dtype=torch.int64, device=self.gpu_device)
+
+            # Insert into extra_ids at the fake positions
+            extra_ids = torch.zeros_like(input_ids, dtype=torch.int64)
+            extra_ids[position:position + num_audio_tokens] = seq_extra_ids
+            input_token_extra_ids = [extra_ids.tolist()]
+
+        # Prepare batch
+        batch_input_ids = [input_ids.tolist()]
+
+        # Update sampling config
         if max_new_tokens is not None:
             self.sampling_config.max_new_tokens = max_new_tokens
 
         # Run generation
         with torch.no_grad():
             outputs = self.runner.generate(
-                batch_input_ids=[input_ids.squeeze(0).tolist()],
+                batch_input_ids=batch_input_ids,
                 sampling_config=self.sampling_config,
+                prompt_table=prompt_table,
+                prompt_tasks="0",
+                input_token_extra_ids=input_token_extra_ids,
                 **generation_kwargs,
             )
 
-        # Decode output
-        output_ids = outputs["output_ids"][0]
-        generated_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+        # Decode new tokens only
+        output_ids = outputs["output_ids"][0][0]
+        input_len = len(input_ids)
+        generated_ids = output_ids[input_len:]
+        generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
 
         return generated_text
 
