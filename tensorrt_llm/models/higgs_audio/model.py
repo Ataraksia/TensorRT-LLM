@@ -408,10 +408,11 @@ class HiggsAudioTransformer(Module):
 
     def forward(
         self,
-        input_ids: Tensor,
+        hidden_states: Optional[Tensor] = None,
+        input_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
         use_cache: bool = False,
-        last_token_ids=None,
+        last_token_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         kv_cache_params: Optional[KeyValueCacheParams] = None,
         attention_params: Optional[AttentionParams] = None,
