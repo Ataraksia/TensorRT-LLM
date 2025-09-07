@@ -51,13 +51,24 @@ def get_feat_extract_output_lengths(input_lengths: torch.LongTensor):
 
 
 def revert_delay_pattern(data):
-    """Convert samples encoded with delay pattern back to the original form."""
+    """Convert samples encoded with delay pattern back to the original form.
+
+    Args:
+        data: The data with delay pattern applied.
+              Shape (num_codebooks, seq_len + num_codebooks - 1).
+
+    Returns:
+        ret: Recovered data with delay pattern removed.
+             Shape (num_codebooks, seq_len).
+    """
     assert len(data.shape) == 2
     out_l = []
     num_codebooks = data.shape[0]
     for i in range(num_codebooks):
-        out_l.append(data[i, i:])
-    return np.concatenate(out_l, axis=0)
+        out_l.append(data[i : (i + 1), i : (data.shape[1] - num_codebooks + 1 + i)])
+    return (
+        torch.cat(out_l, dim=0) if isinstance(data, torch.Tensor) else np.concatenate(out_l, axis=0)
+    )
 
 
 def _validate_and_reshape_mm_tensor(
@@ -690,3 +701,144 @@ class HiggsAudioTRTRunner:
             return generated_text.strip()
 
         return ""  # Return empty string if no output
+
+    def _embed_audio_codes(self, audio_codes):
+        """Convert audio codes to embeddings using codebook embeddings.
+
+        Args:
+            audio_codes: Audio codes tensor of shape (num_codebooks, seq_len)
+
+        Returns:
+            audio_embeddings: Embeddings tensor of shape (seq_len, hidden_size)
+        """
+        # Create codebook shift for each codebook
+        codebook_shift = (
+            torch.arange(self.config.audio_num_codebooks, device=audio_codes.device)
+            * self.config.audio_codebook_size
+        )
+        codebook_shift = codebook_shift.unsqueeze(-1)  # Shape: (num_codebooks, 1)
+
+        # Shift audio codes by codebook offset
+        shifted_codes = audio_codes + codebook_shift
+
+        # Get embeddings for each codebook (this would need the actual embedding layer)
+        # For now, create dummy embeddings - this should be replaced with actual embedding lookup
+        seq_len = audio_codes.shape[1]
+        hidden_size = self.config.hidden_size
+
+        # Create dummy embeddings (in real implementation, use actual codebook embeddings)
+        audio_embeddings = torch.randn(
+            seq_len, hidden_size, device=audio_codes.device, dtype=torch.float32
+        )
+
+        return audio_embeddings
+
+    def generate_with_delay_pattern(
+        self,
+        input_text: str,
+        input_audio: str = None,
+        use_delay_pattern: bool = True,
+        **generation_kwargs,
+    ) -> tuple[str, torch.Tensor]:
+        """Generate response with delay pattern support for audio generation.
+
+        Returns:
+            generated_text: Generated text response
+            generated_audio_codes: Generated audio codes with delay pattern (if any)
+        """
+        if not self.runner:
+            raise RuntimeError("Runner not initialized")
+
+        # Process text input
+        input_ids = self.tokenizer.encode(input_text, return_tensors="pt").squeeze(0)
+
+        # Process audio input if provided
+        prompt_table = None
+        prompt_tasks = None
+        prompt_vocab_size = None
+
+        if input_audio is not None and self.audio_tokenizer:
+            # Encode audio to RVQ codes
+            audio_codes = self.audio_tokenizer.encode(input_audio, sr=24000)
+
+            # Apply delay pattern if requested and we have multiple codebooks
+            if use_delay_pattern and len(audio_codes.shape) >= 2 and audio_codes.shape[0] > 1:
+                # Add BOS and EOS tokens
+                bos_tokens = torch.full(
+                    (audio_codes.shape[0], 1),
+                    self.config.audio_stream_bos_id,
+                    dtype=audio_codes.dtype,
+                    device=audio_codes.device,
+                )
+                eos_tokens = torch.full(
+                    (audio_codes.shape[0], 1),
+                    self.config.audio_stream_eos_id,
+                    dtype=audio_codes.dtype,
+                    device=audio_codes.device,
+                )
+
+                # Concatenate: BOS + audio_codes + EOS
+                audio_codes_with_special = torch.cat([bos_tokens, audio_codes, eos_tokens], dim=-1)
+
+                # Apply delay pattern
+                audio_codes = _build_delay_pattern_mask(
+                    audio_codes_with_special.unsqueeze(0),  # Add batch dimension
+                    bos_token_id=self.config.audio_stream_bos_id,
+                    pad_token_id=self.config.audio_stream_eos_id,
+                ).squeeze(0)  # Remove batch dimension
+
+            # Convert audio codes to embeddings for prompt table
+            audio_embeddings = self._embed_audio_codes(audio_codes)
+
+            # Prepare as prompt embedding table
+            prompt_table = audio_embeddings.unsqueeze(0).to(
+                dtype=torch.bfloat16, device=self.gpu_device
+            )
+
+            # Set up prompt tasks and vocab size for audio features
+            batch_size = prompt_table.shape[0]
+            num_audio_tokens = prompt_table.shape[1]
+
+            # Create task IDs (0 for audio task)
+            prompt_tasks = torch.zeros(
+                (batch_size, num_audio_tokens), dtype=torch.bfloat16, device=self.gpu_device
+            )
+
+            # Set vocab size for audio features
+            prompt_vocab_size = torch.tensor(
+                [num_audio_tokens], dtype=torch.bfloat16, device=self.gpu_device
+            )
+
+        # Prepare batch
+        batch_input_ids = [input_ids.tolist()]
+
+        # Update sampling config
+        input_lengths = torch.tensor(
+            [input_ids.size(-1)], device=self.gpu_device, dtype=torch.int32
+        )
+        max_input_length = torch.max(input_lengths).item()
+        self.sampling_config.max_new_tokens = min(
+            self.max_new_tokens, self.max_seq_len - max_input_length
+        )
+
+        # Run generation with audio features
+        with torch.no_grad():
+            outputs = self.runner.generate(
+                batch_input_ids=batch_input_ids,
+                sampling_config=self.sampling_config,
+                prompt_table=prompt_table,
+                prompt_tasks=prompt_tasks,
+                prompt_vocab_size=prompt_vocab_size,
+            )
+
+        # Process outputs - Only audio output data is currently generated
+        generated_audio = None
+        if outputs is not None and len(outputs) > 0:
+            output_ids = outputs[0]
+            # Remove input tokens from output
+            generated_ids = output_ids[input_lengths[0] :]
+            generated_audio = self.audio_tokenizer.decode(generated_ids)
+            if use_delay_pattern:
+                generated_audio = revert_delay_pattern(generated_audio)
+
+        return generated_audio
