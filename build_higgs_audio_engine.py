@@ -2,9 +2,6 @@
 """Script to build TensorRT-LLM engine for HiggsAudio model."""
 
 import argparse
-import sys
-from pathlib import Path
-from pickle import FALSE
 
 from tensorrt_llm import logger
 from tensorrt_llm.bindings import KVCacheType
@@ -59,6 +56,21 @@ def parse_args():
     return parser.parse_args()
 
 
+def find_bytes_in_dict(d, path=""):
+    for key, value in d.items():
+        current_path = f"{path}.{key}" if path else key
+        if isinstance(value, bytes):
+            print(f"Found bytes at: {current_path}")
+        elif isinstance(value, dict):
+            find_bytes_in_dict(value, current_path)
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                if isinstance(item, bytes):
+                    print(f"Found bytes at: {current_path}[{i}]")
+                elif isinstance(item, dict):
+                    find_bytes_in_dict(item, f"{current_path}[{i}]")
+
+
 def main():
     args = parse_args()
     logger.set_level(args.log_level)
@@ -67,8 +79,6 @@ def main():
     max_seq_len = (max_mel_seq_len - 2) // 2 + 1
 
     # Create output directory
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     plugin_config = PluginConfig()
     plugin_config.dtype = args.dtype
@@ -87,20 +97,13 @@ def main():
         kv_cache_type=KVCacheType.PAGED,
         gather_context_logits=False,
         gather_generation_logits=False,
-        strongly_typed=FALSE,
+        strongly_typed=False,
         plugin_config=plugin_config,
     )
     config = HiggsAudioConfig()
     model = HiggsAudioForCausalLM(config)
     engine = build(model, build_config)
-
-    if engine is None:
-        logger.error(f"Failed to build engine for rank {0}")
-        sys.exit(1)
-
-    # Save the engine
-    engine_path = output_dir / "rank0.engine"
-    engine.save(engine_path)
+    engine.save(args.output_dir)
 
 
 if __name__ == "__main__":

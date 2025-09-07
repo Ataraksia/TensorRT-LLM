@@ -81,7 +81,8 @@ from ...quantization import QuantMode
 from transformers import AutoConfig
 from ..modeling_utils import QuantConfig as DefaultQuantConfig
 import tensorrt_llm
-from .convert import load_weights_from_hf_model
+
+# from .convert import load_weights_from_hf_model
 from transformers import AutoModelForCausalLM
 from tensorrt_llm import logger
 
@@ -231,7 +232,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         self.hidden_size = config.hidden_size
 
         # Shared attention layer
-        self.self_attn = Attention(
+        self.attention = Attention(
             hidden_size=config.hidden_size,
             num_attention_heads=config.num_attention_heads,
             num_kv_heads=getattr(config, "num_key_value_heads", config.num_attention_heads),
@@ -279,7 +280,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
             dtype=config.dtype,
         )
 
-        self.post_attention_layernorm = RmsNorm(
+        self.post_layernorm = RmsNorm(
             normalized_shape=config.hidden_size,
             eps=getattr(config, "rms_norm_eps", 1e-5),
             dtype=config.dtype,
@@ -321,7 +322,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
             hidden_states = self.input_layernorm(hidden_states)
 
         # Shared attention layer
-        attention_output = self.self_attn(
+        attention_output = self.attention(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             use_cache=use_cache,
@@ -339,7 +340,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         if audio_token_mask is not None:
             # Separate processing for text and audio tokens
-            text_states = self.post_attention_layernorm(hidden_states)
+            text_states = self.post_layernorm(hidden_states)
             audio_states = self.audio_post_attention_layernorm(hidden_states)
 
             # Apply appropriate MLPs
@@ -350,7 +351,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
             mlp_output = audio_token_mask * audio_output + (1 - audio_token_mask) * text_output
         else:
             # Default to text processing if no audio mask provided
-            hidden_states = self.post_attention_layernorm(hidden_states)
+            hidden_states = self.post_layernorm(hidden_states)
             mlp_output = self.mlp(hidden_states)
 
         hidden_states = residual + mlp_output
@@ -373,7 +374,7 @@ class HiggsAudioTransformer(Module):
             if config.mapping.tp_size > 1:
                 vocab_size_padded = vocab_size_padded // config.mapping.tp_size
 
-        self.embed_tokens = Embedding(
+        self.vocab_embedding = Embedding(
             num_embeddings=vocab_size_padded,
             embedding_dim=config.hidden_size,
             dtype=config.dtype,
@@ -399,7 +400,7 @@ class HiggsAudioTransformer(Module):
         self.layers = DecoderLayerList(HiggsAudioDualFFNDecoderLayer, config)
 
         # Final layer norm
-        self.norm = RmsNorm(
+        self.ln_f = RmsNorm(
             normalized_shape=config.hidden_size,
             eps=getattr(config, "rms_norm_eps", 1e-5),
             dtype=config.dtype,
@@ -410,12 +411,13 @@ class HiggsAudioTransformer(Module):
         input_ids: Tensor,
         position_ids: Optional[Tensor] = None,
         use_cache: bool = False,
+        last_token_ids=None,
         attention_mask: Optional[Tensor] = None,
         kv_cache_params: Optional[KeyValueCacheParams] = None,
         attention_params: Optional[AttentionParams] = None,
-        audio_features: Optional[Tensor] = None,
-        audio_feature_attention_mask: Optional[Tensor] = None,
-        audio_out_ids: Optional[Tensor] = None,
+        prompt_embedding_table: Optional[Tensor] = None,
+        prompt_tasks: Optional[Tensor] = None,
+        prompt_vocab_size: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer."""
 
@@ -425,7 +427,7 @@ class HiggsAudioTransformer(Module):
             audio_embeddings = self.audio_tokenizer.encode(audio_features, sr=24000)
 
             # Get text embeddings
-            text_embeddings = self.embed_tokens(input_ids)
+            text_embeddings = self.vocab_embedding(input_ids)
 
             # Merge audio and text embeddings based on input_ids
             # This would need custom logic to determine where audio tokens are
@@ -455,7 +457,9 @@ class HiggsAudioTransformer(Module):
 
         else:
             # Text-only mode
-            hidden_states = self.embed_tokens(input_ids)
+            hidden_states = self.vocab_embedding(
+                input_ids,
+            )
 
         # Pass through decoder layers
         hidden_states = self.layers(
@@ -470,7 +474,7 @@ class HiggsAudioTransformer(Module):
             hidden_states, presents = hidden_states
 
         # Final layer norm
-        hidden_states = self.norm(hidden_states)
+        hidden_states = self.ln_f(hidden_states)
 
         if use_cache:
             return hidden_states, presents
@@ -518,15 +522,12 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
             HiggsAudioForCausalLM: The loaded model
         """
 
-        # For now, create a basic HiggsAudio TensorRT-LLM config
-        # In a full implementation, this would parse the HF config properly
         config = HiggsAudioConfig(
             mapping=mapping or Mapping(),
             quant_config=quant_config or DefaultQuantConfig(),
             dtype=dtype,  # Pass dtype in kwargs to override default
             **kwargs,
         )
-        # Create model
         custom_dict = {
             "lm_head": "audio_decoder_proj.audio_lm_head.weight",
         }
@@ -534,26 +535,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
 
         model = cls(config)
         loader.generate_tllm_weights(model)
-        # Load weights using the convert function
-        # if not kwargs.get("skip_loading_weights", False):
-        #     try:
-        #         hf_model = AutoModelForCausalLM.from_pretrained(
-        #             hf_model_dir, trust_remote_code=True, torch_dtype="auto"
-        #         )
-
-        #         # Convert weights
-        #         weights = load_weights_from_hf_model(
-        #             hf_model=hf_model,
-        #             mapping=mapping or Mapping(),
-        #             dtype=dtype,
-        #         )
-
-        #         # Load weights into the model
-        #         model.load(weights)
-
-        #     except Exception as e:
-        #         logger.warning(f"Failed to load weights from HuggingFace model: {e}")
-        #         logger.warning("Model created without weights loaded")
 
         return model
 
@@ -677,7 +658,7 @@ class HiggsAudioTRTRunner:
             extra_ids = torch.zeros_like(input_ids, dtype=torch.int64)
             extra_ids[position : position + num_audio_tokens] = seq_extra_ids
             input_token_extra_ids = [extra_ids.tolist()]
-        print(input_token_extra_ids)
+
         # Prepare batch
         batch_input_ids = [input_ids.tolist()]
 
