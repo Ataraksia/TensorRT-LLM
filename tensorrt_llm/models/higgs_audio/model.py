@@ -901,40 +901,93 @@ class HiggsAudioTRTRunner:
             print(f"DEBUG: First 10 generated tokens: {head}")
             print(f"DEBUG: Last 10 generated tokens: {tail}")
 
+            # Check if we're generating text tokens instead of audio tokens
             if num_gen > 0:
-                # Convert flat tokens to (num_codebooks, seq_len) codes
-                try:
-                    gsize = self.config.audio_codebook_size + 2
-                    num_cbs = self.config.audio_num_codebooks
-                    tokens = gen_seq
-                    codes_per_cb = []
-                    for i in range(num_cbs):
-                        off = i * gsize
-                        mask = (tokens >= off) & (tokens < off + gsize)
-                        cb_tokens = tokens[mask] - off  # 0..gsize-1
-                        # Keep only real codebook indices [0, codebook_size)
-                        cb_tokens = cb_tokens[cb_tokens < self.config.audio_codebook_size]
-                        codes_per_cb.append(cb_tokens)
-                    if any(len(c) > 0 for c in codes_per_cb):
-                        max_len = max(len(c) for c in codes_per_cb)
-                        padded = []
-                        for c in codes_per_cb:
-                            if len(c) < max_len:
-                                pad = torch.zeros(max_len - len(c), dtype=c.dtype, device=c.device)
-                                c = torch.cat([c, pad], dim=0)
-                            padded.append(c)
-                        audio_codes = torch.stack(padded, dim=0)  # (num_codebooks, seq_len)
-                        # Optionally, if delay pattern was used in logits space, try revert
-                        if (
-                            use_delay_pattern
-                            and audio_codes.shape[0] > 1
-                            and audio_codes.shape[1] > 0
-                        ):
-                            try:
-                                audio_codes = revert_delay_pattern(audio_codes)
-                            except Exception:
-                                pass
+                text_tokens = [t for t in head if t >= 128000]  # Text tokens are typically 128000+
+                audio_range_tokens = [
+                    t for t in head if t < 10000
+                ]  # Audio tokens should be < 10000
+                print(f"DEBUG: Text tokens in first 10: {len(text_tokens)} ({text_tokens})")
+                print(
+                    f"DEBUG: Audio range tokens in first 10: {len(audio_range_tokens)} ({audio_range_tokens})"
+                )
+
+                if len(text_tokens) > 0:
+                    print("⚠️  WARNING: Model is generating text tokens instead of audio tokens!")
+                    print(
+                        "This suggests the model is not properly configured for audio generation."
+                    )
+
+            if num_gen > 0:
+                # Filter out text tokens and keep only audio-range tokens
+                max_audio_token = self.config.audio_num_codebooks * (
+                    self.config.audio_codebook_size + 2
+                )
+                audio_tokens = gen_seq[gen_seq < max_audio_token]
+                print(
+                    f"DEBUG: Filtered to {len(audio_tokens)} audio tokens from {num_gen} total tokens"
+                )
+
+                if len(audio_tokens) > 0:
+                    # Convert flat tokens to (num_codebooks, seq_len) codes
+                    try:
+                        gsize = self.config.audio_codebook_size + 2
+                        num_cbs = self.config.audio_num_codebooks
+                        tokens = audio_tokens
+                        codes_per_cb = []
+                        for i in range(num_cbs):
+                            off = i * gsize
+                            mask = (tokens >= off) & (tokens < off + gsize)
+                            cb_tokens = tokens[mask] - off  # 0..gsize-1
+                            # Keep only real codebook indices [0, codebook_size)
+                            cb_tokens = cb_tokens[cb_tokens < self.config.audio_codebook_size]
+                            codes_per_cb.append(cb_tokens)
+                            print(
+                                f"DEBUG: Codebook {i}: {len(cb_tokens)} tokens, range [{off}, {off + gsize})"
+                            )
+                            if len(cb_tokens) > 0:
+                                print(f"DEBUG: Codebook {i} sample: {cb_tokens[:5]}")
+
+                        print(f"DEBUG: Tokens per codebook: {[len(c) for c in codes_per_cb]}")
+
+                        if any(len(c) > 0 for c in codes_per_cb):
+                            # Only use codebooks that have actual data
+                            non_empty_codebooks = [c for c in codes_per_cb if len(c) > 0]
+                            max_len = max(len(c) for c in non_empty_codebooks)
+                            print(f"DEBUG: Using {len(non_empty_codebooks)} non-empty codebooks")
+                            print(f"DEBUG: Max sequence length: {max_len}")
+
+                            # Pad all codebooks to max_len (including empty ones with zeros)
+                            padded = []
+                            for c in codes_per_cb:
+                                if len(c) < max_len:
+                                    pad = torch.zeros(
+                                        max_len - len(c), dtype=c.dtype, device=c.device
+                                    )
+                                    c = torch.cat([c, pad], dim=0)
+                                padded.append(c)
+                            audio_codes = torch.stack(padded, dim=0)  # (num_codebooks, seq_len)
+                            print(f"DEBUG: Audio codes shape: {audio_codes.shape}")
+                            print(
+                                f"DEBUG: Audio codes sample: {audio_codes[:, :5]}"
+                            )  # First 5 tokens per codebook
+
+                        # Try without delay pattern reversion first
+                        print("DEBUG: Skipping delay pattern reversion to test raw codes")
+                        # if (
+                        #     use_delay_pattern
+                        #     and audio_codes.shape[0] > 1
+                        #     and audio_codes.shape[1] > 0
+                        # ):
+                        #     try:
+                        #         print("DEBUG: Reverting delay pattern...")
+                        #         audio_codes = revert_delay_pattern(audio_codes)
+                        #         print(f"DEBUG: After delay pattern revert: {audio_codes.shape}")
+                        #     except Exception as e:
+                        #         print(f"DEBUG: Delay pattern revert failed: {e}")
+                        #         pass
                         # Decode
+                        print("DEBUG: Decoding audio codes...")
                         decoded_audio = self.audio_tokenizer.decode(
                             audio_codes, return_cuda_tensor=False
                         )
@@ -958,8 +1011,10 @@ class HiggsAudioTRTRunner:
                         except Exception:
                             pass
                         return waveform.astype(np.float32)
-                except Exception as e:
-                    print(f"DEBUG: Converting tokens to audio codes failed: {e}")
+                    except Exception as e:
+                        print(f"DEBUG: Converting tokens to audio codes failed: {e}")
+                else:
+                    print("DEBUG: No audio tokens found after filtering")
 
         # Return silence if generation failed or produced nothing useful
         print("DEBUG: No valid output generated, returning silence")
