@@ -3,9 +3,12 @@
 
 import argparse
 
+from boson_multimodal import HiggsAudioModel
+
 from tensorrt_llm.builder import BuildConfig, build
 from tensorrt_llm.models import HiggsAudioForCausalLM
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
+from tensorrt_llm.models.higgs_audio.convert import load_weights_from_hf_model
 from tensorrt_llm.models.modeling_utils import KVCacheType
 from tensorrt_llm.plugin import PluginConfig
 
@@ -84,8 +87,11 @@ def main():
         plugin_config=plugin_config,
     )
     config = HiggsAudioConfig()
-    model = HiggsAudioForCausalLM(config)
-    engine = build(model, build_config)
+    hf_model = HiggsAudioModel.from_pretrained(args.model_dir)
+    trtllm_model = HiggsAudioForCausalLM(config)
+    weights = load_weights_from_hf_model(hf_model, config)
+    trtllm_model.load(weights)
+    engine = build(trtllm_model, build_config)
     engine.save(args.output_dir)
 
 
