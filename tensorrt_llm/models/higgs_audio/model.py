@@ -9,7 +9,7 @@ import torch
 from boson_multimodal import *
 from huggingface_hub import snapshot_download
 from tqdm import tqdm
-from transformers import AutoTokenizer
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, AutoTokenizer, pipeline
 import tensorrt_llm
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models.model_weights_loader import ModelWeightsLoader
@@ -744,10 +744,20 @@ class HiggsAudioTRTRunner:
 
         # Process text input using the exact format from Test.py
         if input_audio is not None:
+            model_id = "openai/whisper-large-v3-turbo"
+            model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id)
+            processor = AutoProcessor.from_pretrained(model_id)
+            audio, _ = librosa.load(input_audio, sr=16000)
+            pipe = pipeline(
+                "automatic-speech-recognition",
+                model=model,
+                tokenizer=processor.tokenizer,
+                feature_extractor=processor.feature_extractor,
+                return_timestamps=True,
+            )
+            transcription = pipe(audio)["text"]
             # Format with reference audio (voice cloning)
-            pre_prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text, using the specified description.<|scene_desc_start|>Audio is recorded from a quiet room. Speaker is an enthusiastic young Australian woman in her early 20s with a bright, high-pitched voice.<|scene_desc_end|><|eot_id|><|start_header_id|>user<|end_header_id|>Can you believe just how realistic this sounds now?<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_bos|><|AUDIO|><|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>"
-            post_prompt = "<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
-            formatted_text = pre_prompt + input_text + post_prompt
+            formatted_text = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text, using the specified description.<|scene_desc_start|>Audio is recorded from a quiet room. Speaker is an enthusiastic young Australian woman in her early 20s with a bright, high-pitched voice.<|scene_desc_end|><|eot_id|><|start_header_id|>user<|end_header_id|>{transcription}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_bos|><|AUDIO|><|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>input_text<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         else:
             # Format without reference audio (default voice)
             formatted_text = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text.<|eot_id|><|start_header_id|>user<|end_header_id|>{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"

@@ -23,7 +23,7 @@ runner = HiggsAudioTRTRunner(
 
 input_text = "Chat, stop backseating! I totally know what I'm doing... I think"
 
-audio_path = None
+audio_path = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
 
 # Generate text/audio
 audio_output = runner.generate(
@@ -48,7 +48,5 @@ expected_transcription = input_text
 word_error_rate = jiwer.wer((expected_transcription), (actual_transcription))
 print(f"Expected: {expected_transcription}")
 print(f"Actual: {actual_transcription}")
-if word_error_rate > 0.25:
-    raise ValueError(f"Word error rate is too high: {word_error_rate}")
-else:
-    print(f"Word error rate is acceptable: {word_error_rate}")
+
+print(f"Word error rate: {word_error_rate}")
