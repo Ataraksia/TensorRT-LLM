@@ -846,7 +846,7 @@ class HiggsAudioTRTRunner:
             # TEMPORARY: Disable prompt table to test basic generation
             # Use the older API approach to avoid the sampling_config_list issue
             print(
-                f"DEBUG: Generating without prompt table (prompt_table was {'not None' if prompt_table is not None else 'None'})"
+                f"DEBUG: Generating (prompt_table={'set' if prompt_table is not None else 'unset'})"
             )
             outputs = self.runner.generate(
                 batch_input_ids=batch_input_ids,
@@ -857,47 +857,110 @@ class HiggsAudioTRTRunner:
                 top_p=self.top_p,
                 end_id=self.generation_end_id,
                 pad_id=self.pad_token_id,
+                prompt_table=prompt_table if prompt_table is not None else None,
+                prompt_tasks=prompt_tasks if prompt_table is not None else None,
             )
 
         # Process outputs - Convert generated token IDs to audio
-        if outputs is not None and len(outputs) > 0:
-            # Remove input tokens from output
-            generated_ids = outputs[0][input_lengths[0] :]
+        def _extract_generated_tokens(outputs_tensor: torch.Tensor) -> torch.Tensor:
+            """Extract 1D generated token ids (without prompt) from ModelRunnerCpp output.
+            outputs_tensor shape: (batch, num_sequences, seq_len). Returns 1D tensor.
+            """
+            if isinstance(outputs_tensor, dict):
+                outputs_tensor = outputs_tensor["output_ids"]
+            if not torch.is_tensor(outputs_tensor):
+                raise RuntimeError("Unexpected outputs type from runner.generate")
+            # Take first batch, first sequence
+            seq = outputs_tensor[0, 0].to(device=self.gpu_device)
+            # Outputs are padded with end_id; truncate at first end_id occurrence
+            if self.generation_end_id is not None:
+                eos_positions = (seq == self.generation_end_id).nonzero(as_tuple=False)
+                if eos_positions.numel() > 0:
+                    seq = seq[: eos_positions[0].item()]
+            # Remove any pad_id just in case
+            if self.pad_token_id is not None:
+                if seq.numel() > 0 and seq[-1].item() == self.pad_token_id:
+                    last_non_pad = (seq != self.pad_token_id).nonzero(as_tuple=False)
+                    if last_non_pad.numel() > 0:
+                        seq = seq[: last_non_pad[-1].item() + 1]
+                    else:
+                        seq = seq[:0]
+            return seq
 
-            print(f"DEBUG: Generated {len(generated_ids)} tokens")
-            print(f"DEBUG: First 10 generated tokens: {generated_ids[:10]}")
-            print(f"DEBUG: Last 10 generated tokens: {generated_ids[-10:]}")
-
-            # The audio tokenizer expects the raw generated token IDs directly
-            # No need for complex conversion - the model generates audio tokens directly
+        if outputs is not None:
             try:
-                generated_audio = self.audio_tokenizer.decode(
-                    generated_ids, return_cuda_tensor=False
-                )
-                print(
-                    f"DEBUG: Audio tokenizer decode successful, shape: {generated_audio.shape if hasattr(generated_audio, 'shape') else type(generated_audio)}"
-                )
-
-                # Ensure it's a numpy array for Whisper compatibility
-                if isinstance(generated_audio, torch.Tensor):
-                    generated_audio = generated_audio.cpu().numpy()
-                return generated_audio
-
+                gen_seq = _extract_generated_tokens(outputs)
             except Exception as e:
-                print(f"DEBUG: Audio tokenizer decode failed: {e}")
-                # Fallback: try with tensor conversion
-                try:
-                    if not isinstance(generated_ids, torch.Tensor):
-                        generated_ids = torch.tensor(generated_ids)
-                    generated_audio = self.audio_tokenizer.decode(
-                        generated_ids, return_cuda_tensor=False
-                    )
-                    if isinstance(generated_audio, torch.Tensor):
-                        generated_audio = generated_audio.cpu().numpy()
-                    return generated_audio
-                except Exception as e2:
-                    print(f"DEBUG: Fallback decode also failed: {e2}")
+                print(f"DEBUG: Failed to parse outputs: {e}")
+                gen_seq = torch.empty(0, dtype=torch.int32, device=self.gpu_device)
 
-        # Return silence if generation failed
+            num_gen = int(gen_seq.numel())
+            head = gen_seq[:10].tolist() if num_gen > 0 else []
+            tail = gen_seq[-10:].tolist() if num_gen > 0 else []
+            print(f"DEBUG: Generated {num_gen} tokens")
+            print(f"DEBUG: First 10 generated tokens: {head}")
+            print(f"DEBUG: Last 10 generated tokens: {tail}")
+
+            if num_gen > 0:
+                # Convert flat tokens to (num_codebooks, seq_len) codes
+                try:
+                    gsize = self.config.audio_codebook_size + 2
+                    num_cbs = self.config.audio_num_codebooks
+                    tokens = gen_seq
+                    codes_per_cb = []
+                    for i in range(num_cbs):
+                        off = i * gsize
+                        mask = (tokens >= off) & (tokens < off + gsize)
+                        cb_tokens = tokens[mask] - off  # 0..gsize-1
+                        # Keep only real codebook indices [0, codebook_size)
+                        cb_tokens = cb_tokens[cb_tokens < self.config.audio_codebook_size]
+                        codes_per_cb.append(cb_tokens)
+                    if any(len(c) > 0 for c in codes_per_cb):
+                        max_len = max(len(c) for c in codes_per_cb)
+                        padded = []
+                        for c in codes_per_cb:
+                            if len(c) < max_len:
+                                pad = torch.zeros(max_len - len(c), dtype=c.dtype, device=c.device)
+                                c = torch.cat([c, pad], dim=0)
+                            padded.append(c)
+                        audio_codes = torch.stack(padded, dim=0)  # (num_codebooks, seq_len)
+                        # Optionally, if delay pattern was used in logits space, try revert
+                        if (
+                            use_delay_pattern
+                            and audio_codes.shape[0] > 1
+                            and audio_codes.shape[1] > 0
+                        ):
+                            try:
+                                audio_codes = revert_delay_pattern(audio_codes)
+                            except Exception:
+                                pass
+                        # Decode
+                        decoded_audio = self.audio_tokenizer.decode(
+                            audio_codes, return_cuda_tensor=False
+                        )
+                        # Handle return as (waveform, sampling_rate)
+                        if isinstance(decoded_audio, tuple) and len(decoded_audio) == 2:
+                            waveform, sr = decoded_audio
+                        else:
+                            waveform, sr = (
+                                decoded_audio,
+                                getattr(self.audio_tokenizer, "sampling_rate", 16000),
+                            )
+                        if isinstance(waveform, torch.Tensor):
+                            waveform = waveform.detach().cpu().numpy()
+                        # Resample to 16kHz for Whisper large-v3-turbo compatibility
+                        try:
+                            if sr != 16000 and isinstance(waveform, np.ndarray):
+                                waveform = librosa.resample(
+                                    waveform.astype(np.float32), orig_sr=sr, target_sr=16000
+                                )
+                                sr = 16000
+                        except Exception:
+                            pass
+                        return waveform.astype(np.float32)
+                except Exception as e:
+                    print(f"DEBUG: Converting tokens to audio codes failed: {e}")
+
+        # Return silence if generation failed or produced nothing useful
         print("DEBUG: No valid output generated, returning silence")
         return np.zeros(16000, dtype=np.float32)  # 1 second of silence at 16kHz
