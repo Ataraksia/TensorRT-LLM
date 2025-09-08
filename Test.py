@@ -1,13 +1,12 @@
 import jiwer
-from boson_multimodal import *
-from transformers import (  # noqa: F403  # noqa: F403
-    AutoModelForSpeechSeq2Seq,
-    AutoProcessor,
-    pipeline,
-)
+from transformers import AutoProcessor, pipeline
 
+from run_chat_completion import AutoModelForSpeechSeq2Seq
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
-from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM, HiggsAudioTRTRunner
+from tensorrt_llm.models.higgs_audio.model import (
+    HiggsAudioForCausalLM,
+    HiggsAudioTRTRunner,  # noqa: F401
+)
 
 # Create configuration
 config = HiggsAudioConfig()
@@ -15,7 +14,6 @@ config = HiggsAudioConfig()
 # Instantiate model
 model = HiggsAudioForCausalLM(config)
 
-# Set up TensorRT-LLM inference runner
 runner = HiggsAudioTRTRunner(
     config=config,
     engine_dir="/home/me/TTS/TensorRT-LLM/higgs_audio_engine/",
@@ -47,7 +45,7 @@ pipe = pipeline(
     feature_extractor=processor.feature_extractor,
     return_timestamps=True,
 )
-actual_transcription = pipe(audio_output).strip()
+actual_transcription = pipe(audio_output)["text"]
 expected_transcription = input_text
 # Calculate the word error rate
 word_error_rate = jiwer.wer((expected_transcription), (actual_transcription))
