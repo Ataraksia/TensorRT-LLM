@@ -742,7 +742,7 @@ class HiggsAudioTRTRunner:
         if not self.runner:
             raise RuntimeError("Runner not initialized")
 
-        # Process text input using the exact format from Test.py
+        # Process text input using the correct format for audio generation
         if input_audio is not None:
             model_id = "openai/whisper-large-v3-turbo"
             model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id)
@@ -756,8 +756,8 @@ class HiggsAudioTRTRunner:
                 return_timestamps=True,
             )
             transcription = pipe(audio)["text"]
-            # Format with reference audio (voice cloning)
-            formatted_text = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text, using the specified description.<|scene_desc_start|>Audio is recorded from a quiet room. Speaker is an enthusiastic young Australian woman in her early 20s with a bright, high-pitched voice.<|scene_desc_end|><|eot_id|><|start_header_id|>user<|end_header_id|>{transcription}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_bos|><|AUDIO|><|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>input_text<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
+            # Format with reference audio (voice cloning) - include the actual input_text
+            formatted_text = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text, using the specified description.<|scene_desc_start|>Audio is recorded from a quiet room. Speaker is an enthusiastic young Australian woman in her early 20s with a bright, high-pitched voice.<|scene_desc_end|><|eot_id|><|start_header_id|>user<|end_header_id|>{transcription}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_bos|><|AUDIO|><|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         else:
             # Format without reference audio (default voice)
             formatted_text = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>You are an AI assistant designed to convert text into speech. Generate speech for the user's text.<|eot_id|><|start_header_id|>user<|end_header_id|>{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
@@ -841,13 +841,32 @@ class HiggsAudioTRTRunner:
 
         # No need for sampling config - using direct parameters
 
+        # Check if we're in audio generation mode by looking at the last token
+        is_audio_generation = input_ids[-1].item() == self.config.audio_out_bos_token_id
+        print(
+            f"DEBUG: Last token ID: {input_ids[-1].item()}, audio_out_bos_token_id: {self.config.audio_out_bos_token_id}"
+        )
+        print(f"DEBUG: Audio generation mode: {is_audio_generation}")
+
         # Run generation with or without audio features
         with torch.no_grad():
-            # TEMPORARY: Disable prompt table to test basic generation
-            # Use the older API approach to avoid the sampling_config_list issue
             print(
                 f"DEBUG: Generating (prompt_table={'set' if prompt_table is not None else 'unset'})"
             )
+
+            # Use standard generation but with audio-aware end tokens
+            print("DEBUG: Using standard generation with audio detection")
+
+            # Set appropriate end tokens for audio generation
+            if is_audio_generation:
+                # For audio generation, use audio_eos_token_id as end token
+                end_id = self.config.audio_eos_token_id
+                print(f"DEBUG: Using audio_eos_token_id: {end_id}")
+                # For text generation, use standard end token
+                end_id = self.generation_end_id
+                print(f"DEBUG: Using text end_id: {end_id}")
+
+            # Run standard generation
             outputs = self.runner.generate(
                 batch_input_ids=batch_input_ids,
                 max_new_tokens=max_new_tokens,
@@ -855,7 +874,7 @@ class HiggsAudioTRTRunner:
                 temperature=self.temperature,
                 top_k=self.top_k,
                 top_p=self.top_p,
-                end_id=self.generation_end_id,
+                end_id=end_id,
                 pad_id=self.pad_token_id,
                 prompt_table=prompt_table if prompt_table is not None else None,
                 prompt_tasks=prompt_tasks if prompt_table is not None else None,
@@ -923,7 +942,27 @@ class HiggsAudioTRTRunner:
                 max_audio_token = self.config.audio_num_codebooks * (
                     self.config.audio_codebook_size + 2
                 )
-                audio_tokens = gen_seq[gen_seq < max_audio_token]
+
+                # Create mask for valid audio tokens
+                audio_mask = gen_seq < max_audio_token
+
+                # Also filter out common text special tokens that shouldn't be in audio generation
+                text_special_tokens = [
+                    128000,
+                    128001,
+                    128006,
+                    128007,
+                    128009,
+                    128011,
+                    128012,
+                    128013,
+                    128015,
+                    128016,
+                ]
+                for token_id in text_special_tokens:
+                    audio_mask = audio_mask & (gen_seq != token_id)
+
+                audio_tokens = gen_seq[audio_mask]
                 print(
                     f"DEBUG: Filtered to {len(audio_tokens)} audio tokens from {num_gen} total tokens"
                 )
@@ -934,19 +973,27 @@ class HiggsAudioTRTRunner:
                         gsize = self.config.audio_codebook_size + 2
                         num_cbs = self.config.audio_num_codebooks
                         tokens = audio_tokens
+                        print(
+                            f"DEBUG: gsize={gsize}, num_cbs={num_cbs}, codebook_size={self.config.audio_codebook_size}"
+                        )
+                        print(f"DEBUG: Token range: min={min(tokens)}, max={max(tokens)}")
+                        print(f"DEBUG: Expected max token: {num_cbs * gsize - 1}")
                         codes_per_cb = []
                         for i in range(num_cbs):
                             off = i * gsize
                             mask = (tokens >= off) & (tokens < off + gsize)
-                            cb_tokens = tokens[mask] - off  # 0..gsize-1
+                            cb_tokens_raw = tokens[mask]
+                            cb_tokens = cb_tokens_raw - off  # 0..gsize-1
                             # Keep only real codebook indices [0, codebook_size)
                             cb_tokens = cb_tokens[cb_tokens < self.config.audio_codebook_size]
                             codes_per_cb.append(cb_tokens)
                             print(
-                                f"DEBUG: Codebook {i}: {len(cb_tokens)} tokens, range [{off}, {off + gsize})"
+                                f"DEBUG: Codebook {i}: {len(cb_tokens)} tokens, range [{off}, {off + gsize}), raw_tokens: {len(cb_tokens_raw)}"
                             )
+                            if len(cb_tokens_raw) > 0:
+                                print(f"DEBUG: Codebook {i} raw sample: {cb_tokens_raw[:5]}")
                             if len(cb_tokens) > 0:
-                                print(f"DEBUG: Codebook {i} sample: {cb_tokens[:5]}")
+                                print(f"DEBUG: Codebook {i} final sample: {cb_tokens[:5]}")
 
                         print(f"DEBUG: Tokens per codebook: {[len(c) for c in codes_per_cb]}")
 
@@ -972,20 +1019,24 @@ class HiggsAudioTRTRunner:
                                 f"DEBUG: Audio codes sample: {audio_codes[:, :5]}"
                             )  # First 5 tokens per codebook
 
-                        # Try without delay pattern reversion first
-                        print("DEBUG: Skipping delay pattern reversion to test raw codes")
-                        # if (
-                        #     use_delay_pattern
-                        #     and audio_codes.shape[0] > 1
-                        #     and audio_codes.shape[1] > 0
-                        # ):
-                        #     try:
-                        #         print("DEBUG: Reverting delay pattern...")
-                        #         audio_codes = revert_delay_pattern(audio_codes)
-                        #         print(f"DEBUG: After delay pattern revert: {audio_codes.shape}")
-                        #     except Exception as e:
-                        #         print(f"DEBUG: Delay pattern revert failed: {e}")
-                        #         pass
+                        # Apply delay pattern reversion for better audio quality
+                        if (
+                            use_delay_pattern
+                            and audio_codes.shape[0] > 1
+                            and audio_codes.shape[1] > 0
+                        ):
+                            try:
+                                print("DEBUG: Reverting delay pattern...")
+                                original_shape = audio_codes.shape
+                                audio_codes = revert_delay_pattern(audio_codes)
+                                print(
+                                    f"DEBUG: After delay pattern revert: {original_shape} -> {audio_codes.shape}"
+                                )
+                            except Exception as e:
+                                print(f"DEBUG: Delay pattern revert failed: {e}")
+                                print("DEBUG: Using raw codes without delay pattern revert")
+                        else:
+                            print("DEBUG: Skipping delay pattern reversion (not applicable)")
                         # Decode
                         print("DEBUG: Decoding audio codes...")
                         decoded_audio = self.audio_tokenizer.decode(
