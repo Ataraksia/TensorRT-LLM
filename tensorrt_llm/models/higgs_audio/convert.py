@@ -850,7 +850,7 @@ def quantize(
         hf_model_dir, trust_remote_code=True, use_fast=False, padding_side="left"
     )
     dataset = load_calib_dataset(calib_dataset, None, "train", "text_to_synthesize")
-    act_range = capture_activation_range(hf_model, config.higgs_type, tokenizer, dataset)
+    act_range = capture_activation_range(hf_model, tokenizer, dataset)
     qkv_para = {}
     # smoother for inputs of self_attn.o_proj and mlp.down_proj
     smoother = {}

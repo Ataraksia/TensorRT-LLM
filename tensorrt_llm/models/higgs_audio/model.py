@@ -494,7 +494,7 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         # Audio output projector
         lm_head = ColumnLinear(
             in_features=config.hidden_size,
-            out_features=config.audio_num_codebooks * config.audio_codebook_size,
+            out_features=config.audio_num_codebooks * (config.audio_codebook_size + 2),
             bias=False,
             dtype=config.dtype,
             tp_group=None,

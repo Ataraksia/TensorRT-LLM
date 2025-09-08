@@ -45,7 +45,7 @@ class HiggsAudioConfig(PretrainedConfig):
         # Adapter configuration
         audio_adapter_type: str = "dual_ffn_fast_forward",
         audio_ffn_hidden_size: int = 4096,
-        audio_ffn_intermediate_size: int = 14336,
+        audio_ffn_intermediate_size: int = 8192,
         # Audio codebook configuration
         audio_num_codebooks: int = 8,
         audio_codebook_size: int = 1024,
@@ -111,7 +111,7 @@ class HiggsAudioConfig(PretrainedConfig):
             num_hidden_layers=num_layers,
             num_attention_heads=24,  # Default for LLaMA-3.2-3B
             vocab_size=vocab_size,
-            hidden_act="silu",
+            hidden_act="swiglu",
             **filtered_kwargs,
         )
 
