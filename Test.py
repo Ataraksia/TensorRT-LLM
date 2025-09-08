@@ -51,5 +51,7 @@ expected_transcription = input_text
 word_error_rate = jiwer.wer((expected_transcription), (actual_transcription))
 print(f"Expected: {expected_transcription}")
 print(f"Actual: {actual_transcription}")
-
-print(f"Word error rate: {word_error_rate}")
+if word_error_rate > 0.25:
+    raise ValueError(f"Word error rate is too high: {word_error_rate}")
+else:
+    print(f"Word error rate is acceptable: {word_error_rate}")
