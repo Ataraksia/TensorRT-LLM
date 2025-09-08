@@ -8,14 +8,10 @@
       ],
       "env": {
         "DEFAULT_MINIMUM_TOKENS": ""
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/home/me/TTS"
+      },
+      "alwaysAllow": [
+        "resolve-library-id",
+        "get-library-docs"
       ]
     },
     "sequentialthinking": {
@@ -23,6 +19,9 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "alwaysAllow": [
+        "sequentialthinking"
       ]
     },
     "exa": {
@@ -33,7 +32,17 @@
       ],
       "env": {
         "EXA_API_KEY": "f6885d05-76ec-477d-a638-87ec7734530b"
-      }
+      },
+      "disabledTools": [
+        "linkedin_search_exa",
+        "company_research_exa"
+      ],
+      "alwaysAllow": [
+        "web_search_exa",
+        "deep_researcher_start",
+        "deep_researcher_check",
+        "crawling_exa"
+      ]
     }
   }
 }
