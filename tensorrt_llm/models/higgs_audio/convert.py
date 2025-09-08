@@ -607,17 +607,19 @@ def convert_hf_higgs(
                     use_gemm_woq_plugin,
                 )
             )
-        # Standard MLP gate projection
-        mlp_gate_weight = get_weight(model_params, prefix + "mlp.up_proj", dtype)
-        split_v = split_matrix_tp(mlp_gate_weight, tensor_parallel, mapping.tp_rank, dim=0)
+        # Standard MLP fc projection (combined gate and up)
+        gate_w = get_weight(model_params, prefix + "mlp.gate_proj", dtype)
+        up_w = get_weight(model_params, prefix + "mlp.up_proj", dtype)
+        fc_w = torch.cat([gate_w, up_w], dim=0)
+        split_v = split_matrix_tp(fc_w, tensor_parallel, mapping.tp_rank, dim=0)
 
         if use_smooth_quant:
-            mlp_gate_weight = mlp_gate_weight.t()
-            int8_weights = generate_int8(mlp_gate_weight, act_range.get(prefix + "mlp.up_proj"))
+            fc_w_t = fc_w.t()
+            int8_weights = generate_int8(fc_w_t, act_range.get(prefix + "mlp.gate_proj"))
             weights.update(
                 get_tllm_linear_sq_weight(
                     int8_weights,
-                    tllm_prex + "mlp.up_proj.",
+                    tllm_prex + "mlp.fc.",
                     [1, intermediate_size // tensor_parallel],
                     tensor_parallel,
                     is_qkv=False,
@@ -634,7 +636,7 @@ def convert_hf_higgs(
             weights.update(
                 get_tllm_linear_weight(
                     split_v,
-                    tllm_prex + "mlp.up_proj.",
+                    tllm_prex + "mlp.fc.",
                     None,
                     use_weight_only,
                     plugin_weight_only_quant_type,
@@ -643,7 +645,7 @@ def convert_hf_higgs(
                 )
             )
 
-        # Standard MLP down projection
+        # Standard MLP proj projection (down)
         mlp_proj_weight = get_weight(model_params, prefix + "mlp.down_proj", dtype)
         split_v = split_matrix_tp(mlp_proj_weight, tensor_parallel, mapping.tp_rank, dim=1)
 
@@ -654,7 +656,7 @@ def convert_hf_higgs(
             weights.update(
                 get_tllm_linear_sq_weight(
                     int8_weights,
-                    tllm_prex + "mlp.down_proj.",
+                    tllm_prex + "mlp.proj.",
                     [1, hidden_size],
                     tensor_parallel,
                     is_qkv=False,
@@ -671,43 +673,7 @@ def convert_hf_higgs(
             weights.update(
                 get_tllm_linear_weight(
                     split_v,
-                    tllm_prex + "mlp.down_proj.",
-                    None,
-                    use_weight_only,
-                    plugin_weight_only_quant_type,
-                    dtype,
-                    use_gemm_woq_plugin,
-                )
-            )
-
-        # Standard MLP up projection
-        mlp_fc_weight = get_weight(model_params, prefix + "mlp.gate_proj", dtype)
-        split_v = split_matrix_tp(mlp_fc_weight, tensor_parallel, mapping.tp_rank, dim=0)
-
-        if use_smooth_quant:
-            mlp_fc_weight = mlp_fc_weight.t()
-            int8_weights = generate_int8(mlp_fc_weight, act_range.get(prefix + "mlp.gate_proj"))
-            weights.update(
-                get_tllm_linear_sq_weight(
-                    int8_weights,
-                    tllm_prex + "mlp.gate_proj.",
-                    [1, intermediate_size // tensor_parallel],
-                    tensor_parallel,
-                    is_qkv=False,
-                    per_token=per_token,
-                    per_channel=per_channel,
-                    last_prefix=tllm_prex + "post_layernorm.scale_to_int",
-                    smoother_value=None,
-                    smoother_shape=None,
-                    rank=mapping.tp_rank,
-                    cat_dim=-1,
-                )
-            )
-        else:
-            weights.update(
-                get_tllm_linear_weight(
-                    split_v,
-                    tllm_prex + "mlp.gate_proj.",
+                    tllm_prex + "mlp.proj.",
                     None,
                     use_weight_only,
                     plugin_weight_only_quant_type,
@@ -720,16 +686,16 @@ def convert_hf_higgs(
         # Check if audio_mlp exists for this layer
         audio_mlp_gate_weight = prefix + "audio_mlp.up_proj.weight"
         if audio_mlp_gate_weight in model_params:
-            # Audio MLP gate projection (separate from up projection)
-            audio_mlp_gate_weight = get_weight(model_params, prefix + "audio_mlp.up_proj", dtype)
-            split_v = split_matrix_tp(
-                audio_mlp_gate_weight, tensor_parallel, mapping.tp_rank, dim=0
-            )
+            # Audio MLP fc projection (combined gate and up)
+            gate_w = get_weight(model_params, prefix + "audio_mlp.gate_proj", dtype)
+            up_w = get_weight(model_params, prefix + "audio_mlp.up_proj", dtype)
+            fc_w = torch.cat([gate_w, up_w], dim=0)
+            split_v = split_matrix_tp(fc_w, tensor_parallel, mapping.tp_rank, dim=0)
 
             weights.update(
                 get_tllm_linear_weight(
                     split_v,
-                    tllm_prex + "audio_mlp.up_proj.",
+                    tllm_prex + "audio_mlp.fc.",
                     None,
                     use_weight_only,
                     plugin_weight_only_quant_type,
@@ -738,7 +704,7 @@ def convert_hf_higgs(
                 )
             )
 
-            # Audio MLP down projection
+            # Audio MLP proj projection (down)
             audio_mlp_proj_weight = get_weight(model_params, prefix + "audio_mlp.down_proj", dtype)
             split_v = split_matrix_tp(
                 audio_mlp_proj_weight, tensor_parallel, mapping.tp_rank, dim=1
@@ -747,23 +713,7 @@ def convert_hf_higgs(
             weights.update(
                 get_tllm_linear_weight(
                     split_v,
-                    tllm_prex + "audio_mlp.down_proj.",
-                    None,
-                    use_weight_only,
-                    plugin_weight_only_quant_type,
-                    dtype,
-                    use_gemm_woq_plugin,
-                )
-            )
-
-            # Audio MLP up projection (separate from gate projection)
-            audio_mlp_fc_weight = get_weight(model_params, prefix + "audio_mlp.gate_proj", dtype)
-            split_v = split_matrix_tp(audio_mlp_fc_weight, tensor_parallel, mapping.tp_rank, dim=0)
-
-            weights.update(
-                get_tllm_linear_weight(
-                    split_v,
-                    tllm_prex + "audio_mlp.gate_proj.",
+                    tllm_prex + "audio_mlp.proj.",
                     None,
                     use_weight_only,
                     plugin_weight_only_quant_type,
@@ -808,7 +758,7 @@ def convert_hf_higgs(
     audio_codebook_key = "audio_codebook_embeddings.weight"
     if audio_codebook_key in model_params:
         audio_codebook_weight = get_weight(model_params, "audio_codebook_embeddings", dtype)
-        weights["audio_codebook_embeddings.weight"] = audio_codebook_weight
+        weights["transformer.audio_codebook_embeddings.weight"] = audio_codebook_weight
 
     # Audio decoder projection with dual heads (only load if on last PP rank)
     if mapping.is_last_pp_rank():
