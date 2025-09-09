@@ -85,11 +85,19 @@ class HiggsAudioConfig(PretrainedConfig):
         if isinstance(text_config, dict):
             hidden_size = text_config.get("hidden_size", 3072)
             num_layers = text_config.get("num_hidden_layers", 28)
-            vocab_size = text_config.get("vocab_size", 128256)
+            text_vocab_size = text_config.get("vocab_size", 128256)
         else:
             hidden_size = getattr(text_config, "hidden_size", 3072)
             num_layers = getattr(text_config, "num_hidden_layers", 28)
-            vocab_size = getattr(text_config, "vocab_size", 128256)
+            text_vocab_size = getattr(text_config, "vocab_size", 128256)
+
+        # Use text vocabulary size for input processing, but audio lm_head for generation
+        # The model needs to accept text tokens as input but generate audio tokens as output
+        vocab_size = text_vocab_size
+        audio_vocab_size = audio_num_codebooks * (audio_codebook_size + 2)
+        print(
+            f"DEBUG: Using text vocab_size: {vocab_size} for input, audio vocab_size: {audio_vocab_size} for output"
+        )
 
         if quant_config is None:
             quant_config = QuantConfig()

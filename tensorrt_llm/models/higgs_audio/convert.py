@@ -48,29 +48,6 @@ from ..convert_utils import (
 from .config import HiggsAudioConfig
 
 
-def get_higgs_audio_key_list():
-    """Return key mapping for HiggsAudio model layers."""
-    return [
-        "self_attn.",  # attention layers
-        "self_attn.o_proj",  # attention output projection
-        "mlp.gate_proj",  # standard MLP gate projection
-        "mlp.up_proj",  # standard MLP up projection
-        "mlp.down_proj",  # standard MLP down projection
-        "input_layernorm",  # input layer norm
-        "post_attention_layernorm",  # post attention layer norm
-        "embed_tokens",  # token embeddings
-        "norm",  # final layer norm
-        "audio_mlp.gate_proj",  # audio MLP gate projection
-        "audio_mlp.up_proj",  # audio MLP up projection
-        "audio_mlp.down_proj",  # audio MLP down projection
-        "audio_input_layernorm",  # audio input layer norm
-        "audio_post_attention_layernorm",  # audio post attention layer norm
-        "audio_codebook_embeddings",  # audio codebook embeddings
-        "audio_decoder_proj.audio_lm_head",  # audio language model head
-        "audio_decoder_proj.text_lm_head",  # text language model head
-    ]
-
-
 def make_context_higgs_audio(tokenizer, query, history=None, system=None, max_input_length=512):
     """Create context for HiggsAudio model."""
     # Simple context creation for HiggsAudio - just tokenize the query
@@ -450,7 +427,6 @@ def convert_hf_higgs(
     layers_range = mapping.pp_layers(text_config.num_hidden_layers)
 
     layer_prefix = "layers."  # HiggsAudio uses layers. prefix
-    key_list = get_higgs_audio_key_list()
     intermediate_size = text_config.intermediate_size
 
     for l in layers_range:
@@ -769,6 +745,28 @@ def convert_hf_higgs(
             audio_lm_head_weight = get_weight(
                 model_params, f"{audio_decoder_proj_key}.audio_lm_head", dtype
             )
+            print(f"DEBUG: Original audio_lm_head_weight shape: {audio_lm_head_weight.shape}")
+            print(f"DEBUG: Expected vocab_size: {vocab_size}")
+
+            # For audio-only generation, we need to pad the audio_lm_head to match vocab_size
+            # This allows the model to accept text tokens as input but only generate audio tokens
+            if audio_lm_head_weight.shape[0] < vocab_size:
+                print(
+                    f"DEBUG: Padding audio_lm_head from {audio_lm_head_weight.shape[0]} to {vocab_size}"
+                )
+                pad_width = vocab_size - audio_lm_head_weight.shape[0]
+                # Convert to float32 for padding, then back to original dtype
+                original_dtype = audio_lm_head_weight.dtype
+                audio_lm_head_weight_np = audio_lm_head_weight.detach().cpu().float().numpy()
+                padded_weight_np = np.pad(
+                    audio_lm_head_weight_np,
+                    ((0, pad_width), (0, 0)),
+                    "constant",
+                    constant_values=0,
+                )
+                audio_lm_head_weight = torch.from_numpy(padded_weight_np).to(original_dtype)
+                print(f"DEBUG: Padded audio_lm_head_weight shape: {audio_lm_head_weight.shape}")
+
             if vocab_size % mapping.tp_size != 0:
                 vocab_size_padded = pad_vocab_size(vocab_size, mapping.tp_size)
                 pad_width = vocab_size_padded - vocab_size
