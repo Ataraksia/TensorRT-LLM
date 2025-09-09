@@ -28,12 +28,9 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 from transformers.pytorch_utils import Conv1D
 
-from ..._utils import pad_vocab_size
 from ...mapping import Mapping
 from ...quantization import QuantAlgo
 from ..convert_utils import (
-    dup_kv_bias,
-    dup_kv_weight,
     generate_int8,
     get_weight,
     get_weight_and_bias,
@@ -42,8 +39,6 @@ from ..convert_utils import (
     smooth_gemm_fc1_gate,
     split,
     split_matrix_tp,
-    split_qkv_bias_tp,
-    split_qkv_tp,
 )
 from .config import HiggsAudioConfig
 
@@ -177,7 +172,9 @@ def capture_activation_range(model, tokenizer, dataset, num_samples=512, seq_len
             max_input_length=seq_len,
         )
         line_encoded = (
-            torch.from_numpy(np.array(input_id_list, dtype=np.int32)).type(torch.int32).unsqueeze(0)
+            torch.from_numpy(np.array(input_id_list, dtype=np.bfloat16))
+            .type(torch.bfloat16)
+            .unsqueeze(0)
         )
         line_encoded = line_encoded.to(device)
         model(line_encoded)
@@ -192,7 +189,7 @@ def get_tllm_linear_weight(
     bias=None,
     use_weight_only=False,
     plugin_weight_only_quant_type=torch.int8,
-    dtype="float32",
+    dtype="bfloat16",
     use_gemm_woq_plugin=True,
     postfix="weight",
     quant_scale_name=None,
@@ -273,7 +270,7 @@ def get_tllm_linear_sq_weight(
             cur_weights = cur_weights.reshape(hidden_dim, -1)
         results[prefix + "weight"] = cur_weights.t().contiguous()
         if smoother_value is None:
-            results[last_prefix] = torch.from_numpy(np.array([1.0], dtype=np.float32))
+            results[last_prefix] = torch.from_numpy(np.array([1.0], dtype=np.bfloat16))
 
         if per_channel:
             cur_per_channel_value = vals["scale_w_quant_orig.col"]
@@ -375,7 +372,7 @@ def load_hf_higgs_audio(model_dir: str, load_model_on_cpu: bool = False):
     model = model_cls.from_pretrained(
         model_dir,
         device_map="auto" if not load_model_on_cpu else "cpu",
-        torch_dtype="auto",
+        torch_dtype="bfloat16",
         trust_remote_code=True,
     )
     return model
@@ -423,7 +420,6 @@ def convert_hf_higgs(
         if hasattr(text_config, "num_key_value_heads")
         else num_attention_heads
     )
-    mha_mode = num_key_value_heads == num_attention_heads
     layers_range = mapping.pp_layers(text_config.num_hidden_layers)
 
     layer_prefix = "layers."  # HiggsAudio uses layers. prefix
@@ -441,61 +437,30 @@ def convert_hf_higgs(
         v_weight, v_bias = get_weight_and_bias(
             model_params, prefix + "self_attn." + "v_proj", dtype
         )
-        if not mha_mode:
-            if num_key_value_heads < tensor_parallel:
-                # duplicate the KV heads up to tensor_parallel
-                k_weight = dup_kv_weight(k_weight, num_key_value_heads, tensor_parallel)
-                v_weight = dup_kv_weight(v_weight, num_key_value_heads, tensor_parallel)
-                k_bias = dup_kv_bias(k_bias, num_key_value_heads, tensor_parallel)
-                v_bias = dup_kv_bias(v_bias, num_key_value_heads, tensor_parallel)
-            assert (k_weight.shape[0] % (mapping.tp_size * head_size)) == 0
-            assert (v_weight.shape[0] % (mapping.tp_size * head_size)) == 0
+        assert (k_weight.shape[0] % (mapping.tp_size * head_size)) == 0
+        assert (v_weight.shape[0] % (mapping.tp_size * head_size)) == 0
 
-            if k_bias is not None and v_bias is not None:
-                assert (k_bias.shape[0] % (mapping.tp_size * head_size)) == 0
-                assert (v_bias.shape[0] % (mapping.tp_size * head_size)) == 0
+        wq = split(q_weight, mapping.tp_size, mapping.tp_rank)
+        wk = split(k_weight, mapping.tp_size, mapping.tp_rank)
+        wv = split(v_weight, mapping.tp_size, mapping.tp_rank)
 
-            wq = split(q_weight, mapping.tp_size, mapping.tp_rank)
-            wk = split(k_weight, mapping.tp_size, mapping.tp_rank)
-            wv = split(v_weight, mapping.tp_size, mapping.tp_rank)
-
-            qkv_w = torch.concat((wq, wk, wv))
-
-            if q_bias is not None and k_bias is not None and v_bias is not None:
-                bq = split(q_bias, mapping.tp_size, mapping.tp_rank)
-                bk = split(k_bias, mapping.tp_size, mapping.tp_rank)
-                bv = split(v_bias, mapping.tp_size, mapping.tp_rank)
-                qkv_b = torch.concat((bq, bk, bv))
-            else:
-                qkv_b = None
-        else:
-            qkv_weight = torch.cat([q_weight, k_weight, v_weight], dim=0)
-            qkv_bias = torch.cat([q_bias, k_bias, v_bias], dim=0)
-
-            qkv_w = split_qkv_tp(
-                qkv_weight, num_attention_heads, hidden_size, tensor_parallel, mapping.tp_rank
-            )
-            qkv_b = split_qkv_bias_tp(
-                qkv_bias, num_attention_heads, hidden_size, tensor_parallel, mapping.tp_rank
-            )
+        qkv_w = torch.concat((wq, wk, wv))
+        qkv_b = None
 
         if use_smooth_quant:
             qkv_proj_key = "self_attn.qkv_proj"
             qkv_weight = qkv_para[prefix + qkv_proj_key]
             qkv_out_dim = qkv_weight.shape[1]
 
-            if not mha_mode:
-                local_dim = qkv_weight.shape[0]
-                kv_hidden_size = (qkv_weight.shape[-1] - local_dim) // 2
-                qkv_weight = qkv_weight.reshape(local_dim, local_dim + 2 * kv_hidden_size)
-            else:
-                qkv_weight = qkv_weight.reshape(hidden_size, 3, hidden_size)
+            local_dim = qkv_weight.shape[0]
+            kv_hidden_size = (qkv_weight.shape[-1] - local_dim) // 2
+            qkv_weight = qkv_weight.reshape(local_dim, local_dim + 2 * kv_hidden_size)
 
             int8_weights = generate_int8(
                 qkv_weight,
                 act_range.get(prefix + qkv_proj_key),
                 is_qkv=True,
-                multi_query_mode=bool(not mha_mode),
+                multi_query_mode=False,
             )
 
             weights.update(
@@ -513,7 +478,7 @@ def convert_hf_higgs(
                     smoother_shape=None,
                     rank=mapping.tp_rank,
                     cat_dim=-1,
-                    multi_query_mode=bool(not mha_mode),
+                    multi_query_mode=False,
                 )
             )
         else:
@@ -659,66 +624,56 @@ def convert_hf_higgs(
             )
 
         # HiggsAudio dual FFN layers - Handle audio_mlp components separately
-        # Check if audio_mlp exists for this layer
-        audio_mlp_gate_weight = prefix + "audio_mlp.up_proj.weight"
-        if audio_mlp_gate_weight in model_params:
-            # Audio MLP fc projection (combined gate and up)
-            gate_w = get_weight(model_params, prefix + "audio_mlp.gate_proj", dtype)
-            up_w = get_weight(model_params, prefix + "audio_mlp.up_proj", dtype)
-            fc_w = torch.cat([gate_w, up_w], dim=0)
-            split_v = split_matrix_tp(fc_w, tensor_parallel, mapping.tp_rank, dim=0)
 
-            weights.update(
-                get_tllm_linear_weight(
-                    split_v,
-                    tllm_prex + "audio_mlp.fc.",
-                    None,
-                    use_weight_only,
-                    plugin_weight_only_quant_type,
-                    dtype,
-                    use_gemm_woq_plugin,
-                )
+        # Audio MLP fc projection (combined gate and up)
+        gate_w = get_weight(model_params, prefix + "audio_mlp.gate_proj", dtype)
+        up_w = get_weight(model_params, prefix + "audio_mlp.up_proj", dtype)
+        fc_w = torch.cat([gate_w, up_w], dim=0)
+        split_v = split_matrix_tp(fc_w, tensor_parallel, mapping.tp_rank, dim=0)
+
+        weights.update(
+            get_tllm_linear_weight(
+                split_v,
+                tllm_prex + "audio_mlp.fc.",
+                None,
+                use_weight_only,
+                plugin_weight_only_quant_type,
+                dtype,
+                use_gemm_woq_plugin,
             )
+        )
 
-            # Audio MLP proj projection (down)
-            audio_mlp_proj_weight = get_weight(model_params, prefix + "audio_mlp.down_proj", dtype)
-            split_v = split_matrix_tp(
-                audio_mlp_proj_weight, tensor_parallel, mapping.tp_rank, dim=1
+        # Audio MLP proj projection (down)
+        audio_mlp_proj_weight = get_weight(model_params, prefix + "audio_mlp.down_proj", dtype)
+        split_v = split_matrix_tp(audio_mlp_proj_weight, tensor_parallel, mapping.tp_rank, dim=1)
+
+        weights.update(
+            get_tllm_linear_weight(
+                split_v,
+                tllm_prex + "audio_mlp.proj.",
+                None,
+                use_weight_only,
+                plugin_weight_only_quant_type,
+                dtype,
+                use_gemm_woq_plugin,
             )
+        )
 
-            weights.update(
-                get_tllm_linear_weight(
-                    split_v,
-                    tllm_prex + "audio_mlp.proj.",
-                    None,
-                    use_weight_only,
-                    plugin_weight_only_quant_type,
-                    dtype,
-                    use_gemm_woq_plugin,
-                )
-            )
+    # HiggsAudio audio-specific layer norms (if they exist)
+    audio_input_ln_weight = get_weight(model_params, prefix + "audio_input_layernorm", dtype)
+    weights[tllm_prex + "audio_input_layernorm.weight"] = audio_input_ln_weight
 
-        # HiggsAudio audio-specific layer norms (if they exist)
-        audio_input_ln_weight = prefix + "audio_input_layernorm.weight"
-        if audio_input_ln_weight in model_params:
-            audio_input_ln_weight = get_weight(
-                model_params, prefix + "audio_input_layernorm", dtype
-            )
-            weights[tllm_prex + "audio_input_layernorm.weight"] = audio_input_ln_weight
+    audio_post_ln_weight = get_weight(
+        model_params, prefix + "audio_post_attention_layernorm", dtype
+    )
+    weights[tllm_prex + "audio_post_layernorm.weight"] = audio_post_ln_weight
 
-        audio_post_ln_weight = prefix + "audio_post_attention_layernorm.weight"
-        if audio_post_ln_weight in model_params:
-            audio_post_ln_weight = get_weight(
-                model_params, prefix + "audio_post_attention_layernorm", dtype
-            )
-            weights[tllm_prex + "audio_post_attention_layernorm.weight"] = audio_post_ln_weight
+    # Layer norms do not use tensor parallelism
+    input_ln_weight = get_weight(model_params, prefix + "input_layernorm", dtype)
+    weights[tllm_prex + "input_layernorm.weight"] = input_ln_weight
 
-        # Layer norms do not use tensor parallelism
-        input_ln_weight = get_weight(model_params, prefix + "input_layernorm", dtype)
-        weights[tllm_prex + "input_layernorm.weight"] = input_ln_weight
-
-        post_ln_weight = get_weight(model_params, prefix + "post_attention_layernorm", dtype)
-        weights[tllm_prex + "post_layernorm.weight"] = post_ln_weight
+    post_ln_weight = get_weight(model_params, prefix + "post_attention_layernorm", dtype)
+    weights[tllm_prex + "post_layernorm.weight"] = post_ln_weight
 
     # Load embedding weights
     v = get_weight(model_params, "embed_tokens", dtype)
@@ -731,77 +686,54 @@ def convert_hf_higgs(
 
     # HiggsAudio specific components
     # Audio codebook embeddings
-    audio_codebook_key = "audio_codebook_embeddings.weight"
-    if audio_codebook_key in model_params:
-        audio_codebook_weight = get_weight(model_params, "audio_codebook_embeddings", dtype)
-        weights["transformer.audio_codebook_embeddings.weight"] = audio_codebook_weight
+    audio_codebook_weight = get_weight(model_params, "audio_codebook_embeddings", dtype)
+    weights["transformer.audio_codebook_embedding.weight"] = audio_codebook_weight
 
     # Audio decoder projection with dual heads (only load if on last PP rank)
     if mapping.is_last_pp_rank():
         audio_decoder_proj_key = "audio_decoder_proj"
 
         # Audio LM head (for audio token generation)
-        if f"{audio_decoder_proj_key}.audio_lm_head.weight" in model_params:
-            audio_lm_head_weight = get_weight(
-                model_params, f"{audio_decoder_proj_key}.audio_lm_head", dtype
-            )
-            print(f"DEBUG: Original audio_lm_head_weight shape: {audio_lm_head_weight.shape}")
-            print(f"DEBUG: Expected vocab_size: {vocab_size}")
+        audio_lm_head_weight = get_weight(
+            model_params, f"{audio_decoder_proj_key}.audio_lm_head", dtype
+        )
+        print(f"DEBUG: Original audio_lm_head_weight shape: {audio_lm_head_weight.shape}")
+        print(f"DEBUG: Expected vocab_size: {vocab_size}")
 
-            # For audio-only generation, we need to pad the audio_lm_head to match vocab_size
-            # This allows the model to accept text tokens as input but only generate audio tokens
-            if audio_lm_head_weight.shape[0] < vocab_size:
-                print(
-                    f"DEBUG: Padding audio_lm_head from {audio_lm_head_weight.shape[0]} to {vocab_size}"
-                )
-                pad_width = vocab_size - audio_lm_head_weight.shape[0]
-                # Convert to float32 for padding, then back to original dtype
-                original_dtype = audio_lm_head_weight.dtype
-                audio_lm_head_weight_np = audio_lm_head_weight.detach().cpu().float().numpy()
-                padded_weight_np = np.pad(
-                    audio_lm_head_weight_np,
-                    ((0, pad_width), (0, 0)),
-                    "constant",
-                    constant_values=0,
-                )
-                audio_lm_head_weight = torch.from_numpy(padded_weight_np).to(original_dtype)
-                print(f"DEBUG: Padded audio_lm_head_weight shape: {audio_lm_head_weight.shape}")
+        # # For audio-only generation, we need to pad the audio_lm_head to match vocab_size
+        # # This allows the model to accept text tokens as input but only generate audio tokens
+        # if audio_lm_head_weight.shape[0] < vocab_size:
+        #     print(
+        #         f"DEBUG: Padding audio_lm_head from {audio_lm_head_weight.shape[0]} to {vocab_size}"
+        #     )
+        #     pad_width = vocab_size - audio_lm_head_weight.shape[0]
+        #     # Convert to float32 for padding, then back to original dtype
+        #     original_dtype = audio_lm_head_weight.dtype
+        #     audio_lm_head_weight_np = audio_lm_head_weight.detach().cpu().float().numpy()
+        #     padded_weight_np = np.pad(
+        #         audio_lm_head_weight_np,
+        #         ((0, pad_width), (0, 0)),
+        #         "constant",
+        #         constant_values=0,
+        #     )
+        #     audio_lm_head_weight = torch.from_numpy(padded_weight_np).to(original_dtype)
+        #     print(f"DEBUG: Padded audio_lm_head_weight shape: {audio_lm_head_weight.shape}")
 
-            if vocab_size % mapping.tp_size != 0:
-                vocab_size_padded = pad_vocab_size(vocab_size, mapping.tp_size)
-                pad_width = vocab_size_padded - vocab_size
-                audio_lm_head_weight = torch.from_numpy(
-                    np.pad(
-                        audio_lm_head_weight.detach().cpu().numpy(),
-                        ((0, pad_width), (0, 0)),
-                        "constant",
-                        constant_values=0,
-                    )
-                )
-            # Use audio_lm_head as the main lm_head for HiggsAudio
-            weights["lm_head.weight"] = split_matrix_tp(
-                audio_lm_head_weight, tensor_parallel, mapping.tp_rank, dim=0
-            )
-
-        # Text LM head (for text token generation, if needed separately)
-        if f"{audio_decoder_proj_key}.text_lm_head.weight" in model_params:
-            text_lm_head_weight = get_weight(
-                model_params, f"{audio_decoder_proj_key}.text_lm_head", dtype
-            )
-            if vocab_size % mapping.tp_size != 0:
-                vocab_size_padded = pad_vocab_size(vocab_size, mapping.tp_size)
-                pad_width = vocab_size_padded - vocab_size
-                text_lm_head_weight = torch.from_numpy(
-                    np.pad(
-                        text_lm_head_weight.detach().cpu().numpy(),
-                        ((0, pad_width), (0, 0)),
-                        "constant",
-                        constant_values=0,
-                    )
-                )
-            weights["text_lm_head.weight"] = split_matrix_tp(
-                text_lm_head_weight, tensor_parallel, mapping.tp_rank, dim=0
-            )
+        # if vocab_size % mapping.tp_size != 0:
+        #     vocab_size_padded = pad_vocab_size(vocab_size, mapping.tp_size)
+        #     pad_width = vocab_size_padded - vocab_size
+        #     audio_lm_head_weight = torch.from_numpy(
+        #         np.pad(
+        #             audio_lm_head_weight.detach().cpu().numpy(),
+        #             ((0, pad_width), (0, 0)),
+        #             "constant",
+        #             constant_values=0,
+        #         )
+        #     )
+        # Use audio_lm_head as the main lm_head for HiggsAudio
+        weights["lm_head.weight"] = split_matrix_tp(
+            audio_lm_head_weight, tensor_parallel, mapping.tp_rank, dim=0
+        )
 
     # Final layer norm (only on last PP rank)
     if mapping.is_last_pp_rank():
@@ -839,7 +771,7 @@ def quantize(
     hf_model = model_cls.from_pretrained(
         hf_model_dir,
         device_map="auto",
-        torch_dtype="auto" if not use_smooth_quant else torch.float16,
+        torch_dtype="bfloat16" if not use_smooth_quant else torch.float16,
         trust_remote_code=True,
     ).half()
 

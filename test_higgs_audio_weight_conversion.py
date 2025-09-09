@@ -244,7 +244,7 @@ def test_weight_conversion(
     # Test basic conversion (no quantization)
     print("\n[Test] Testing basic weight conversion (no quantization)")
 
-    config = HiggsAudioConfig(dtype="bfloat16")
+    config = HiggsAudioConfig.from_hugging_face("bosonai/higgs-audio-v2-generation-3B-base")
     tllm_model = HiggsAudioForCausalLM(config)
 
     print("[Test] Converting weights from HF -> TLLM")

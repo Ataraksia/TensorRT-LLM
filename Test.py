@@ -9,7 +9,7 @@ from tensorrt_llm.models.higgs_audio.model import (
 )
 
 # Create configuration
-config = HiggsAudioConfig()
+config = HiggsAudioConfig.from_hugging_face()
 
 # Instantiate model
 model = HiggsAudioForCausalLM(config)

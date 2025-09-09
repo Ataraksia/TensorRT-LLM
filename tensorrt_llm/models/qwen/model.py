@@ -22,25 +22,29 @@ from tqdm import tqdm
 
 from ..._utils import pad_vocab_size
 from ...functional import Tensor, recv, send
-from ...layers import (MOE, Attention, AttentionMaskType, ColumnLinear,
-                       Embedding, GatedMLP, RmsNorm, SharedMoE)
+from ...layers import (
+    MOE,
+    Attention,
+    AttentionMaskType,
+    ColumnLinear,
+    Embedding,
+    GatedMLP,
+    RmsNorm,
+    SharedMoE,
+)
 from ...layers.moe import MOEWeightWrapper
 from ...logger import logger
-from ...lora_manager import (LoraConfig,
-                             get_default_trtllm_modules_to_hf_modules, use_lora)
+from ...lora_manager import LoraConfig, get_default_trtllm_modules_to_hf_modules, use_lora
 from ...mapping import Mapping
 from ...module import Module
 from ...quantization import QuantAlgo
 from ..model_weights_loader import ModelWeightsLoader
-from ..modeling_utils import (DecoderLayerList, DecoderModelForCausalLM,
-                              QuantConfig)
+from ..modeling_utils import DecoderLayerList, DecoderModelForCausalLM, QuantConfig
 from .config import QWenConfig
-from .convert import (load_hf_qwen, load_weights_from_hf_gptq_model,
-                      load_weights_from_hf_model)
+from .convert import load_hf_qwen, load_weights_from_hf_gptq_model, load_weights_from_hf_model
 
 
 class QWenDecoderLayer(Module):
-
     def __init__(self, config: QWenConfig, layer_idx: int):
         super().__init__()
         self.layer_idx = layer_idx
@@ -50,9 +54,9 @@ class QWenDecoderLayer(Module):
         self.tp_group = config.mapping.tp_group
         self.tp_size = config.mapping.tp_size
 
-        self.input_layernorm = RmsNorm(normalized_shape=config.hidden_size,
-                                       eps=config.norm_epsilon,
-                                       dtype=dtype)
+        self.input_layernorm = RmsNorm(
+            normalized_shape=config.hidden_size, eps=config.norm_epsilon, dtype=dtype
+        )
 
         layers_range = config.mapping.pp_layers(config.num_hidden_layers)
         local_layer_idx = layer_idx - layers_range[0]
@@ -78,16 +82,18 @@ class QWenDecoderLayer(Module):
             cp_group=config.mapping.cp_group,
             quant_mode=config.quant_mode,
             use_logn_scaling=config.use_logn_attn,
-            dense_bias=False)
+            dense_bias=False,
+        )
 
         if config.moe.has_moe():
-            mlp_kwargs = {'moe_config': config.moe, 'mapping': config.mapping}
-            if config.qwen_type == 'qwen2_moe':
+            mlp_kwargs = {"moe_config": config.moe, "mapping": config.mapping}
+            if config.qwen_type == "qwen2_moe":
                 ClsMLP = SharedMoE
-                mlp_kwargs['use_shared_gate'] = True
-                mlp_kwargs['use_side_stream'] = True
-                mlp_kwargs['moe_config'].shared_expert_intermediate_size = \
-                    config.moe_shared_expert_intermediate_size
+                mlp_kwargs["use_shared_gate"] = True
+                mlp_kwargs["use_side_stream"] = True
+                mlp_kwargs[
+                    "moe_config"
+                ].shared_expert_intermediate_size = config.moe_shared_expert_intermediate_size
             else:
                 ClsMLP = MOE
         else:
@@ -95,25 +101,27 @@ class QWenDecoderLayer(Module):
             mlp_kwargs = {}
 
         # Qwen's real inter_size depends on qwen_type
-        if self.config.qwen_type == 'qwen':
+        if self.config.qwen_type == "qwen":
             intermediate_size = config.intermediate_size // 2
-        elif self.config.qwen_type == 'qwen2_moe':
+        elif self.config.qwen_type == "qwen2_moe":
             intermediate_size = config.moe_intermediate_size
         else:
             intermediate_size = config.intermediate_size
 
-        self.mlp = ClsMLP(hidden_size=config.hidden_size,
-                          ffn_hidden_size=intermediate_size,
-                          hidden_act=config.hidden_act,
-                          dtype=dtype,
-                          bias=config.mlp_bias,
-                          tp_group=self.tp_group,
-                          tp_size=self.tp_size,
-                          quant_mode=config.quant_mode,
-                          **mlp_kwargs)
-        self.post_layernorm = RmsNorm(normalized_shape=config.hidden_size,
-                                      eps=config.norm_epsilon,
-                                      dtype=dtype)
+        self.mlp = ClsMLP(
+            hidden_size=config.hidden_size,
+            ffn_hidden_size=intermediate_size,
+            hidden_act=config.hidden_act,
+            dtype=dtype,
+            bias=config.mlp_bias,
+            tp_group=self.tp_group,
+            tp_size=self.tp_size,
+            quant_mode=config.quant_mode,
+            **mlp_kwargs,
+        )
+        self.post_layernorm = RmsNorm(
+            normalized_shape=config.hidden_size, eps=config.norm_epsilon, dtype=dtype
+        )
 
     def forward(
         self,
@@ -147,8 +155,7 @@ class QWenDecoderLayer(Module):
 
         hidden_states = self.post_layernorm(hidden_states)
 
-        hidden_states = self.mlp(hidden_states,
-                                 lora_layer_params=lora_layer_params)
+        hidden_states = self.mlp(hidden_states, lora_layer_params=lora_layer_params)
 
         hidden_states = residual + hidden_states
         if use_cache:
@@ -157,40 +164,42 @@ class QWenDecoderLayer(Module):
 
 
 class QWenModel(Module):
-
     def __init__(self, config: QWenConfig) -> None:
         super().__init__()
         self.mapping = config.mapping
         if self.mapping.is_first_pp_rank():
-            self.vocab_embedding = Embedding(config.vocab_size,
-                                             config.hidden_size,
-                                             dtype=config.dtype)
+            self.vocab_embedding = Embedding(
+                config.vocab_size, config.hidden_size, dtype=config.dtype
+            )
 
         self.layers = DecoderLayerList(QWenDecoderLayer, config)
 
         if self.mapping.is_last_pp_rank():
-            self.ln_f = RmsNorm(normalized_shape=config.hidden_size,
-                                eps=config.norm_epsilon,
-                                dtype=config.dtype)
+            self.ln_f = RmsNorm(
+                normalized_shape=config.hidden_size, eps=config.norm_epsilon, dtype=config.dtype
+            )
 
-    def forward(self,
-                input_ids: Tensor,
-                position_ids=None,
-                use_cache=False,
-                spec_decoding_params=None,
-                attention_mask=None,
-                kv_cache_params=None,
-                attention_params=None,
-                mrope_params=None,
-                hidden_states=None,
-                prompt_embedding_table: Optional[Tensor] = None,
-                prompt_tasks: Optional[Tensor] = None,
-                prompt_vocab_size: Optional[Tensor] = None,
-                lora_params=None):
-
-        ptuning_args = [
-            prompt_embedding_table, prompt_tasks, prompt_vocab_size
-        ] if prompt_embedding_table is not None else []
+    def forward(
+        self,
+        input_ids: Tensor,
+        position_ids=None,
+        use_cache=False,
+        spec_decoding_params=None,
+        attention_mask=None,
+        kv_cache_params=None,
+        attention_params=None,
+        mrope_params=None,
+        hidden_states=None,
+        prompt_embedding_table: Optional[Tensor] = None,
+        prompt_tasks: Optional[Tensor] = None,
+        prompt_vocab_size: Optional[Tensor] = None,
+        lora_params=None,
+    ):
+        ptuning_args = (
+            [prompt_embedding_table, prompt_tasks, prompt_vocab_size]
+            if prompt_embedding_table is not None
+            else []
+        )
 
         if self.mapping.is_first_pp_rank():
             hidden_states = self.vocab_embedding(input_ids, *ptuning_args)
@@ -205,7 +214,8 @@ class QWenModel(Module):
             kv_cache_params=kv_cache_params,
             attention_params=attention_params,
             lora_params=lora_params,
-            mrope_params=mrope_params)
+            mrope_params=mrope_params,
+        )
 
         if use_cache:
             hidden_states, presents = hidden_states
@@ -225,31 +235,34 @@ class QWenForCausalLM(DecoderModelForCausalLM):
 
     def __init__(self, config: QWenConfig):
         transformer = QWenModel(config)
-        vocab_size_padded = pad_vocab_size(config.vocab_size,
-                                           config.mapping.tp_size)
+        vocab_size_padded = pad_vocab_size(config.vocab_size, config.mapping.tp_size)
 
         if config.mapping.is_last_pp_rank():
-            if config.architecture == 'Qwen2ForSequenceClassification':
-                lm_head = ColumnLinear(config.hidden_size,
-                                       config.num_labels,
-                                       bias=False,
-                                       dtype=config.dtype,
-                                       tp_group=config.mapping.tp_group,
-                                       tp_size=config.mapping.tp_size,
-                                       gather_output=True)
+            if config.architecture == "Qwen2ForSequenceClassification":
+                lm_head = ColumnLinear(
+                    config.hidden_size,
+                    config.num_labels,
+                    bias=False,
+                    dtype=config.dtype,
+                    tp_group=config.mapping.tp_group,
+                    tp_size=config.mapping.tp_size,
+                    gather_output=True,
+                )
             else:
-                lm_head = ColumnLinear(config.hidden_size,
-                                       vocab_size_padded,
-                                       bias=False,
-                                       dtype=config.dtype,
-                                       tp_group=config.mapping.tp_group,
-                                       tp_size=config.mapping.tp_size,
-                                       gather_output=True)
+                lm_head = ColumnLinear(
+                    config.hidden_size,
+                    vocab_size_padded,
+                    bias=False,
+                    dtype=config.dtype,
+                    tp_group=config.mapping.tp_group,
+                    tp_size=config.mapping.tp_size,
+                    gather_output=True,
+                )
         else:
             lm_head = None
         self.quant_mode = config.quant_mode
         self.mapping = config.mapping
-        if config.qwen_type == 'qwen':
+        if config.qwen_type == "qwen":
             self.trtllm_modules_to_hf_modules = {
                 "attn_qkv": "c_attn",
                 "attn_dense": "attn.c_proj",
@@ -257,47 +270,42 @@ class QWenForCausalLM(DecoderModelForCausalLM):
                 "mlp_4h_to_h": "mlp.c_proj",
                 "mlp_gate": "w1",
             }
-        elif config.qwen_type == 'qwen2_moe':
+        elif config.qwen_type == "qwen2_moe":
             self.trtllm_modules_to_hf_modules = copy.copy(
-                get_default_trtllm_modules_to_hf_modules())
-            self.trtllm_modules_to_hf_modules.update({
-                "mlp_h_to_4h":
-                "mlp.shared_expert.gate_proj",
-                "mlp_4h_to_h":
-                "mlp.shared_expert.down_proj",
-                "mlp_gate":
-                "mlp.shared_expert.up_proj",
-                "mlp_router":
-                "mlp.shared_expert_gate",
-                "moe_h_to_4h":
-                "mlp.experts.gate_proj",
-                "moe_4h_to_h":
-                "mlp.experts.down_proj",
-                "moe_gate":
-                "mlp.experts.up_proj",
-            })
+                get_default_trtllm_modules_to_hf_modules()
+            )
+            self.trtllm_modules_to_hf_modules.update(
+                {
+                    "mlp_h_to_4h": "mlp.shared_expert.gate_proj",
+                    "mlp_4h_to_h": "mlp.shared_expert.down_proj",
+                    "mlp_gate": "mlp.shared_expert.up_proj",
+                    "mlp_router": "mlp.shared_expert_gate",
+                    "moe_h_to_4h": "mlp.experts.gate_proj",
+                    "moe_4h_to_h": "mlp.experts.down_proj",
+                    "moe_gate": "mlp.experts.up_proj",
+                }
+            )
         else:
             self.trtllm_modules_to_hf_modules = None
         super().__init__(config, transformer, lm_head)
 
     @classmethod
     def from_hugging_face(
-            cls,
-            hf_model_or_dir: Union[str, 'transformers.PreTrainedModel'],
-            dtype: str = 'auto',
-            mapping: Optional[Mapping] = None,
-            quant_config: Optional[QuantConfig] = None,
-            **kwargs):
-        ''' Create a QWenForCausalLM object from give parameters
-        '''
+        cls,
+        hf_model_or_dir: Union[str, "transformers.PreTrainedModel"],
+        dtype: str = "auto",
+        mapping: Optional[Mapping] = None,
+        quant_config: Optional[QuantConfig] = None,
+        **kwargs,
+    ):
+        """Create a QWenForCausalLM object from give parameters"""
         import transformers
 
-        load_model_on_cpu = kwargs.pop('load_model_on_cpu', False)
-        use_autoawq = kwargs.pop('use_autoawq', False)
+        load_model_on_cpu = kwargs.pop("load_model_on_cpu", False)
+        use_autoawq = kwargs.pop("use_autoawq", False)
 
         assert hf_model_or_dir is not None
-        use_preloading = isinstance(hf_model_or_dir,
-                                    transformers.PreTrainedModel)
+        use_preloading = isinstance(hf_model_or_dir, transformers.PreTrainedModel)
         if use_preloading:
             hf_model = hf_model_or_dir
             hf_config_or_dir = hf_model.config
@@ -305,11 +313,9 @@ class QWenForCausalLM(DecoderModelForCausalLM):
             hf_model_dir = hf_model_or_dir
             hf_config_or_dir = hf_model_or_dir
 
-        config = QWenConfig.from_hugging_face(hf_config_or_dir,
-                                              dtype=dtype,
-                                              mapping=mapping,
-                                              quant_config=quant_config,
-                                              **kwargs)
+        config = QWenConfig.from_hugging_face(
+            hf_config_or_dir, dtype=dtype, mapping=mapping, quant_config=quant_config, **kwargs
+        )
 
         if os.environ.get("TRTLLM_DISABLE_UNIFIED_CONVERTER") is None:
             arg_dict = {"use_autoawq": True} if use_autoawq else {}
@@ -336,8 +342,7 @@ class QWenForCausalLM(DecoderModelForCausalLM):
                     "mlp.shared_expert_gate": "mlp.shared_expert_gate",
                     "fc": ["up_proj", "gate_proj"],
                 }
-            elif config.qwen_type in {"qwen2", "qwen2_vl"
-                                      } and config.tie_word_embeddings:
+            elif config.qwen_type in {"qwen2", "qwen2_vl"} and config.tie_word_embeddings:
                 custom_dict = {"lm_head": "model.embed_tokens"}
             elif config.architecture == "Qwen2ForSequenceClassification":
                 custom_dict = {
@@ -391,22 +396,24 @@ class QWenForCausalLM(DecoderModelForCausalLM):
                 for tllm_key, _ in tqdm(model.named_parameters()):
                     if "qkv" in tllm_key:
                         tllm_weights.update(
-                            loader.load(tllm_key,
-                                        reshape_qkv,
-                                        skip_tp=True,
-                                        custom_postprocess_kwargs=arg_dict))
+                            loader.load(
+                                tllm_key,
+                                reshape_qkv,
+                                skip_tp=True,
+                                custom_postprocess_kwargs=arg_dict,
+                            )
+                        )
                     else:
                         tllm_weights.update(
-                            loader.load(tllm_key,
-                                        custom_postprocess_kwargs=arg_dict))
+                            loader.load(tllm_key, custom_postprocess_kwargs=arg_dict)
+                        )
                 loader.fill(tllm_weights)
             elif config.qwen_type == "qwen2_moe":
                 for tllm_key, _ in model.named_parameters():
                     sub_module = model
                     for attr in tllm_key.split(".")[:-1]:
                         sub_module = getattr(sub_module, attr)
-                    if "router" in tllm_key or isinstance(
-                            sub_module, MOEWeightWrapper):
+                    if "router" in tllm_key or isinstance(sub_module, MOEWeightWrapper):
                         sub_module_dic = sub_module.tllm_to_externel_key_dict
                         sub_module_dic["mlp"] = "mlp"
                         if "fc" in sub_module_dic.keys():
@@ -433,13 +440,14 @@ class QWenForCausalLM(DecoderModelForCausalLM):
                 for tllm_key, _ in tqdm(model.named_parameters()):
                     if tllm_key.endswith("shared_expert.fc.weight"):
                         tllm_weights.update(
-                            loader.load(tllm_key,
-                                        concat_gate_up_proj,
-                                        custom_postprocess_kwargs=arg_dict))
+                            loader.load(
+                                tllm_key, concat_gate_up_proj, custom_postprocess_kwargs=arg_dict
+                            )
+                        )
                     else:
                         tllm_weights.update(
-                            loader.load(tllm_key,
-                                        custom_postprocess_kwargs=arg_dict))
+                            loader.load(tllm_key, custom_postprocess_kwargs=arg_dict)
+                        )
                 loader.fill(tllm_weights)
             else:
                 # For Qwen1 w/o TP, Qwen1.5 and Qwen2 w/o MoE
@@ -463,7 +471,7 @@ class QWenForCausalLM(DecoderModelForCausalLM):
     def default_plugin_config(self, **kwargs):
         plugin_config = super().default_plugin_config(**kwargs)
         if self.quant_mode.is_int4_weight_only_per_group():
-            plugin_config.weight_only_groupwise_quant_matmul_plugin = 'auto'
+            plugin_config.weight_only_groupwise_quant_matmul_plugin = "auto"
         return plugin_config
 
     @classmethod
@@ -471,11 +479,11 @@ class QWenForCausalLM(DecoderModelForCausalLM):
         cls,
         hf_model_dir: str,
         output_dir: str,
-        dtype: str = 'auto',
+        dtype: str = "auto",
         mapping: Optional[Mapping] = None,
         quant_config: Optional[QuantConfig] = None,
         *,
-        calib_dataset='cnn_dailymail',
+        calib_dataset="cnn_dailymail",
         calib_batches=512,
         calib_batch_size=1,
         calib_max_seq_length=512,
@@ -485,30 +493,27 @@ class QWenForCausalLM(DecoderModelForCausalLM):
     ):
         if quant_config._requires_modelopt_quantization:
             # modelopt quantization flow
-            super().quantize(hf_model_dir,
-                             output_dir,
-                             dtype=dtype,
-                             mapping=mapping,
-                             quant_config=quant_config,
-                             calib_dataset=calib_dataset,
-                             calib_batches=calib_batches,
-                             calib_batch_size=calib_batch_size,
-                             calib_max_seq_length=calib_max_seq_length,
-                             random_seed=random_seed,
-                             tokenizer_max_seq_length=tokenizer_max_seq_length)
+            super().quantize(
+                hf_model_dir,
+                output_dir,
+                dtype=dtype,
+                mapping=mapping,
+                quant_config=quant_config,
+                calib_dataset=calib_dataset,
+                calib_batches=calib_batches,
+                calib_batch_size=calib_batch_size,
+                calib_max_seq_length=calib_max_seq_length,
+                random_seed=random_seed,
+                tokenizer_max_seq_length=tokenizer_max_seq_length,
+            )
         elif quant_config._requires_calibration:
             # non-modelopt quantization flow
             from . import convert
 
-            config = QWenConfig.from_hugging_face(hf_model_dir,
-                                                  dtype=dtype,
-                                                  mapping=mapping,
-                                                  quant_config=quant_config,
-                                                  **kwargs)
-            convert.quantize(hf_model_dir,
-                             output_dir,
-                             config=config,
-                             calib_dataset=calib_dataset)
+            config = QWenConfig.from_hugging_face(
+                hf_model_dir, dtype=dtype, mapping=mapping, quant_config=quant_config, **kwargs
+            )
+            convert.quantize(hf_model_dir, output_dir, config=config, calib_dataset=calib_dataset)
         else:
             raise ValueError(
                 f"The quant_config ({quant_config}) does not require calibration, try {cls.__name__}.from_hugging_face instead."
