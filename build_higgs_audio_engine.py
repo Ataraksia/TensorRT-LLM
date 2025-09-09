@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Script to build TensorRT-LLM engine for HiggsAudio model."""
 
-from tensorrt_llm.models import HiggsAudioForCausalLM
+from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 
 def main():
@@ -32,10 +32,12 @@ def main():
     # config = HiggsAudioConfig.from_hugging_face(**kwargs)
     # hf_model = HiggsAudioModel.from_pretrained("bosonai/higgs-audio-v2-generation-3B-base")
     # trtllm_model = HiggsAudioForCausalLM(config)
-    trtllm_model = HiggsAudioForCausalLM.from_hugging_face(
-        "bosonai/higgs-audio-v2-generation-3B-base"
-    )
-    trtllm_model.save_checkpoint("./higgs_audio_engine")
+    config = HiggsAudioConfig.from_hugging_face("bosonai/higgs-audio-v2-generation-3B-base")
+    print(config.to_dict())
+    # trtllm_model = HiggsAudioForCausalLM.from_hugging_face(
+    #     "bosonai/higgs-audio-v2-generation-3B-base"
+    # )
+    # trtllm_model.save_checkpoint("./higgs_audio_engine")
 
     # weights = load_weights_from_hf_model(hf_model, config)
     # trtllm_model.load(weights)
@@ -45,3 +47,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # print("Build TRT-LLM engine...")
+    # build_cmd = [
+    #     "trtllm-build",
+    #     f"--checkpoint_dir={workspace}/Qwen2-Audio",
+    #     f"--gemm_plugin=float16",
+    #     f"--gpt_attention_plugin=float16",
+    #     f"--max_prompt_embedding_table_size=4096",
+    #     f"--output_dir={engine_dir}",
+    #     f"--max_batch_size={1}",
+    # ]

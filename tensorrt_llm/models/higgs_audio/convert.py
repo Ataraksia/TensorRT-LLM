@@ -659,21 +659,21 @@ def convert_hf_higgs(
             )
         )
 
-    # HiggsAudio audio-specific layer norms (if they exist)
-    audio_input_ln_weight = get_weight(model_params, prefix + "audio_input_layernorm", dtype)
-    weights[tllm_prex + "audio_input_layernorm.weight"] = audio_input_ln_weight
+        # HiggsAudio audio-specific layer norms (if they exist)
+        audio_input_ln_weight = get_weight(model_params, prefix + "audio_input_layernorm", dtype)
+        weights[tllm_prex + "audio_input_layernorm.weight"] = audio_input_ln_weight
 
-    audio_post_ln_weight = get_weight(
-        model_params, prefix + "audio_post_attention_layernorm", dtype
-    )
-    weights[tllm_prex + "audio_post_layernorm.weight"] = audio_post_ln_weight
+        audio_post_ln_weight = get_weight(
+            model_params, prefix + "audio_post_attention_layernorm", dtype
+        )
+        weights[tllm_prex + "audio_post_layernorm.weight"] = audio_post_ln_weight
 
-    # Layer norms do not use tensor parallelism
-    input_ln_weight = get_weight(model_params, prefix + "input_layernorm", dtype)
-    weights[tllm_prex + "input_layernorm.weight"] = input_ln_weight
+        # Layer norms do not use tensor parallelism
+        input_ln_weight = get_weight(model_params, prefix + "input_layernorm", dtype)
+        weights[tllm_prex + "input_layernorm.weight"] = input_ln_weight
 
-    post_ln_weight = get_weight(model_params, prefix + "post_attention_layernorm", dtype)
-    weights[tllm_prex + "post_layernorm.weight"] = post_ln_weight
+        post_ln_weight = get_weight(model_params, prefix + "post_attention_layernorm", dtype)
+        weights[tllm_prex + "post_layernorm.weight"] = post_ln_weight
 
     # Load embedding weights
     v = get_weight(model_params, "embed_tokens", dtype)
@@ -687,7 +687,7 @@ def convert_hf_higgs(
     # HiggsAudio specific components
     # Audio codebook embeddings
     audio_codebook_weight = get_weight(model_params, "audio_codebook_embeddings", dtype)
-    weights["transformer.audio_codebook_embedding.weight"] = audio_codebook_weight
+    weights["transformer.audio_codebook_embeddings.weight"] = audio_codebook_weight
 
     # Audio decoder projection with dual heads (only load if on last PP rank)
     if mapping.is_last_pp_rank():

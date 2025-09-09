@@ -99,7 +99,6 @@ def check_weight_non_empty(weights: Dict[str, torch.Tensor]) -> Tuple[List[str],
 def extract_hf_weight_by_tllm_name(hf_model, tllm_name: str, mapping: Mapping) -> torch.Tensor:
     """Extract HF weight corresponding to TLLM weight name."""
     model_params = dict(hf_model.named_parameters())
-
     # Handle embedding weights
     if tllm_name == "transformer.vocab_embedding.weight":
         return model_params.get("embed_tokens.weight")
@@ -176,13 +175,12 @@ def compare_weights(
     hf_model,
     tllm_weights: Dict[str, torch.Tensor],
     mapping: Mapping,
-    tolerance: float = 1e-5,
+    tolerance: float = 1e-6,
     verbose: bool = False,
 ) -> Tuple[List[str], List[Tuple[str, float]]]:
     """Compare TLLM weights with original HF weights."""
     missing_hf_weights = []
     mismatched_weights = []
-
     for tllm_name, tllm_weight in tllm_weights.items():
         hf_weight = extract_hf_weight_by_tllm_name(hf_model, tllm_name, mapping)
 

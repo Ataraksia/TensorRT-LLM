@@ -20,11 +20,6 @@ The model includes:
 - HiggsAudioConfig: Main configuration for the multimodal model
 """
 
-from typing import Dict, Union
-
-import transformers
-
-from tensorrt_llm.models.convert_utils import infer_dtype
 from tensorrt_llm.models.modeling_utils import PretrainedConfig
 
 
@@ -42,12 +37,12 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_adapter_type: str = "dual_ffn_fast_forward",
         audio_ffn_hidden_size: int = 4096,
         audio_ffn_intermediate_size: int = 8192,
-        text_vocab_size: int = 128256,
-        audio_vocab_size: int = 8208,
+        # Audio codebook configuration
         audio_num_codebooks: int = 8,
         audio_codebook_size: int = 1024,
         audio_stream_bos_id: int = 1024,
         audio_stream_eos_id: int = 1025,
+        # Special tokens
         audio_bos_token: str = "<|audio_bos|>",
         audio_bos_token_id: int = 128011,
         audio_eos_token: str = "<|audio_eos|>",
@@ -61,15 +56,40 @@ class HiggsAudioConfig(PretrainedConfig):
         pad_token_id: int = 128001,
         **kwargs,
     ):
-        # Determine base configuration parameters from text config
+        text_config = {
+            "architecture": "llama",
+            "hidden_size": 3072,
+            "num_hidden_layers": 28,
+            "num_attention_heads": 24,
+            "intermediate_size": 8192,
+            "vocab_size": 128256,
+            "max_position_embeddings": 131072,
+            "num_key_value_heads": 8,
+        }
+        self.text_vocab_size = text_config.get("vocab_size", 128256)
+        self.audio_vocab_size = audio_num_codebooks * (audio_codebook_size + 2)
 
         # Initialize base PretrainedConfig
-        super().__init__(**kwargs)
-
-        # Use text vocab size for input processing, but audio vocab size for generation
-        # The model needs to accept text tokens as input but generate audio tokens as output
-        self.text_vocab_size = text_vocab_size
-        self.audio_vocab_size = audio_vocab_size
+        super().__init__(
+            architecture="HiggsAudioForCausalLM",
+            hidden_size=text_config.get("hidden_size", 3072),
+            num_hidden_layers=text_config.get("num_hidden_layers", 28),
+            num_attention_heads=24,  # Default for LLaMA-3.2-3B
+            vocab_size=text_config.get("vocab_size", 128256),
+            hidden_act="swiglu",
+            dtype="bfloat16",
+            **kwargs,
+        )
+        self.intermediate_size = (
+            getattr(text_config, "intermediate_size", 11008)
+            if not isinstance(text_config, dict)
+            else text_config.get("intermediate_size", 11008)
+        )
+        self.num_key_value_heads = (
+            getattr(text_config, "num_key_value_heads", self.num_attention_heads)
+            if not isinstance(text_config, dict)
+            else text_config.get("num_key_value_heads", self.num_attention_heads)
+        )
 
         # Adapter configuration
         self.audio_adapter_type = audio_adapter_type
@@ -95,90 +115,12 @@ class HiggsAudioConfig(PretrainedConfig):
         self.audio_out_token_idx = audio_out_token_idx
         self.pad_token_id = pad_token_id
 
-    def to_dict(self) -> Dict:
-        output = super().to_dict()
-        # Add all our custom attributes
-        custom_attrs = [
-            "text_vocab_size",
-            "audio_vocab_size",
-            "audio_adapter_type",
-            "audio_ffn_hidden_size",
-            "audio_ffn_intermediate_size",
-            "audio_num_codebooks",
-            "audio_codebook_size",
-            "audio_stream_bos_id",
-            "audio_stream_eos_id",
-            "audio_bos_token",
-            "audio_bos_token_id",
-            "audio_eos_token",
-            "audio_eos_token_id",
-            "audio_out_bos_token",
-            "audio_out_bos_token_id",
-            "audio_in_token",
-            "audio_out_token",
-            "audio_in_token_idx",
-            "audio_out_token_idx",
-            "pad_token_id",
-        ]
-        for attr in custom_attrs:
-            if hasattr(self, attr):
-                output[attr] = getattr(self, attr)
-
-        return output
-
     @classmethod
     def from_hugging_face(
         cls,
-        hf_config_or_dir: Union[str, "transformers.PretrainedConfig"],
-        dtype: str = "bfloat16",
+        hf_config_or_dir: str,
         **kwargs,
     ) -> "HiggsAudioConfig":
-        trust_remote_code = kwargs.pop("trust_remote_code", True)
-
-        if isinstance(hf_config_or_dir, transformers.PretrainedConfig):
-            hf_config = hf_config_or_dir
-        else:
-            hf_config_dir = str(hf_config_or_dir)
-
-            hf_config = transformers.AutoConfig.from_pretrained(
-                hf_config_dir, trust_remote_code=trust_remote_code
-            )
-
-        hf_config = hf_config.text_config
-        hf_config.architectures = ["HiggsAudioForCausalLM"]
-        attn_bias = False  # All existing Qwen models have attn bias
-        rotary_scaling = getattr(hf_config, "rope_scaling", None)
-        seq_length = getattr(hf_config, "seq_length", 1024)
-        use_logn_attn = getattr(hf_config, "use_logn_attn", False)
-        disable_weight_only_quant_plugin = kwargs.pop("disable_weight_only_quant_plugin", False)
-        rotary_base = getattr(hf_config, "rope_theta", 100000.0)
-        num_labels = 1
-        dtype = infer_dtype(dtype, getattr(hf_config, "torch_dtype", None))
-        pe_type = "rope_gpt_neox"
-        rotary_embedding_dim = None
-
         return cls(
-            architecture=hf_config.architectures[0],
-            dtype=dtype,
-            num_hidden_layers=hf_config.num_hidden_layers,
-            num_attention_heads=hf_config.num_attention_heads,
-            hidden_size=hf_config.hidden_size,
-            intermediate_size=hf_config.intermediate_size,
-            num_key_value_heads=hf_config.num_key_value_heads,
-            head_size=hf_config.head_dim,
-            vocab_size=hf_config.vocab_size,
-            position_embedding_type=pe_type,
-            max_position_embeddings=hf_config.max_position_embeddings,
-            rotary_embedding_dim=rotary_embedding_dim,
-            hidden_act=hf_config.hidden_act,
-            norm_epsilon=hf_config.rms_norm_eps,
-            attn_bias=attn_bias,
-            rotary_base=rotary_base,
-            rotary_scaling=rotary_scaling,
-            disable_weight_only_quant_plugin=disable_weight_only_quant_plugin,
-            seq_length=seq_length,
-            use_logn_attn=use_logn_attn,
-            num_labels=num_labels,
-            tie_word_embeddings=hf_config.tie_word_embeddings,
             **kwargs,
         )
