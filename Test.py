@@ -17,7 +17,7 @@ runner = HiggsAudioTRTRunner(
     engine_dir="/home/me/TTS/TensorRT-LLM/higgs_audio_engine/",
     hf_model_dir="bosonai/higgs-audio-v2-generation-3B-base",
     audio_tokenizer_dir="bosonai/higgs-audio-v2-tokenizer",
-    reference_audio=None,
+    reference_audio=audio_path,
 )
 
 input_text = "Chat, stop backseating! I totally know what I'm doing... I think"

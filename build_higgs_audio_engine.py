@@ -8,8 +8,7 @@ from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM
 
 
 def main():
-    max_mel_seq_len = 3000
-    max_seq_len = (max_mel_seq_len - 2) // 2 + 1
+    max_len = 2048
     plugin_config = PluginConfig()
     plugin_config.dtype = "bfloat16"
     plugin_config.use_fp8_context_fmha = False
@@ -17,10 +16,11 @@ def main():
     plugin_config.gemm_plugin = "bfloat16"
     plugin_config.remove_input_padding = True
     build_config = BuildConfig(
-        max_seq_len=max_seq_len,
+        max_seq_len=max_len,
+        max_input_len=max_len,
         max_batch_size=1,
         max_beam_width=1,
-        max_num_tokens=max_seq_len,
+        max_num_tokens=max_len,
         max_prompt_embedding_table_size=0,
         kv_cache_type=KVCacheType.PAGED,
         gather_context_logits=False,

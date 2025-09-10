@@ -145,7 +145,7 @@ class HiggsAudioConfig(PretrainedConfig):
         hf_config.architectures = ["HiggsAudioForCausalLM"]
         attn_bias = False  # All existing Qwen models have attn bias
         rotary_scaling = getattr(hf_config, "rope_scaling", None)
-        seq_length = getattr(hf_config, "seq_length", 1024)
+        seq_length = getattr(hf_config, "seq_length", 2048)
         use_logn_attn = getattr(hf_config, "use_logn_attn", False)
         disable_weight_only_quant_plugin = kwargs.pop("disable_weight_only_quant_plugin", False)
         rotary_base = getattr(hf_config, "rope_theta", 100000.0)
