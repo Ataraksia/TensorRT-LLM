@@ -281,19 +281,19 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
-        self.hidden_size = self.confighidden_size
+        self.hidden_size = self.config.hidden_size
 
         # Shared attention layer
         self.attention = Attention(
-            hidden_size=self.confighidden_size,
-            num_attention_heads=self.confignum_attention_heads,
-            num_kv_heads=self.confignum_key_value_heads,
-            max_position_embeddings=self.configmax_position_embeddings,
-            num_layers=self.confignum_hidden_layers,
+            hidden_size=self.config.hidden_size,
+            num_attention_heads=self.config.num_attention_heads,
+            num_kv_heads=self.config.num_key_value_heads,
+            max_position_embeddings=self.config.max_position_embeddings,
+            num_layers=self.config.num_hidden_layers,
             apply_query_key_layer_scaling=False,
             attention_mask_type=AttentionMaskType.causal,
             bias=False,
-            dtype=self.configdtype,
+            dtype=self.config.dtype,
             tp_group=None,
             tp_size=1,
             tp_rank=0,
@@ -303,10 +303,10 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         # Text MLP
         self.mlp = MLP(
-            hidden_size=self.confighidden_size,
-            ffn_hidden_size=self.configaudio_ffn_intermediate_size,
-            hidden_act=self.confighidden_act,
-            dtype=self.configdtype,
+            hidden_size=self.config.hidden_size,
+            ffn_hidden_size=self.config.audio_ffn_intermediate_size,
+            hidden_act=self.config.hidden_act,
+            dtype=self.config.dtype,
             bias=False,
             tp_group=None,
             tp_size=1,
@@ -315,10 +315,10 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         # Audio MLP (potentially smaller)
         self.audio_mlp = MLP(
-            hidden_size=self.confighidden_size,
-            ffn_hidden_size=self.configaudio_ffn_intermediate_size,
-            hidden_act=self.confighidden_act,
-            dtype=self.configdtype,
+            hidden_size=self.config.hidden_size,
+            ffn_hidden_size=self.config.audio_ffn_intermediate_size,
+            hidden_act=self.config.hidden_act,
+            dtype=self.config.dtype,
             bias=False,
             tp_group=None,
             tp_size=1,
@@ -327,27 +327,27 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         # Layer norms
         self.input_layernorm = RmsNorm(
-            normalized_shape=self.confighidden_size,
-            eps=self.confignorm_epsilon,
-            dtype=self.configdtype,
+            normalized_shape=self.config.hidden_size,
+            eps=self.config.norm_epsilon,
+            dtype=self.config.audio_bos_tokendtype,
         )
 
         self.audio_input_layernorm = RmsNorm(
-            normalized_shape=self.confighidden_size,
-            eps=self.confignorm_epsilon,
-            dtype=self.configdtype,
+            normalized_shape=self.config.hidden_size,
+            eps=self.config.norm_epsilon,
+            dtype=self.config.dtype,
         )
 
         self.post_layernorm = RmsNorm(
-            normalized_shape=self.confighidden_size,
-            eps=self.confignorm_epsilon,
-            dtype=self.configdtype,
+            normalized_shape=self.config.hidden_size,
+            eps=self.config.norm_epsilon,
+            dtype=self.config.dtype,
         )
 
         self.audio_post_layernorm = RmsNorm(
-            normalized_shape=self.confighidden_size,
-            eps=self.confignorm_epsilon,
-            dtype=self.configdtype,
+            normalized_shape=self.config.hidden_size,
+            eps=self.config.norm_epsilon,
+            dtype=self.config.dtype,
         )
 
     def forward(
@@ -362,9 +362,6 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         """Forward pass for dual FFN decoder layer."""
 
         residual = hidden_states
-
-        # if use_cache:
-        #     audio_out_mask = audio_out_mask[:, -hidden_states.shape[1] :]
 
         hidden_states = torch.where(
             audio_out_mask.unsqueeze(-1),
@@ -388,19 +385,6 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         residual = hidden_states
 
-        # # Make whole graph in decode stage
-        # if decode_stage and is_using_cuda_graph:
-        #     assert is_decoding_audio_token is not None, (
-        #         "is_decoding_audio_token should be present in the decoding stage."
-        #     )
-        #     if is_decoding_audio_token:
-        #         hidden_states = self.audio_post_layernorm(hidden_states)
-        #         hidden_states = self.audio_mlp(hidden_states)
-        #     else:
-        #         hidden_states = self.post_layernorm(hidden_states)
-        #         hidden_states = self.mlp(hidden_states)
-        #     residual = residual + hidden_states
-        # else:
         text_hidden_states = self.post_layernorm(hidden_states[~audio_out_mask])
         audio_hidden_states = self.audio_post_layernorm(hidden_states[audio_out_mask])
 
@@ -413,7 +397,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         hidden_states = residual
 
         if use_cache:
-            return hidden_states, presents
+            return (hidden_states, presents)
         return hidden_states
 
 
@@ -425,26 +409,17 @@ class HiggsAudioTransformer(Module):
         self.config = config
 
         self.vocab_embedding = Embedding(
-            num_embeddings=self.configtext_vocab_size,
-            embedding_dim=self.confighidden_size,
-            dtype=self.configdtype,
+            num_embeddings=self.config.text_vocab_size,
+            embedding_dim=self.config.hidden_size,
+            dtype=self.config.dtype,
         )
 
-        # # Audio codebook embeddings for audio generation
-        # self.audio_codebook_embeddings = Embedding(
-        #     num_embeddings=self.configaudio_vocab_size,
-        #     embedding_dim=self.confighidden_size,
-        #     dtype=self.configdtype,
-        # )
-
-        # Decoder layers - use dual FFN for all layers for simplicity
         self.layers = DecoderLayerList(HiggsAudioDualFFNDecoderLayer, config)
 
-        # Final layer norm
         self.ln_f = RmsNorm(
-            normalized_shape=self.confighidden_size,
-            eps=self.confignorm_epsilon,
-            dtype=self.configdtype,
+            normalized_shape=self.config.hidden_size,
+            eps=self.config.norm_epsilon,
+            dtype=self.config.dtype,
         )
 
     def forward(
@@ -465,17 +440,13 @@ class HiggsAudioTransformer(Module):
         text_embeddings = self.vocab_embeddings(input_ids)
         input_embeddings = torch.cat([prompt_embedding_table, text_embeddings], dim=0)
 
-        hidden_states = where(unsqueeze(audio_tokens_mask, -1), audio_embeddings, text_embeddings)
-
-        # audio_out_mask = input_ids == self.audio_in_token_idx
-        # Decoder layers
         hidden_states = self.layers(
-            hidden_states=hidden_states,
+            hidden_states=input_embeddings,
             use_cache=use_cache,
             attention_mask=attention_mask,
             kv_cache_params=kv_cache_params,
             attention_params=attention_params,
-            audio_out_mask=audio_tokens_mask,
+            audio_out_mask=position_ids,
         )
 
         if use_cache:
@@ -485,7 +456,7 @@ class HiggsAudioTransformer(Module):
         hidden_states = self.ln_f(hidden_states)
 
         if use_cache:
-            return hidden_states, presents
+            return (hidden_states, tuple(presents))
         return hidden_states
 
 
@@ -527,20 +498,20 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         transformer = HiggsAudioTransformer(config)
 
         # text_lm_head = ColumnLinear(
-        #     in_features=self.confighidden_size,
-        #     out_features=self.configtext_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
+        #     in_features=self.config.hidden_size,
+        #     out_features=self.config.text_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
         #     bias=False,
-        #     dtype=self.configdtype,
+        #     dtype=self.config.dtype,
         #     tp_group=None,
         #     tp_size=1,
         #     gather_output=True,
         # )
 
         audio_lm_head = ColumnLinear(
-            in_features=self.confighidden_size,
-            out_features=self.configaudio_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
+            in_features=self.config.hidden_size,
+            out_features=self.config.audio_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
             bias=False,
-            dtype=self.configdtype,
+            dtype=self.config.dtype,
             tp_group=None,
             tp_size=1,
             gather_output=True,
@@ -719,7 +690,13 @@ class HiggsAudioTRTRunner:
                 codebook_shift = (
                     torch.arange(self.config.audio_num_codebooks) * self.audio_codebook_size
                 )
+                audio_codes_flattened = audio_codes.transpose(1, 0).reshape(
+                    audio_codes.shape[1], -1
+                )
+                print(audio_codes_flattened.shape)
                 audio_codes_flat = audio_codes.transpose(1, 2).reshape(-1)
+                print(audio_codes_flat.shape)
+
                 audio_embeddings = audio_codebook_embeddings(
                     audio_codes_flat + codebook_shift.unsqueeze(-1)
                 )
@@ -831,9 +808,9 @@ class HiggsAudioTRTRunner:
         #         if eos_positions.numel() > 0:
         #             seq = seq[: eos_positions[0].item()]
         #     # Remove any pad_id just in case
-        #     if self.configpad_token_id is not None:
-        #         if seq.numel() > 0 and seq[-1].item() == self.configpad_token_id:
-        #             last_non_pad = (seq != self.configpad_token_id).nonzero(as_tuple=False)
+        #     if self.config.pad_token_id is not None:
+        #         if seq.numel() > 0 and seq[-1].item() == self.config.pad_token_id:
+        #             last_non_pad = (seq != self.config.pad_token_id).nonzero(as_tuple=False)
         #             if last_non_pad.numel() > 0:
         #                 seq = seq[: last_non_pad[-1].item() + 1]
         #             else:
