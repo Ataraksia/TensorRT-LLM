@@ -1919,187 +1919,22 @@ class HiggsAudioDualFFNDecoderLayer(nn.Module):
 
         has_audio_out = audio_out_mask is not None and audio_out_mask.shape[0] > 0
 
-        audio_out_mask_sq = audio_out_mask
-
-        if self.fast_forward and has_audio_out:
-            original_hidden_states = hidden_states.clone()
-            min_dtype = torch.finfo(hidden_states.dtype).min
-            if attention_mask is None:
-                attention_mask = ~audio_out_mask
-
-                if self.self_attn.config._attn_implementation != "flash_attention_2":
-                    sequence_length = audio_out_mask.shape[1]
-                    attention_mask = _prepare_4d_causal_attention_mask_with_cache_position(
-                        attention_mask=attention_mask,
-                        sequence_length=sequence_length,
-                        target_length=sequence_length,
-                        dtype=hidden_states.dtype,
-                        min_dtype=min_dtype,
-                        device=hidden_states.device,
-                        cache_position=cache_position,
-                        batch_size=hidden_states.shape[0],
-                    )
-                    if use_cache:
-                        attention_mask = attention_mask[:, :, -target_length:, :]
-            elif len(attention_mask.shape) == 2:
-                # Attention mask has shape (batch_size, sequence_length)
-                # We should be using flash attention 2
-                attention_mask = attention_mask * ~audio_out_mask
-            elif len(attention_mask.shape) == 4:
-                # When using static cache, the attention mask was already preprocessed in the previous layer
-                if use_static_cache:
-                    attention_mask = fast_forward_attention_mask
-                else:
-                    if use_cache:
-                        # Attention mask has shape (batch_size, 1, query_length, key_length)
-                        # In addition, the attention mask should be inverted, that means "1" (attend_to) --> "0", and "0" --> minimal dtype value.
-                        attention_mask = attention_mask.masked_fill(
-                            audio_out_mask[:, -target_length:].reshape(
-                                audio_out_mask.shape[0], 1, target_length, 1
-                            )
-                            | audio_out_mask.reshape(
-                                audio_out_mask.shape[0], 1, 1, audio_out_mask.shape[1]
-                            ),
-                            min_dtype,
-                        )
-                    else:
-                        attention_mask = attention_mask.masked_fill(
-                            audio_out_mask.reshape(
-                                audio_out_mask.shape[0], 1, audio_out_mask.shape[1], 1
-                            )
-                            | audio_out_mask.reshape(
-                                audio_out_mask.shape[0], 1, 1, audio_out_mask.shape[1]
-                            ),
-                            min_dtype,
-                        )
-            else:
-                raise NotImplementedError(
-                    f"Unsupported attention_mask format, attention_mask={attention_mask}"
-                )
-
-            if (
-                self.self_attn.config._attn_implementation == "sdpa"
-                and attention_mask is not None
-                and attention_mask.device.type == "cuda"
-                and not output_attentions
-            ):
-                # Attend to all tokens in fully masked rows in the causal_mask, for example the relevant first rows when
-                # using left padding. This is required by F.scaled_dot_product_attention memory-efficient attention path.
-                # Details: https://github.com/pytorch/pytorch/issues/110213
-                attention_mask = AttentionMaskConverter._unmask_unattended(
-                    attention_mask, min_dtype
-                )
-
         if has_audio_out and not self.fast_forward:
             # Apply separate layernorm layers for audio tokens and text tokens
             if use_cache:
                 hidden_states = torch.where(
-                    audio_out_mask_sq[:, -target_length:].unsqueeze(-1),
+                    audio_out_mask[:, -target_length:].unsqueeze(-1),
                     self.audio_input_layernorm(hidden_states),
                     self.input_layernorm(hidden_states),
                 )
             else:
                 hidden_states = torch.where(
-                    audio_out_mask_sq.unsqueeze(-1),
+                    audio_out_mask.unsqueeze(-1),
                     self.audio_input_layernorm(hidden_states),
                     self.input_layernorm(hidden_states),
                 )
         else:
             hidden_states = self.input_layernorm(hidden_states)
-
-        # Audio Attention
-        if self.use_audio_attention and has_audio_out:
-            if use_static_cache:
-                assert audio_attention_mask is not None, (
-                    "audio_attention_mask should not be None when using static cache."
-                )
-
-            if audio_attention_mask is None:
-                no_audio_out_mask = (~audio_out_mask)[:, -target_length:].reshape(
-                    audio_out_mask.shape[0], 1, target_length, 1
-                ) | (~audio_out_mask).reshape(
-                    audio_out_mask.shape[0], 1, 1, audio_out_mask.shape[1]
-                )
-                min_dtype = torch.finfo(hidden_states.dtype).min
-
-                if attention_mask is None:
-                    audio_attention_mask = audio_out_mask
-
-                    if self.audio_attn.config._attn_implementation != "flash_attention_2":
-                        sequence_length = audio_out_mask.shape[1]
-                        audio_attention_mask = (
-                            _prepare_4d_causal_attention_mask_with_cache_position(
-                                attention_mask=audio_attention_mask,
-                                sequence_length=sequence_length,
-                                target_length=sequence_length,
-                                dtype=hidden_states.dtype,
-                                min_dtype=min_dtype,
-                                device=hidden_states.device,
-                                cache_position=cache_position,
-                                batch_size=hidden_states.shape[0],
-                            )
-                        )
-                        if use_cache:
-                            audio_attention_mask = audio_attention_mask[:, :, -target_length:, :]
-                        audio_attention_mask = audio_attention_mask.masked_fill(
-                            no_audio_out_mask, min_dtype
-                        )
-                elif len(attention_mask.shape) == 2:
-                    # Attention mask has shape (batch_size, sequence_length)
-                    audio_attention_mask = attention_mask * audio_out_mask
-                elif len(attention_mask.shape) == 4:
-                    # Attention mask has shape (batch_size, 1, query_length, key_length)
-                    # In addition, the attention mask should be inverted. This means "1" (attend_to) --> "0", and "0" --> minimal dtype value.
-                    audio_attention_mask = attention_mask.masked_fill(no_audio_out_mask, min_dtype)
-                else:
-                    raise NotImplementedError(
-                        f"Unsupported attention_mask format, attention_mask={attention_mask}"
-                    )
-
-                if (
-                    self.audio_attn.config._attn_implementation == "sdpa"
-                    and audio_attention_mask is not None
-                    and audio_attention_mask.device.type == "cuda"
-                    and not output_attentions
-                ):
-                    # Attend to all tokens in fully masked rows in the causal_mask, for example the relevant first rows when
-                    # using left padding. This is required by F.scaled_dot_product_attention memory-efficient attention path.
-                    # Details: https://github.com/pytorch/pytorch/issues/110213
-                    audio_attention_mask = AttentionMaskConverter._unmask_unattended(
-                        audio_attention_mask, min_dtype
-                    )
-
-            audio_attention_mask = audio_attention_mask.contiguous()
-
-            audio_hidden_states, audio_self_attn_weights = self.audio_attn(
-                hidden_states=hidden_states,
-                attention_mask=audio_attention_mask,
-                past_key_value=past_key_value,
-                cache_position=cache_position,
-                **kwargs,
-            )
-            audio_hidden_states = residual + audio_hidden_states
-            if use_cache:
-                residual = torch.where(
-                    audio_out_mask_sq[:, -target_length:].unsqueeze(-1),
-                    audio_hidden_states,
-                    residual,
-                )
-            else:
-                residual = torch.where(
-                    audio_out_mask_sq.unsqueeze(-1), audio_hidden_states, residual
-                )
-            audio_hidden_states = self.audio_post_audio_attn_layer_norm(audio_hidden_states)
-            if use_cache:
-                hidden_states = torch.where(
-                    audio_out_mask_sq[:, -target_length:].unsqueeze(-1),
-                    audio_hidden_states,
-                    hidden_states,
-                )
-            else:
-                hidden_states = torch.where(
-                    audio_out_mask_sq.unsqueeze(-1), audio_hidden_states, hidden_states
-                )
 
         # Text Attention
         hidden_states, self_attn_weights = self.self_attn(

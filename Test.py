@@ -1,26 +1,23 @@
 import jiwer
+import torch
 from transformers import AutoProcessor, pipeline
 
 from run_chat_completion import AutoModelForSpeechSeq2Seq
-from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
-from tensorrt_llm.models.higgs_audio.model import (
-    HiggsAudioForCausalLM,
-    HiggsAudioTRTRunner,  # noqa: F401
-)
+from tensorrt_llm.models.higgs_audio.model import HiggsAudioTRTRunner  # noqa: F401
 
 # Create configuration
-config = HiggsAudioConfig.from_hugging_face()
+
 
 # Instantiate model
-model = HiggsAudioForCausalLM(config)
+gpu_device = torch.device("cuda", 0)
+torch.cuda.set_device(gpu_device)
 audio_path = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
 
 runner = HiggsAudioTRTRunner(
-    config=config,
     engine_dir="/home/me/TTS/TensorRT-LLM/higgs_audio_engine/",
     hf_model_dir="bosonai/higgs-audio-v2-generation-3B-base",
     audio_tokenizer_dir="bosonai/higgs-audio-v2-tokenizer",
-    reference_audio=audio_path,
+    reference_audio=None,
 )
 
 input_text = "Chat, stop backseating! I totally know what I'm doing... I think"

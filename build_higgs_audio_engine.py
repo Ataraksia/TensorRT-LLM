@@ -21,7 +21,7 @@ def main():
         max_batch_size=1,
         max_beam_width=1,
         max_num_tokens=max_seq_len,
-        max_prompt_embedding_table_size=1024,
+        max_prompt_embedding_table_size=0,
         kv_cache_type=KVCacheType.PAGED,
         gather_context_logits=False,
         gather_generation_logits=False,
