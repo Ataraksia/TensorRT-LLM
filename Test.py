@@ -13,22 +13,21 @@ config = HiggsAudioConfig.from_hugging_face()
 
 # Instantiate model
 model = HiggsAudioForCausalLM(config)
+audio_path = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
 
 runner = HiggsAudioTRTRunner(
     config=config,
     engine_dir="/home/me/TTS/TensorRT-LLM/higgs_audio_engine/",
-    tokenizer_dir="bosonai/higgs-audio-v2-generation-3B-base",
+    hf_model_dir="bosonai/higgs-audio-v2-generation-3B-base",
     audio_tokenizer_dir="bosonai/higgs-audio-v2-tokenizer",
+    reference_audio=audio_path,
 )
 
 input_text = "Chat, stop backseating! I totally know what I'm doing... I think"
 
-audio_path = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
-
 # Generate text/audio
 audio_output = runner.generate(
     input_text,
-    audio_path,
 )
 
 model_id = "openai/whisper-large-v3-turbo"
