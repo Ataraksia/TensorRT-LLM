@@ -2,6 +2,7 @@
 # ruff: noqa
 """TensorRT-LLM implementation of Higgs Audio multimodal model."""
 
+from contextlib import contextmanager
 import gc
 import os
 from typing import Optional, List
@@ -304,7 +305,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         # Text MLP
         self.mlp = MLP(
             hidden_size=self.config.hidden_size,
-            ffn_hidden_size=self.config.audio_ffn_intermediate_size,
+            ffn_hidden_size=self.config.intermediate_size,
             hidden_act=self.config.hidden_act,
             dtype=self.config.dtype,
             bias=False,
@@ -316,7 +317,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         # Audio MLP (potentially smaller)
         self.audio_mlp = MLP(
             hidden_size=self.config.hidden_size,
-            ffn_hidden_size=self.config.audio_ffn_intermediate_size,
+            ffn_hidden_size=self.config.intermediate_size,
             hidden_act=self.config.hidden_act,
             dtype=self.config.dtype,
             bias=False,
@@ -329,7 +330,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         self.input_layernorm = RmsNorm(
             normalized_shape=self.config.hidden_size,
             eps=self.config.norm_epsilon,
-            dtype=self.config.audio_bos_tokendtype,
+            dtype=self.config.dtype,
         )
 
         self.audio_input_layernorm = RmsNorm(
@@ -436,8 +437,13 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
+        ptuning_args = (
+            [prompt_embedding_table, prompt_tasks, prompt_vocab_size]
+            if prompt_embedding_table is not None
+            else []
+        )
+        text_embeddings = self.vocab_embedding(input_ids, *ptuning_args)
 
-        text_embeddings = self.vocab_embeddings(input_ids)
         input_embeddings = torch.cat([prompt_embedding_table, text_embeddings], dim=0)
 
         hidden_states = self.layers(
@@ -497,27 +503,17 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         # Initialize the transformer component
         transformer = HiggsAudioTransformer(config)
 
-        # text_lm_head = ColumnLinear(
-        #     in_features=self.config.hidden_size,
-        #     out_features=self.config.text_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
-        #     bias=False,
-        #     dtype=self.config.dtype,
-        #     tp_group=None,
-        #     tp_size=1,
-        #     gather_output=True,
-        # )
-
-        audio_lm_head = ColumnLinear(
-            in_features=self.config.hidden_size,
-            out_features=self.config.audio_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
+        lm_head = ColumnLinear(
+            in_features=config.hidden_size,
+            out_features=config.audio_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
             bias=False,
-            dtype=self.config.dtype,
+            dtype=config.dtype,
             tp_group=None,
             tp_size=1,
             gather_output=True,
         )
 
-        super().__init__(config, transformer, audio_lm_head)
+        super().__init__(config, transformer, lm_head)
 
     @classmethod
     def from_hugging_face(
@@ -545,44 +541,16 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
 
         config = HiggsAudioConfig.from_hugging_face(hf_config_or_dir, **kwargs)
         custom_dict = {
-            "lm_head": "audio_decoder_proj.audio_lm_head.weight",
+            "transformer": "",
+            "lm_head": "audio_decoder_proj.audio_lm_head",
+            "audio_post_layernorm": "audio_post_attention_layernorm",
         }
         loader = ModelWeightsLoader(hf_config_or_dir, custom_dict)
+        trtllm_model = cls(config)
+        loader.update_key_mapping(trtllm_model)
+        loader.generate_tllm_weights(trtllm_model)
 
-        model = cls(config)
-
-        # tllm_weights = {}
-        # for tllm_key, _ in model.named_parameters():
-        #     sub_module = model
-        #     for attr in tllm_key.split(".")[:-1]:
-        #         print(attr)
-        #         sub_module = getattr(sub_module, attr)
-        #     if "audio" in tllm_key:
-        #         sub_module_dic = sub_module.tllm_to_externel_key_dict
-        #         sub_module_dic["audio_mlp"] = "audio_mlp"
-        #         if "fc" in sub_module_dic.keys():
-        #             sub_module_dic["fc"] = [
-        #                 hf_keyword.replace("w1", "gate_proj") for hf_keyword in sub_module_dic["fc"]
-        #             ]
-        #             sub_module_dic["fc"] = [
-        #                 hf_keyword.replace("w3", "up_proj") for hf_keyword in sub_module_dic["fc"]
-        #             ]
-        #         if "proj" in sub_module_dic.keys():
-        #             sub_module_dic["proj"] = [
-        #                 hf_keyword.replace("w2", "down_proj")
-        #                 for hf_keyword in sub_module_dic["proj"]
-        #             ]
-        #         sub_module.tllm_to_externel_key_dict = sub_module_dic
-        for tllm_key, _ in tqdm(model.named_parameters()):
-            if "audio" in tllm_key:
-                print(tllm_key)
-                # tllm_weights.update(loader.load(tllm_key))
-            else:
-                print(tllm_key)
-                # tllm_weights.update(loader.load(tllm_key))
-        # loader.fill(tllm_weights)
-
-        return model
+        return trtllm_model
 
 
 class HiggsAudioTRTRunner:
@@ -668,8 +636,8 @@ class HiggsAudioTRTRunner:
                 ).squeeze(0)
             with self._load_hf_model(hf_model_dir) as hf_model:
                 hf_model = AutoModel.from_pretrained(hf_model_dir)
-                text_codebook_embeddings = hf_model.embeddings.embed_tokens
-                audio_codebook_embeddings = hf_model.embeddings.audio_codebook_embeddings
+                text_embeddings = hf_model.embeddings.embed_tokens
+                audio_embeddings = hf_model.embeddings.audio_codebook_embeddings
 
                 # Format with reference audio (voice cloning) following Higgs Audio expected format
                 # The format should include the reference audio transcription and then the target text
@@ -685,7 +653,7 @@ class HiggsAudioTRTRunner:
                 pre_audio_input_ids = self.tokenizer.encode(
                     pre_audio_input, return_tensors="pt"
                 ).squeeze(0)
-                pre_audio_embeddings = text_codebook_embeddings(pre_audio_input_ids)
+                pre_audio_embeddings = text_embeddings(pre_audio_input_ids)
 
                 codebook_shift = (
                     torch.arange(self.config.audio_num_codebooks) * self.audio_codebook_size
@@ -697,9 +665,7 @@ class HiggsAudioTRTRunner:
                 audio_codes_flat = audio_codes.transpose(1, 2).reshape(-1)
                 print(audio_codes_flat.shape)
 
-                audio_embeddings = audio_codebook_embeddings(
-                    audio_codes_flat + codebook_shift.unsqueeze(-1)
-                )
+                audio_embeddings = audio_embeddings(audio_codes_flat + codebook_shift.unsqueeze(-1))
                 audio_embeddings = torch.sum(audio_embeddings, dim=0)
 
                 post_audio_input += (
@@ -708,7 +674,7 @@ class HiggsAudioTRTRunner:
                 post_audio_input_ids = self.tokenizer.encode(
                     post_audio_input, return_tensors="pt"
                 ).squeeze(0)
-                post_audio_embeddings = text_codebook_embeddings(post_audio_input_ids)
+                post_audio_embeddings = text_embeddings(post_audio_input_ids)
 
                 self.input_embeddings = torch.cat(
                     [pre_audio_embeddings, audio_embeddings, post_audio_embeddings], dim=0
@@ -735,7 +701,7 @@ class HiggsAudioTRTRunner:
                 f"<|start_header_id|>user<|end_header_id|>"
             )
             text_input_ids = self.tokenizer.encode(text_input, return_tensors="pt").squeeze(0)
-            self.input_embeddings = text_codebook_embeddings(text_input_ids)
+            self.input_embeddings = text_embeddings(text_input_ids)
 
             # Create mask tensor: all zeros since there are no audio embeddings in this case
             self.audio_mask = torch.zeros(self.input_embeddings.shape[0], dtype=torch.bool)

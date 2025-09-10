@@ -137,29 +137,23 @@ def extract_hf_weight_by_tllm_name(hf_model, tllm_name: str, mapping: Mapping) -
                 return model_params.get(f"{hf_prefix}self_attn.o_proj.weight")
 
             elif "audio_mlp.fc.weight" in tllm_name:
-                # For audio MLP FC, concatenate gate and up weights
-                gate_weight = model_params.get(f"{hf_prefix}audio_mlp.gate_proj.weight")
-                up_weight = model_params.get(f"{hf_prefix}audio_mlp.up_proj.weight")
-                if gate_weight is not None and up_weight is not None:
-                    return torch.cat([gate_weight, up_weight], dim=0)
-
+                return model_params.get(f"{hf_prefix}audio_mlp.gate_proj.weight")
             elif "audio_mlp.proj.weight" in tllm_name:
                 return model_params.get(f"{hf_prefix}audio_mlp.down_proj.weight")
+            elif "audio_mlp.gate.weight" in tllm_name:
+                return model_params.get(f"{hf_prefix}audio_mlp.up_proj.weight")
 
             elif "mlp.fc.weight" in tllm_name:
-                # For FC, we need to concatenate gate and up weights
-                gate_weight = model_params.get(f"{hf_prefix}mlp.gate_proj.weight")
-                up_weight = model_params.get(f"{hf_prefix}mlp.up_proj.weight")
-                if gate_weight is not None and up_weight is not None:
-                    return torch.cat([gate_weight, up_weight], dim=0)
-
+                return model_params.get(f"{hf_prefix}mlp.gate_proj.weight")
             elif "mlp.proj.weight" in tllm_name:
                 return model_params.get(f"{hf_prefix}mlp.down_proj.weight")
+            elif "mlp.gate.weight" in tllm_name:
+                return model_params.get(f"{hf_prefix}mlp.up_proj.weight")
 
             elif "audio_input_layernorm.weight" in tllm_name:
                 return model_params.get(f"{hf_prefix}audio_input_layernorm.weight")
 
-            elif "audio_post_attention_layernorm.weight" in tllm_name:
+            elif "audio_post_layernorm.weight" in tllm_name:
                 return model_params.get(f"{hf_prefix}audio_post_attention_layernorm.weight")
 
             elif "input_layernorm.weight" in tllm_name:
