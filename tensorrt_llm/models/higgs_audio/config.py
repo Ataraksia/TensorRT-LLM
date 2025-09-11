@@ -142,6 +142,8 @@ class HiggsAudioConfig(PretrainedConfig):
             )
 
         hf_config = hf_config.text_config
+        # Keep the custom architecture name for our model; we'll extend the TRT-LLM
+        # builder to recognize it as a decoder-only model when preparing inputs.
         hf_config.architectures = ["HiggsAudioForCausalLM"]
         attn_bias = False  # All existing Qwen models have attn bias
         rotary_scaling = getattr(hf_config, "rope_scaling", None)

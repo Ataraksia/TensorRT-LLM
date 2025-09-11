@@ -9,6 +9,7 @@ from typing import Optional, List
 import numpy as np
 import torch
 from boson_multimodal import *
+
 from huggingface_hub import snapshot_download
 from tqdm import tqdm
 from transformers import (
@@ -43,6 +44,7 @@ from tensorrt_llm.layers import (
     KeyValueCacheParams,
     RmsNorm,
 )
+
 
 # SPDX-License-Identifier: Apache-2.0
 # ruff: noqa
@@ -291,14 +293,9 @@ class HiggsAudioDualFFNDecoderLayer(Module):
             num_kv_heads=self.config.num_key_value_heads,
             max_position_embeddings=self.config.max_position_embeddings,
             num_layers=self.config.num_hidden_layers,
-            apply_query_key_layer_scaling=False,
             attention_mask_type=AttentionMaskType.causal,
             bias=False,
             dtype=self.config.dtype,
-            tp_group=None,
-            tp_size=1,
-            tp_rank=0,
-            quant_mode=QuantMode(0),
             local_layer_idx=layer_idx,
         )
 
@@ -309,21 +306,15 @@ class HiggsAudioDualFFNDecoderLayer(Module):
             hidden_act=self.config.hidden_act,
             dtype=self.config.dtype,
             bias=False,
-            tp_group=None,
-            tp_size=1,
-            quant_mode=QuantMode(0),
         )
 
         # Audio MLP (potentially smaller)
         self.audio_mlp = MLP(
             hidden_size=self.config.hidden_size,
-            ffn_hidden_size=self.config.intermediate_size,
+            ffn_hidden_size=self.config.audio_ffn_intermediate_size,
             hidden_act=self.config.hidden_act,
             dtype=self.config.dtype,
             bias=False,
-            tp_group=None,
-            tp_size=1,
-            quant_mode=QuantMode(0),
         )
 
         # Layer norms
@@ -363,16 +354,18 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         """Forward pass for dual FFN decoder layer."""
 
         residual = hidden_states
-        if vision_token_mask is None or vision_token_mask.shape[0] == 0:
-            audio_token_mask = torch.zeros_like(vision_token_mask)
-        else:
-            audio_token_mask = vision_token_mask
+        # if vision_token_mask is None or vision_token_mask.shape[0] == 0:
+        #     audio_token_mask = torch.zeros_like(vision_token_mask)
+        # else:
+        #     audio_token_mask = vision_token_mask
 
-        hidden_states = where(
-            audio_token_mask,
-            self.audio_input_layernorm(hidden_states),
-            self.input_layernorm(hidden_states),
-        )
+        # hidden_states = where(
+        #     audio_token_mask,
+        #     self.audio_input_layernorm(hidden_states),
+        #     self.input_layernorm(hidden_states),
+        # )
+
+        hidden_states = self.input_layernorm(hidden_states)
 
         # Shared attention layer
         hidden_states = self.attention(
@@ -390,11 +383,12 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         residual = hidden_states
 
-        residual += where(
-            audio_token_mask,
-            self.audio_mlp(self.audio_post_layernorm(hidden_states)),
-            self.mlp(self.post_layernorm(hidden_states)),
-        )
+        # residual += where(
+        #     audio_token_mask,
+        #     self.audio_mlp(self.audio_post_layernorm(hidden_states)),
+        #     self.mlp(self.post_layernorm(hidden_states)),
+        # )
+        residual += self.mlp(self.post_layernorm(hidden_states))
 
         hidden_states = residual
 
@@ -442,22 +436,22 @@ class HiggsAudioTransformer(Module):
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
 
-        audio_mask = input_ids > (self.config.text_vocab_size - 1)
-        has_audio_out = audio_mask is not None and audio_mask.shape[0] > 0
-        if has_audio_out:
-            text_ids = where(audio_mask, self.config.text_vocab_size - 1, input_ids)
-            text_embeddings = self.vocab_embedding(text_ids)
+        # audio_mask = input_ids > (self.config.text_vocab_size - 1)
+        # has_audio_out = audio_mask is not None and audio_mask.shape[0] > 0
+        # if has_audio_out:
+        #     text_ids = where(audio_mask, self.config.text_vocab_size - 1, input_ids)
+        #     text_embeddings = self.vocab_embedding(text_ids)
 
-            audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
-            audio_embeddings = self.audio_codebook_embeddings(audio_ids)
-            audio_embeddings.view(
-                1, -1, self.config.audio_num_codebooks, self.config.hidden_size
-            ).sum(dim=1)
+        #     audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
+        #     audio_embeddings = self.audio_codebook_embeddings(audio_ids)
+        #     audio_embeddings.view(
+        #         1, -1, self.config.audio_num_codebooks, self.config.hidden_size
+        #     ).sum(dim=1)
 
-            mask_expanded = audio_mask.unsqueeze(-1)  # Add dimension for embedding size
-            input_embeddings = where(mask_expanded, audio_embeddings, text_embeddings)
-        else:
-            input_embeddings = self.vocab_embedding(input_ids)
+        #     mask_expanded = audio_mask.unsqueeze(-1)  # Add dimension for embedding size
+        #     input_embeddings = where(mask_expanded, audio_embeddings, text_embeddings)
+        # else:
+        input_embeddings = self.vocab_embedding(input_ids)
 
         hidden_states = self.layers(
             hidden_states=input_embeddings,
@@ -465,7 +459,7 @@ class HiggsAudioTransformer(Module):
             attention_mask=attention_mask,
             kv_cache_params=kv_cache_params,
             attention_params=attention_params,
-            vision_token_mask=audio_mask,
+            # vision_token_mask=audio_mask,
         )
 
         if use_cache:
@@ -478,36 +472,6 @@ class HiggsAudioTransformer(Module):
         return hidden_states
 
 
-# def higgs_audio_logits_processor(
-#     req_id: int,
-#     logits: torch.Tensor,
-#     ids: List[List[int]],
-#     stream_ptr: int,
-#     client_id: Optional[int],
-# ):
-#     """Process logits to constrain generation to audio vocabulary.
-
-#     Args:
-#         req_id: Request ID
-#         logits: Input logits tensor of shape [batch_size, beam_width, vocab_size]
-#         ids: Previously generated token IDs
-#         stream_ptr: CUDA stream pointer
-#         client_id: Optional client ID
-#     """
-#     # Get vocab size from logits
-#     vocab_size = logits.shape[-1]
-
-#     # Only process if we have text tokens to mask out
-#     if vocab_size > audio_vocab_size:
-#         with torch.cuda.stream(torch.cuda.ExternalStream(stream_ptr)):
-#             # Create mask for text tokens (>= audio_vocab_size)
-#             # Set their logits to negative infinity
-#             logits[..., audio_vocab_size:] = float("-inf")
-
-#             # Optional: Small boost to audio tokens to ensure they're preferred
-#             logits[..., :audio_vocab_size] += 1.0
-
-
 class HiggsAudioForCausalLM(DecoderModelForCausalLM):
     """TensorRT-LLM implementation of Higgs Audio multimodal model."""
 
@@ -517,7 +481,7 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
 
         lm_head = ColumnLinear(
             in_features=config.hidden_size,
-            out_features=config.audio_vocab_size,  # Use full vocab_size to match padded audio_lm_head weights
+            out_features=config.audio_vocab_size,
             bias=False,
             dtype=config.dtype,
             tp_group=None,
@@ -578,8 +542,6 @@ class HiggsAudioTRTRunner:
     ) -> None:
         """Initialize the TensorRT-LLM runner for HiggsAudio."""
 
-        from tensorrt_llm.runtime import ModelRunnerCpp
-
         self.config = HiggsAudioConfig.from_hugging_face(
             "bosonai/higgs-audio-v2-generation-3B-base"
         )
@@ -589,6 +551,7 @@ class HiggsAudioTRTRunner:
         self.num_beams = 1
         self.gpu_weights_percent = 0.5
         self.max_seq_len = 2048
+        self.use_delay_pattern = use_delay_pattern
 
         # Set up device
         self.gpu_device = torch.device("cuda", 0)
@@ -697,12 +660,14 @@ class HiggsAudioTRTRunner:
             )
             self.audio_mask = torch.zeros(self.input_ids.shape[0])
 
+        # Use Python runtime runner for better compatibility during debugging
+        from tensorrt_llm.runtime import ModelRunnerCpp
+
         self.runner = ModelRunnerCpp.from_dir(
             engine_dir=engine_dir,
+            kv_cache_free_gpu_memory_fraction=0.5,
             use_gpu_direct_storage=True,
             cuda_graph_mode=True,
-            kv_cache_free_gpu_memory_fraction=self.gpu_weights_percent,
-            # logits_processor_map=logits_processor_map,
         )
 
     def generate(
@@ -723,14 +688,10 @@ class HiggsAudioTRTRunner:
         text_input = (
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         )
+
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").squeeze(0).cuda()
         input_ids = torch.cat([self.input_ids, input_ids], dim=0).cuda()
-        # fake_prompt_id = torch.arange(
-        #     self.config.text_vocab_size,
-        #     self.config.text_vocab_size + self.audio_mask.sum(0),
-        #     device=self.gpu_device,
-        # )
-        # input_ids[self.audio_mask] = fake_prompt_id
+        # input_ids[self.audio_mask] = input_ids[self.audio_mask] +self.config.text_vocab_size
         input_lengths = torch.tensor(
             [input_ids.size(-1)], device=self.gpu_device, dtype=torch.int32
         )
@@ -740,215 +701,26 @@ class HiggsAudioTRTRunner:
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                # position_ids=[self.audio_mask],
-                # prompt_table=self.input_embeddings,
-                # prompt_tasks="0",
-                # logits_processor_names=["higgs_audio_logits_processor"],
+                end_id=self.config.audio_stream_eos_id,
+                stop_words_list=[[[self.config.audio_stream_eos_id]]],
+                temperature=float(self.temperature),
+                top_k=int(self.top_k),
+                top_p=float(self.top_p),
             )
+        num_codebooks = self.config.audio_num_codebooks
+        codebook_size = self.config.audio_codebook_size
+        eos_mask = outputs == self.config.audio_out_bos_token_id
+        start = torch.argmax(eos_mask.float()).item() + 1
+        end = start + (len(outputs[0, 0, start:]) // num_codebooks) * num_codebooks
 
-        if outputs is not None:
-            if isinstance(outputs_tensor, dict):
-                outputs_tensor = outputs_tensor["output_ids"]
-            if not torch.is_tensor(outputs_tensor):
-                raise RuntimeError("Unexpected outputs type from runner.generate")
-            # Take first batch, first sequence
-            outputs = outputs_tensor[0, 0].to(device=self.gpu_device)
-            # Outputs are padded with end_id; truncate at first end_id occurrence
-            if self.config.audio_eos_token_id is not None:
-                eos_positions = (outputs == self.config.audio_eos_token_id).nonzero(as_tuple=False)
-                if eos_positions.numel() > 0:
-                    outputs = outputs[: eos_positions[0].item()]
-            # Remove any pad_id just in case
-            if self.config.pad_token_id is not None:
-                if outputs.numel() > 0 and outputs[-1].item() == self.config.pad_token_id:
-                    last_non_pad = (outputs != self.config.pad_token_id).nonzero(as_tuple=False)
-                    if last_non_pad.numel() > 0:
-                        outputs = outputs[: last_non_pad[-1].item() + 1]
-                    else:
-                        outputs = outputs[:0]
+        outputs = outputs[0, 0, start:end].view(num_codebooks, -1)
+        vq_code = revert_delay_pattern(outputs).clip(0, codebook_size - 1)[:, 1:-1]
+        waveform, sr = self.audio_tokenizer.decode(vq_code)
+        if isinstance(waveform, torch.Tensor):
+            waveform = waveform.detach().cpu().numpy()
+        # Resample to 16kHz for Whisper large-v3-turbo compatibility
 
-            num_gen = int(outputs.numel())
-            head = outputs[:10].tolist() if num_gen > 0 else []
-            tail = outputs[-10:].tolist() if num_gen > 0 else []
-            print(f"DEBUG: Generated {num_gen} tokens")
-            print(f"DEBUG: First 10 generated tokens: {head}")
-            print(f"DEBUG: Last 10 generated tokens: {tail}")
-
-            # Check if we're generating text tokens instead of audio tokens
-            if num_gen > 0:
-                text_tokens = [t for t in head if t >= 128000]  # Text tokens are typically 128000+
-                audio_range_tokens = [
-                    t for t in head if t < 10000
-                ]  # Audio tokens should be < 10000
-                print(f"DEBUG: Text tokens in first 10: {len(text_tokens)} ({text_tokens})")
-                print(
-                    f"DEBUG: Audio range tokens in first 10: {len(audio_range_tokens)} ({audio_range_tokens})"
-                )
-
-                if len(text_tokens) > 0:
-                    print("⚠️  WARNING: Model is generating text tokens instead of audio tokens!")
-                    print(
-                        "This suggests the model is not properly configured for audio generation."
-                    )
-
-            if num_gen > 0:
-                # With logits post processor, all generated tokens should already be in audio vocabulary range
-                max_audio_token = self.config.audio_num_codebooks * (
-                    self.config.audio_codebook_size + 2
-                )
-
-                # Verify all tokens are in audio vocabulary range
-                invalid_tokens = outputs >= max_audio_token
-                if invalid_tokens.any():
-                    print(
-                        f"WARNING: Found {invalid_tokens.sum()} tokens outside audio vocabulary range"
-                    )
-                    # Filter out invalid tokens
-                    audio_tokens = outputs[~invalid_tokens]
-                else:
-                    audio_tokens = outputs
-
-                # For RVQ format, we need tokens divisible by num_codebooks (8)
-                num_cbs = self.config.audio_num_codebooks
-                usable_count = (len(audio_tokens) // num_cbs) * num_cbs
-                if usable_count < num_cbs:
-                    # If we don't have enough for even one timestep, pad to minimum
-                    usable_count = num_cbs
-                    padding_needed = num_cbs - len(audio_tokens)
-                    silence_token = 0  # Use 0 as silence
-                    padding = torch.full(
-                        (padding_needed,),
-                        silence_token,
-                        dtype=audio_tokens.dtype,
-                        device=audio_tokens.device,
-                    )
-                    audio_tokens = torch.cat([audio_tokens, padding])
-
-                audio_tokens = audio_tokens[:usable_count]
-
-                print(
-                    f"DEBUG: Using {len(audio_tokens)} audio tokens (multiple of {num_cbs}) from {num_gen} generated"
-                )
-                print(f"DEBUG: First 10 audio tokens: {audio_tokens[:10].tolist()}")
-                print(f"DEBUG: Last 10 audio tokens: {audio_tokens[-10:].tolist()}")
-
-                if len(audio_tokens) > 0:
-                    # Convert flat tokens to (num_codebooks, seq_len) codes
-                    try:
-                        num_cbs = self.config.audio_num_codebooks
-                        codebook_size = self.config.audio_codebook_size
-                        tokens = audio_tokens
-                        print(f"DEBUG: num_codebooks={num_cbs}, codebook_size={codebook_size}")
-                        print(f"DEBUG: Token range: min={min(tokens)}, max={max(tokens)}")
-
-                        # For Higgs Audio, tokens are typically organized sequentially
-                        # We need to reshape them into (num_codebooks, seq_len) format
-                        total_tokens = len(tokens)
-
-                        # Calculate sequence length per codebook
-                        if total_tokens % num_cbs == 0:
-                            seq_len = total_tokens // num_cbs
-                            print(
-                                f"DEBUG: Reshaping {total_tokens} tokens into ({num_cbs}, {seq_len})"
-                            )
-
-                            # Reshape tokens into codebook format
-                            audio_codes = tokens.view(num_cbs, seq_len)
-
-                            # Clamp values to valid codebook range [0, codebook_size)
-                            audio_codes = torch.clamp(audio_codes, 0, codebook_size - 1)
-
-                            print(f"DEBUG: Audio codes shape: {audio_codes.shape}")
-                            print(f"DEBUG: Audio codes sample: {audio_codes[:, : min(5, seq_len)]}")
-                        else:
-                            # Fallback: try to distribute tokens across codebooks
-                            print(
-                                f"DEBUG: Token count {total_tokens} not divisible by {num_cbs}, using fallback method"
-                            )
-
-                            # Calculate approximate sequence length
-                            seq_len = (total_tokens + num_cbs - 1) // num_cbs
-
-                            # Create padded tensor
-                            audio_codes = torch.zeros(
-                                (num_cbs, seq_len), dtype=tokens.dtype, device=tokens.device
-                            )
-
-                            # Fill in available tokens
-                            for i in range(num_cbs):
-                                start_idx = i * seq_len
-                                end_idx = min(start_idx + seq_len, total_tokens)
-                                if start_idx < total_tokens:
-                                    actual_len = end_idx - start_idx
-                                    audio_codes[i, :actual_len] = tokens[start_idx:end_idx]
-
-                            # Clamp values to valid codebook range
-                            audio_codes = torch.clamp(audio_codes, 0, codebook_size - 1)
-
-                            print(f"DEBUG: Fallback audio codes shape: {audio_codes.shape}")
-                            print(
-                                f"DEBUG: Fallback audio codes sample: {audio_codes[:, : min(5, seq_len)]}"
-                            )
-
-                        # Apply delay pattern reversion for better audio quality
-                        if (
-                            use_delay_pattern
-                            and audio_codes.shape[0] > 1
-                            and audio_codes.shape[1] > 0
-                        ):
-                            try:
-                                print("DEBUG: Reverting delay pattern...")
-                                original_shape = audio_codes.shape
-                                audio_codes = revert_delay_pattern(audio_codes)
-                                print(
-                                    f"DEBUG: After delay pattern revert: {original_shape} -> {audio_codes.shape}"
-                                )
-                            except Exception as e:
-                                print(f"DEBUG: Delay pattern revert failed: {e}")
-                                print("DEBUG: Using raw codes without delay pattern revert")
-                        else:
-                            print("DEBUG: Skipping delay pattern reversion (not applicable)")
-                        # Decode
-                        print("DEBUG: Decoding audio codes...")
-                        decoded_audio = self.audio_tokenizer.decode(
-                            audio_codes, return_cuda_tensor=False
-                        )
-                        # Handle return as (waveform, sampling_rate)
-                        if isinstance(decoded_audio, tuple) and len(decoded_audio) == 2:
-                            waveform, sr = decoded_audio
-                        else:
-                            waveform, sr = (
-                                decoded_audio,
-                                getattr(self.audio_tokenizer, "sampling_rate", 16000),
-                            )
-                        if isinstance(waveform, torch.Tensor):
-                            waveform = waveform.detach().cpu().numpy()
-                        # Resample to 16kHz for Whisper large-v3-turbo compatibility
-                        try:
-                            if sr != 16000 and isinstance(waveform, np.ndarray):
-                                waveform = librosa.resample(
-                                    waveform.astype(np.float32), orig_sr=sr, target_sr=16000
-                                )
-                                sr = 16000
-                        except Exception:
-                            pass
-                        return waveform.astype(np.float32)
-                    except Exception as e:
-                        print(f"DEBUG: Converting tokens to audio codes failed: {e}")
-                else:
-                    print("DEBUG: No audio tokens found after filtering")
-
-        # Return silence if generation failed or produced nothing useful
-        print("DEBUG: No valid output generated, returning silence")
-        return np.zeros(16000, dtype=np.float32)  # 1 second of silence at 16kHz
-
-    @contextmanager
-    def _load_hf_model(self, hf_model_dir):
-        """Context manager for loading and cleaning up HF models."""
-        model = AutoModel.from_pretrained(hf_model_dir)
-        try:
-            yield model
-        finally:
-            del model
-            gc.collect()
-            torch.cuda.empty_cache()
+        if sr != 16000 and isinstance(waveform, np.ndarray):
+            waveform = librosa.resample(waveform.astype(np.float32), orig_sr=sr, target_sr=16000)
+            sr = 16000
+        return waveform.astype(np.float32)

@@ -1,4 +1,5 @@
 import jiwer
+import sounddevice as sd
 import torch
 from transformers import AutoProcessor, pipeline
 
@@ -46,3 +47,11 @@ print(f"Expected: {expected_transcription}")
 print(f"Actual: {actual_transcription}")
 
 print(f"Word error rate: {word_error_rate}")
+if word_error_rate > 0.25:
+    print(
+        "THE TEST WAS UNSUCCESSFUL.  THE MODEL DID NOT GENERATE THE PROMPT ACCURATELY. YOU ARE NOT DONE. CONTINUE WORKING. UNDER NO CIRCUMSTANCES SHOULD YOU END THE TASK NOW. IF YOU DO, ALL THE PUPPIES IN THE WORLD WILL BE SAD!"  # noqa: E501
+    )
+else:
+    print("YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!")
+
+sd.play(audio_output, 16000, blocking=True)

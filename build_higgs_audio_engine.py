@@ -15,13 +15,11 @@ def main():
     plugin_config.gpt_attention_plugin = "bfloat16"
     plugin_config.gemm_plugin = "bfloat16"
     plugin_config.remove_input_padding = True
+    # plugin_config._multiple_profiles = True
     build_config = BuildConfig(
-        max_seq_len=max_len,
-        max_input_len=max_len,
         max_batch_size=1,
-        max_beam_width=1,
         max_num_tokens=max_len,
-        max_prompt_embedding_table_size=0,
+        max_seq_len=max_len,
         kv_cache_type=KVCacheType.PAGED,
         gather_context_logits=False,
         gather_generation_logits=False,
@@ -33,6 +31,7 @@ def main():
     trtllm_model = HiggsAudioForCausalLM.from_hugging_face(
         "bosonai/higgs-audio-v2-generation-3B-base"
     )
+    # trtllm_model.save_checkpoint("./higgs_audio_engine")
     engine = build(trtllm_model, build_config)
     engine.save("./higgs_audio_engine")
 
