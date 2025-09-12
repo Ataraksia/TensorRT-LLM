@@ -29,7 +29,16 @@ from tensorrt_llm.models.modeling_utils import (
 from tensorrt_llm.module import Module, ModuleList
 from tensorrt_llm.quantization import QuantMode
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
-from tensorrt_llm.functional import Tensor, arange, where, sum
+from tensorrt_llm.functional import (
+    Tensor,
+    arange,
+    cumsum,
+    expand_dims_like,
+    unsqueeze,
+    where,
+    sum,
+    mean,
+)
 from tensorrt_llm.layers import (
     MLP,
     Attention,
@@ -318,20 +327,14 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         vision_token_mask: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for dual FFN decoder layer."""
-
         residual = hidden_states
-        if vision_token_mask is None or vision_token_mask.shape[0] == 0:
-            audio_token_mask = torch.zeros_like(vision_token_mask)
-        else:
-            audio_token_mask = vision_token_mask
 
         hidden_states = where(
-            audio_token_mask,
+            vision_token_mask,
             self.audio_input_layernorm(hidden_states),
             self.input_layernorm(hidden_states),
         )
 
-        # Shared attention layer
         hidden_states = self.attention(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -348,7 +351,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         residual = hidden_states
 
         residual += where(
-            audio_token_mask,
+            vision_token_mask,
             self.audio_mlp(self.audio_post_layernorm(hidden_states)),
             self.mlp(self.post_layernorm(hidden_states)),
         )
@@ -357,7 +360,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
 
         if use_cache:
             return (hidden_states, presents)
-        return hidden_states
+        return hidden_states, presents
 
 
 class HiggsAudioTransformer(Module):
@@ -389,11 +392,13 @@ class HiggsAudioTransformer(Module):
 
     def _embed_audio_ids(self, audio_ids: Tensor):
         """Embed the audio ids"""
-
-        codebook_shift = (
-            arange(0, self.config.audio_num_codebooks, "int32") * self.config.audio_codebook_size
-        ).unsqueeze(-1)
-        audio_embed = sum(self.audio_codebook_embeddings(audio_ids + codebook_shift), dim=0)
+        num_codebooks = self.config.audio_num_codebooks
+        codebook_size = self.config.audio_codebook_size
+        codebook_shift = (arange(0, num_codebooks, "int32") * codebook_size).unsqueeze(-1)
+        audio_embed = sum(
+            self.audio_codebook_embeddings(audio_ids + codebook_shift),
+            dim=0,
+        )
         return audio_embed
 
     def forward(
@@ -408,30 +413,27 @@ class HiggsAudioTransformer(Module):
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
         audio_mask = input_ids > (self.config.text_vocab_size - 1)
-        text_ids = where(audio_mask, 0, input_ids)
+        text_ids = where(audio_mask, self.config.text_vocab_size - 1, input_ids)
         text_embed = self.vocab_embedding(text_ids)
         audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
-        audio_embed = self._embed_audio_ids(
-            audio_ids.view((self.config.audio_num_codebooks, -1))
-        ).unsqueeze(0)
+        audio_embed = self._embed_audio_ids(audio_ids)
+        input_embed = where(unsqueeze(audio_mask, -1), audio_embed, text_embed)
+        # input_embed = self.vocab_embedding(input_ids)
+        # if audio_out_ids is not None and audio_out_ids.shape[-1] > 0:
+        #     audio_out_ids = audio_out_ids.cuda()
+        # else:
+        #     audio_out_ids = torch.zeros(
+        #         (input_ids.shape[0], self.audio_num_codebooks, 0),
+        #         device=input_ids.device,
+        #         dtype=torch.long,
+        #     )
 
-        input_embed = where(audio_mask.unsqueeze(-1), audio_embed, text_embed)
-
-        if audio_out_ids is not None and audio_out_ids.shape[-1] > 0:
-            audio_out_ids = audio_out_ids.cuda()
-        else:
-            audio_out_ids = torch.zeros(
-                (input_ids.shape[0], self.audio_num_codebooks, 0),
-                device=input_ids.device,
-                dtype=torch.long,
-            )
-
-        combined_embed = torch.cat(
-            [input_embed, self._embed_audio_ids(audio_out_ids).unsqueeze(0)], dim=1
-        )
+        # combined_embed = torch.cat(
+        #     [input_embed, self._embed_audio_ids(audio_out_ids).unsqueeze(0)], dim=1
+        # )
 
         hidden_states = self.layers(
-            hidden_states=combined_embed,
+            hidden_states=input_embed,
             use_cache=use_cache,
             attention_mask=attention_mask,
             kv_cache_params=kv_cache_params,

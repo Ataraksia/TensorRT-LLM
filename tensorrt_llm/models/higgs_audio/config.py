@@ -40,7 +40,7 @@ class HiggsAudioConfig(PretrainedConfig):
         self,
         *,
         audio_adapter_type: str = "dual_ffn_fast_forward",
-        audio_ffn_hidden_size: int = 4096,
+        audio_ffn_hidden_size: int = 3072,
         audio_ffn_intermediate_size: int = 8192,
         text_vocab_size: int = 128256,
         audio_vocab_size: int = 8208,
