@@ -40,6 +40,7 @@ class HiggsAudioConfig(PretrainedConfig):
         self,
         *,
         audio_adapter_type: str = "dual_ffn_fast_forward",
+        audio_dual_ffn_layers: list = None,
         audio_ffn_hidden_size: int = 3072,
         audio_ffn_intermediate_size: int = 8192,
         text_vocab_size: int = 128256,
@@ -70,6 +71,7 @@ class HiggsAudioConfig(PretrainedConfig):
         super().__init__(**kwargs)
         # Adapter configuration
         self.audio_adapter_type = audio_adapter_type
+        self.audio_dual_ffn_layers = audio_dual_ffn_layers or list(range(28))  # Default: all layers
         self.audio_ffn_hidden_size = audio_ffn_hidden_size
         self.audio_ffn_intermediate_size = audio_ffn_intermediate_size
 
@@ -99,6 +101,7 @@ class HiggsAudioConfig(PretrainedConfig):
             "text_vocab_size",
             "audio_vocab_size",
             "audio_adapter_type",
+            "audio_dual_ffn_layers",
             "audio_ffn_hidden_size",
             "audio_ffn_intermediate_size",
             "audio_num_codebooks",
