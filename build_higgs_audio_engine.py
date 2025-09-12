@@ -3,38 +3,48 @@
 
 import torch
 
-from tensorrt_llm.builder import BuildConfig, KVCacheType, PluginConfig
+from tensorrt_llm.builder import BuildConfig, build
+from tensorrt_llm.logger import logger
 from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM
 
 
 def main():
-    max_len = 2048
-    plugin_config = PluginConfig()
-    plugin_config.dtype = "bfloat16"
-    plugin_config.use_fp8_context_fmha = False
-    plugin_config.gpt_attention_plugin = "bfloat16"
-    plugin_config.gemm_plugin = "bfloat16"
-    plugin_config.remove_input_padding = True
-    plugin_config._multiple_profiles = True
-    build_config = BuildConfig(
-        max_batch_size=1,
-        max_num_tokens=max_len,
-        max_seq_len=max_len,
-        kv_cache_type=KVCacheType.PAGED,
-        gather_context_logits=False,
-        gather_generation_logits=False,
-        strongly_typed=False,
-        plugin_config=plugin_config,
-    )
+    logger.set_level("info")
+
+    build_config = BuildConfig()
+    build_config.max_batch_size = 1
+    build_config.plugin_config.dtype = "bfloat16"
+    build_config.plugin_config.gpt_attention_plugin = "bfloat16"
+    build_config.plugin_config.gemm_plugin = "bfloat16"
+    build_config.plugin_config.use_fp8_context_fmha = True
+    build_config.plugin_config._multiple_profiles = True
+    build_config.strongly_typed = False
+    # build_config.plugin_config._gemm_swiglu_plugin = "FP8"
+    build_config.plugin_config._fp8_rowwise_gemm_plugin = "bfloat16"
+    # build_config.plugin_config._low_latency_gemm_swiglu_plugin = "FP8"
+    # build_config.plugin_config.low_latency_gemm_plugin = FP8
+    # build_config.plugin_config.gemm_allreduce_plugin = "bfloat16"
+    build_config.plugin_config.context_fmha = True
+    build_config.plugin_config.norm_quant_fusion = True
+    build_config.plugin_config.user_buffer = True
+    build_config.plugin_config._use_paged_context_fmha = True
+    build_config.plugin_config._use_fp8_context_fmha = True
+    # build_config.plugin_config._fuse_fp4_quant = True
+    build_config.plugin_config.paged_state = True
+    build_config.plugin_config._streamingllm = True
+    build_config.plugin_config.use_fused_mlp = True
+    build_config.plugin_config._pp_reduce_scatter = True
+    build_config.plugin_config._use_fused_mlp = True
 
     gpu_device = torch.device("cuda", 0)
     torch.cuda.set_device(gpu_device)
     trtllm_model = HiggsAudioForCausalLM.from_hugging_face(
         "bosonai/higgs-audio-v2-generation-3B-base"
     )
-    trtllm_model.save_checkpoint("./higgs_audio_engine")
-    # engine = build(trtllm_model, build_config)
-    # engine.save("./higgs_audio_engine")
+
+    # trtllm_model.save_checkpoint("./higgs_audio_engine")
+    engine = build(trtllm_model, build_config)
+    engine.save("./higgs_audio_engine")
 
 
 if __name__ == "__main__":

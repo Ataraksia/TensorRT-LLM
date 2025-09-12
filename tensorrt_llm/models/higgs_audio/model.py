@@ -20,6 +20,7 @@ from transformers import (
 )
 from tensorrt_llm.bindings import INT32
 from tensorrt_llm.mapping import Mapping
+
 from tensorrt_llm.models.model_weights_loader import ModelWeightsLoader
 from tensorrt_llm.models.modeling_utils import (
     DecoderLayerList,
@@ -283,10 +284,10 @@ class HiggsAudioDualFFNDecoderLayer(Module):
             bias=False,
         )
 
-        # Audio MLP (potentially smaller)
+        # Audio MLP (use same intermediate size as text MLP to avoid broadcast issues)
         self.audio_mlp = MLP(
             hidden_size=self.config.hidden_size,
-            ffn_hidden_size=self.config.audio_ffn_intermediate_size,
+            ffn_hidden_size=self.config.intermediate_size,
             hidden_act=self.config.hidden_act,
             dtype=self.config.dtype,
             bias=False,
@@ -330,7 +331,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         residual = hidden_states
 
         hidden_states = where(
-            vision_token_mask,
+            vision_token_mask.unsqueeze(-1),
             self.audio_input_layernorm(hidden_states),
             self.input_layernorm(hidden_states),
         )
@@ -351,7 +352,7 @@ class HiggsAudioDualFFNDecoderLayer(Module):
         residual = hidden_states
 
         residual += where(
-            vision_token_mask,
+            vision_token_mask.unsqueeze(-1),
             self.audio_mlp(self.audio_post_layernorm(hidden_states)),
             self.mlp(self.post_layernorm(hidden_states)),
         )
@@ -418,19 +419,6 @@ class HiggsAudioTransformer(Module):
         audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
         input_embed = where(unsqueeze(audio_mask, -1), audio_embed, text_embed)
-        # input_embed = self.vocab_embedding(input_ids)
-        # if audio_out_ids is not None and audio_out_ids.shape[-1] > 0:
-        #     audio_out_ids = audio_out_ids.cuda()
-        # else:
-        #     audio_out_ids = torch.zeros(
-        #         (input_ids.shape[0], self.audio_num_codebooks, 0),
-        #         device=input_ids.device,
-        #         dtype=torch.long,
-        #     )
-
-        # combined_embed = torch.cat(
-        #     [input_embed, self._embed_audio_ids(audio_out_ids).unsqueeze(0)], dim=1
-        # )
 
         hidden_states = self.layers(
             hidden_states=input_embed,
@@ -647,14 +635,14 @@ class HiggsAudioTRTRunner:
         Returns:
             Generated audio tensor suitable for Whisper transcription"""
 
+        from tensorrt_llm.models.higgs_audio.serve import create_audio_chunk
+
         text_input = (
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         )
 
         text_input_ids = self.tokenizer.encode(text_input, return_tensors="pt").squeeze(0).cuda()
-        audio_input_ids = torch.as_tensor(
-            [self.config.audio_stream_bos_id + self.config.text_vocab_size]
-        ).cuda()
+        audio_input_ids = torch.as_tensor([self.config.audio_stream_bos_id]).cuda()
         input_ids = torch.cat(
             [self.saved_input_ids, text_input_ids, audio_input_ids],
             dim=0,
@@ -663,30 +651,35 @@ class HiggsAudioTRTRunner:
             [input_ids.size(-1)], device=self.gpu_device, dtype=torch.int32
         )
         max_input_length = torch.max(input_lengths).item()
-        max_new_tokens = self.max_seq_len - max_input_length
+        max_new_tokens = min(1024, self.max_seq_len - max_input_length)
         with torch.no_grad():
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
                 end_id=self.config.audio_stream_eos_id,
-                stop_words_list=[[[self.config.audio_stream_eos_id]]],
                 temperature=float(self.temperature),
                 top_k=int(self.top_k),
                 top_p=float(self.top_p),
             )
+
         num_codebooks = self.config.audio_num_codebooks
         codebook_size = self.config.audio_codebook_size
-        bos_mask = outputs == self.config.audio_out_bos_token_id
+        bos_mask = outputs == self.config.audio_stream_bos_id
+        eos_mask = outputs == self.config.audio_stream_eos_id
         start = torch.argmax(bos_mask.float()).item() + 1
-        end = start + (len(outputs[0, 0, start:]) // num_codebooks) * num_codebooks
-
-        outputs = outputs[0, 0, start:end].view((num_codebooks, -1))
-        vq_code = revert_delay_pattern(outputs).clip(0, codebook_size - 1)[:, 1:-1]
+        end = (
+            start
+            + (len(outputs[0, 0, start : torch.argmax(eos_mask.float()).item()]) // num_codebooks)
+            * num_codebooks
+        )
+        output = outputs[0, 0, start:end].view((num_codebooks, -1))
+        # import numpy as np
+        # np.savetxt("log.txt", output.cpu().view(-1), delimiter=",", fmt="%d")
+        print(output.shape)
+        vq_code = revert_delay_pattern(output).clip(0, codebook_size - 1)
         waveform, sr = self.audio_tokenizer.decode(vq_code)
         if isinstance(waveform, torch.Tensor):
             waveform = waveform.detach().cpu().numpy()
-        # Resample to 16kHz for Whisper large-v3-turbo compatibility
-
         if sr != 16000 and isinstance(waveform, np.ndarray):
             waveform = librosa.resample(waveform.astype(np.float32), orig_sr=sr, target_sr=16000)
             sr = 16000
