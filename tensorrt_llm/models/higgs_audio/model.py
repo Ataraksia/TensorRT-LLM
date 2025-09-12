@@ -531,9 +531,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         """Get or create delay pattern state for a request."""
         if req_id not in self.request_states:
             self.request_states[req_id] = {
-                "num_audio_delay": 0,
-                "num_audio_eos": 0,
-                "active": "True",
+                "num_remaining_delays": 0,
+                "num_delay": 0,
             }
         return self.request_states[req_id]
 
@@ -547,54 +546,68 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
     ) -> None:
         """Apply delay pattern logic to audio logits during generation."""
 
-        # Handle CUDA stream
-        stream = None if stream_ptr is None else torch.cuda.ExternalStream(stream_ptr)
+        state = self._get_or_create_state(req_id)
 
-        with torch.cuda.stream(stream):
-            state = self._get_or_create_state(req_id)
+        audio_logits = logits[0, 0, 0 : self.audio_vocab_size]
 
-            # logits shape is typically [1, 1, vocab_size] or [1, vocab_size]
-            audio_logits = logits[0, 0, 0 : self.audio_vocab_size]
+        if audio_logits.numel() != self.audio_vocab_size:
+            print(
+                f"Warning: Audio logits size mismatch. Expected {self.audio_vocab_size}, got {audio_logits.numel()}"
+            )
+            return
 
-            # Reshape to multi-codebook format: [num_codebooks, codebook_size + 2]
-            expected_size = self.audio_vocab_size
-            if audio_logits.numel() != expected_size:
-                print(
-                    f"Warning: Audio logits size mismatch. Expected {expected_size}, got {audio_logits.numel()}"
-                )
-                return
+        # Determine which codebook position we're currently generating for
+        # This assumes cyclic generation across codebooks
+        current_codebook_pos = len(token_ids[0]) % self.config.audio_num_codebooks
 
-            audio_logits = audio_logits.view(self.audio_num_codebooks, -1)
+        forced_token_id = None
 
-            # Apply delay pattern logic (similar to vLLM implementation)
-            self._apply_delay_pattern_logic(audio_logits, state)
+        # Phase 1: Apply initial delays (BOS tokens for delayed positions)
+        if state["num_delay"] + 1 < self.config.audio_num_codebooks:
+            if current_codebook_pos > state["num_delay"]:
+                forced_token_id = self.audio_stream_bos_id
+            # Only increment delay counter once per complete cycle
+            if current_codebook_pos == self.config.audio_num_codebooks - 1:
+                state["num_delay"] += 1
 
-            # Update the original logits tensor
-            logits[0, 0, 0 : self.audio_vocab_size] = audio_logits.view(-1)
+        # Phase 2: Handle remaining delays
+        if state["num_remaining_delays"] is not None:
+            # Apply EOS tokens to positions that should end early
+            if current_codebook_pos < (
+                self.config.audio_num_codebooks - state["num_remaining_delays"]
+            ):
+                forced_token_id = self.audio_stream_eos_id
 
-    def _apply_delay_pattern_logic(self, audio_logits: torch.Tensor, state: dict):
-        """Apply delay pattern logic to audio logits."""
+            # Decrement remaining delays once per cycle
+            if current_codebook_pos == self.config.audio_num_codebooks - 1:
+                state["num_remaining_delays"] -= 1
+        else:
+            # Initialize remaining delays by finding EOS tokens in current sequence
+            eos_indices = (token_ids[0] == self.audio_stream_eos_id).nonzero(as_tuple=False)
+            if eos_indices.numel() > 0:
+                last_eos_idx = eos_indices[-1, 0].item()
+                # Calculate remaining delays based on last EOS position
+                relative_pos = last_eos_idx % self.config.audio_num_codebooks
+                state["num_remaining_delays"] = self.config.audio_num_codebooks - relative_pos - 1
 
-        # Generate the delayed tokens for the first few codebooks
-        if state["num_audio_delay"] < self.audio_num_codebooks:
-            # Force BOS tokens for positions from num_audio_delay onwards
-            for i in range(state["num_audio_delay"], self.audio_num_codebooks):
-                audio_logits[i, :] = -float("inf")
-                if 0 <= self.audio_stream_bos_id < audio_logits.shape[1]:
-                    audio_logits[i, self.audio_stream_bos_id] = 10.0
-            state["num_audio_delay"] += 1
+                # Force EOS for positions that should end
+                if current_codebook_pos <= relative_pos:
+                    forced_token_id = self.audio_stream_eos_id
 
-        # Handle EOS pattern
-        if state["num_audio_eos"] < self.audio_num_codebooks:
-            # Force EOS for the first num_audio_eos positions
-            for i in range(state["num_audio_eos"]):
-                audio_logits[i, :] = -float("inf")
-                if 0 <= self.audio_stream_eos_id < audio_logits.shape[1]:
-                    audio_logits[i, self.audio_stream_eos_id] = 10.0
+        # Phase 3: End generation when all delays are complete
+        if state["num_remaining_delays"] is not None and state["num_remaining_delays"] <= 0:
+            forced_token_id = self.config.audio_eos_token_id
+            # Reset state for potential future use
+            state["num_delay"] = 0
+            state["num_remaining_delays"] = None
 
-        elif state["num_audio_eos"] >= self.audio_num_codebooks:
-            # All codebooks have generated EOS, force EOS for all
-            state["active"] = False
+        # Apply the forced token by manipulating logits
+        if forced_token_id is not None:
+            # Set all logits to very negative values
+            logits.fill_(-float("inf"))
+            # Set target token logit to high positive value
+            if forced_token_id < self.audio_vocab_size:
+                logits[forced_token_id] = float("inf")
 
 
 class HiggsAudioTRTRunner:
