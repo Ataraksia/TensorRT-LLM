@@ -40,11 +40,6 @@ from transformers.models.whisper.modeling_whisper import WhisperEncoderLayer
 from transformers.utils import ModelOutput, logging
 from vector_quantize_pytorch import ResidualFSQ
 
-from .configuration_higgs_audio import HiggsAudioConfig, HiggsAudioEncoderConfig
-from .cuda_graph_runner import CUDAGraphRunner
-from .descriptaudiocodec.dac.model import dac as dac2
-from .quantization.vq import ResidualVectorQuantizer
-
 logger = logging.get_logger(__name__)
 
 AUDIO_IN_TOKEN = "<|AUDIO|>"
@@ -2907,53 +2902,6 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             num_remaining_delays,
         )
 
-    def _sample_text_tokens(
-        self,
-        logits: torch.Tensor,
-        input_ids: torch.Tensor,
-        do_sample: bool,
-        logits_processor: LogitsProcessorList,
-        device: torch.device,
-        generation_mode: GenerationMode,
-        torch_generator: torch.Generator | None,
-    ) -> torch.Tensor:
-        """Sample text tokens from the logits"""
-        # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
-        # (the clone itself is always small)
-        next_token_logits = logits.clone()[:, -1, :].float()
-        next_token_logits = next_token_logits.to(input_ids.device)
-
-        # pre-process distribution
-        next_token_scores = logits_processor(input_ids, next_token_logits)
-
-        if generation_mode == GenerationMode.AUDIO_INIT:
-            # See the audio bos token, we should start generating audio tokens
-            next_tokens = torch.full(
-                (input_ids.shape[0],),
-                self.audio_out_token_idx,
-                dtype=torch.long,
-                device=device,
-            )
-            next_audio_tokens = torch.full(
-                (self.config.audio_num_codebooks,),
-                self.config.audio_stream_bos_id,
-                dtype=torch.long,
-                device=device,
-            )
-        else:
-            if do_sample:
-                probs = nn.functional.softmax(next_token_scores, dim=-1)
-                # TODO (joao): this OP throws "skipping cudagraphs due to ['incompatible ops']", find solution
-                next_tokens = torch.multinomial(
-                    probs, num_samples=1, generator=torch_generator
-                ).squeeze(1)
-            else:
-                next_tokens = torch.argmax(next_token_scores, dim=-1)
-
-            next_audio_tokens = None
-
-        return next_tokens, next_audio_tokens, next_token_logits, next_token_scores
-
     # Built on top of GenerationMixin._sample.
     # We revise the implementation to support generating both audio / text.
     def _sample(
@@ -3075,31 +3023,16 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         while self._has_unfinished_sequences(
             this_peer_finished, synced_gpus, device=input_ids.device
         ):
-            # Check which multimodal stage we are in
-            # FIXME: Assume single input generation
-            if input_ids[0][-1] == audio_out_bos_token_id:
-                generation_mode = GenerationMode.AUDIO_INIT
-            elif input_ids[0][-1] == self.audio_out_token_idx:
-                generation_mode = GenerationMode.AUDIO_IN_PROGRESS
-            else:
-                generation_mode = GenerationMode.TEXT
-
-            is_audio_generation_mode = generation_mode == GenerationMode.AUDIO_IN_PROGRESS
-
             if init_model_input or not generation_config.use_cache:
                 model_inputs = {"input_ids": input_ids, **model_kwargs}
             else:
                 model_inputs = {"input_ids": input_ids[:, -1:], **model_kwargs}
 
-                if is_audio_generation_mode and generation_config.use_cache:
+                if generation_config.use_cache:
                     model_inputs["audio_out_ids"] = model_kwargs["audio_out_ids"][:, -1:]
                     model_inputs["audio_out_ids_start"] = torch.tensor(
                         [0], dtype=torch.long, device=input_ids.device
                     )
-                elif not is_audio_generation_mode:
-                    del model_inputs["audio_out_ids"]
-                    del model_inputs["audio_out_ids_start"]
-
                 if generation_config.use_cache:
                     if (
                         "audio_features" in model_inputs
@@ -3155,122 +3088,47 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             if synced_gpus and this_peer_finished:
                 continue
 
-            if is_audio_generation_mode:
-                # In audio generation mode, we sample the audio tokens from audio logits.
-                # It might also generate the audio eos token to end the audio generation.
-                (
-                    next_tokens,
-                    next_audio_tokens,
-                    next_audio_token_logits,
-                    next_audio_token_scores,
-                    num_delay,
-                    num_remaining_delays,
-                ) = self._sample_audio_tokens(
-                    hidden_states=outputs.audio_hidden_states,
-                    audio_logits=outputs.audio_logits,
-                    audio_out_ids=model_kwargs["audio_out_ids"],
-                    do_sample=do_sample,
-                    logits_processor=logits_processor,
-                    device=input_ids.device,
-                    torch_generator=torch_generator,
-                    generation_config=generation_config,
-                    num_delay=num_delay,
-                    num_remaining_delays=num_remaining_delays,
-                )
+            (
+                next_tokens,
+                next_audio_tokens,
+                next_audio_token_logits,
+                next_audio_token_scores,
+                num_delay,
+                num_remaining_delays,
+            ) = self._sample_audio_tokens(
+                hidden_states=outputs.audio_hidden_states,
+                audio_logits=outputs.audio_logits,
+                audio_out_ids=model_kwargs["audio_out_ids"],
+                do_sample=do_sample,
+                logits_processor=logits_processor,
+                device=input_ids.device,
+                torch_generator=torch_generator,
+                generation_config=generation_config,
+                num_delay=num_delay,
+                num_remaining_delays=num_remaining_delays,
+            )
 
-                # update generated ids, model inputs, and length for next step
-                model_kwargs["audio_out_ids"] = torch.cat(
-                    [model_kwargs["audio_out_ids"], next_audio_tokens[:, None]], dim=-1
-                )
-                audio_sequences[-1] = torch.cat(
-                    [audio_sequences[-1], next_audio_tokens[:, None]], dim=-1
-                )
+            # update generated ids, model inputs, and length for next step
+            model_kwargs["audio_out_ids"] = torch.cat(
+                [model_kwargs["audio_out_ids"], next_audio_tokens[:, None]], dim=-1
+            )
+            audio_sequences[-1] = torch.cat(
+                [audio_sequences[-1], next_audio_tokens[:, None]], dim=-1
+            )
 
-                if streamer is not None:
-                    streamer.put(next_audio_tokens.cpu())
-            else:
-                # In text generation mode, we sample the text tokens from text logits.
-                # It might also generate the audio placeholder token to start the audio generation.
-                next_tokens, next_audio_tokens, next_token_logits, next_token_scores = (
-                    self._sample_text_tokens(
-                        input_ids=input_ids,
-                        logits=outputs.logits,
-                        do_sample=do_sample,
-                        logits_processor=logits_processor,
-                        device=input_ids.device,
-                        generation_mode=generation_mode,
-                        torch_generator=torch_generator,
-                    )
-                )
-
-                if streamer is not None:
-                    streamer.put(next_tokens.cpu())
-
-                if next_audio_tokens is not None:
-                    # If the token is audio bos token, we will generate the audio placeholder token
-                    # and the corrensponding audio stream bos token to start the audio generation.
-                    audio_sequences.append(next_audio_tokens[:, None])
-                    if streamer is not None:
-                        streamer.put(next_audio_tokens.cpu())
-                    if (
-                        model_kwargs["audio_out_ids"] is None
-                        or model_kwargs["audio_out_ids"].shape[0] == 0
-                    ):
-                        # Initialize audio_out_ids
-                        model_kwargs["audio_out_ids"] = next_audio_tokens[:, None]
-                        model_kwargs["audio_out_ids_start"] = torch.tensor(
-                            [0], dtype=torch.long, device=input_ids.device
-                        )
-                    else:
-                        model_kwargs["audio_out_ids_start"] = torch.concat(
-                            [
-                                model_kwargs["audio_out_ids_start"],
-                                torch.tensor(
-                                    [model_kwargs["audio_out_ids"].shape[1]],
-                                    dtype=torch.long,
-                                    device=input_ids.device,
-                                ),
-                            ],
-                            dim=0,
-                        )
-                        model_kwargs["audio_out_ids"] = torch.concat(
-                            [model_kwargs["audio_out_ids"], next_audio_tokens[:, None]], dim=1
-                        )
+            if streamer is not None:
+                streamer.put(next_audio_tokens.cpu())
 
             if return_dict_in_generate:
                 if output_scores:
-                    if is_audio_generation_mode:
-                        scores += (next_audio_token_scores,)
-                    else:
-                        scores += (next_token_scores,)
+                    scores += (next_audio_token_scores,)
                 if output_logits:
-                    if is_audio_generation_mode:
-                        raw_logits += (next_audio_token_logits,)
-                    else:
-                        raw_logits += (next_token_logits,)
+                    raw_logits += (next_audio_token_logits,)
                 if output_attentions:
                     decoder_attentions += (outputs.attentions,)
                 if output_hidden_states:
                     decoder_hidden_states += (outputs.hidden_states,)
 
-            # finished sentences should have their next token be a padding token
-            if has_eos_stopping_criteria:
-                next_tokens = next_tokens * unfinished_sequences + pad_token_id * (
-                    1 - unfinished_sequences
-                )
-
-            if hasattr(generation_config, "tokenizer_length"):
-                tokenizer_length = generation_config.tokenizer_length
-                if torch.max(next_tokens) >= tokenizer_length:
-                    raise ValueError(
-                        f"Next generated token has max value {torch.max(next_tokens)} which is greater than the tokenizer's vocabulary size {tokenizer_length}, this is undesired behavior."
-                    )
-
-            # update generated ids, model inputs, and length for next step
-            if not is_audio_generation_mode or next_tokens[0] != self.audio_out_token_idx:
-                # We only add one <|AUDIO_OUT|> token to the input_ids for simplicity.
-                input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
-            input_ids_full = torch.cat([input_ids_full, next_tokens[:, None]], dim=-1)
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids_full, scores)
             this_peer_finished = unfinished_sequences.max() == 0
             cur_len += 1
@@ -3684,26 +3542,6 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
 
                 self.decode_graph_runners[kv_cache_length][is_decoding_audio_token] = runner
 
-
-import json
-import multiprocessing as mp
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
-from typing import Union
-
-import dacite
-import numpy as np
-import pandas as pd
-import torch
-from loguru import logger
-
-from .modeling_higgs_audio import (
-    AUDIO_IN_TOKEN,
-    AUDIO_OUT_TOKEN,
-    AudioContent,
-    ChatMLSample,
-    TextContent,
-)
 
 # Whisper processor, 30 sec -> 3000 features
 # Then we divide 4 in the audio towker, we decrease 3000 features to 750, which gives 25 Hz
@@ -4277,14 +4115,6 @@ class DatasetInfo:
     dataset_type: str
     group_type: str | None = None
     mask_text: bool | None = None  # Whether to mask the text tokens for pretraining samples.
-
-
-from dataclasses import dataclass
-
-import librosa
-import torch
-import torch.nn.functional as F
-from transformers.models.whisper.processing_whisper import WhisperProcessor
 
 
 def _ceil_to_nearest(n, round_to):
@@ -5171,29 +5001,6 @@ def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
     return model
 
 
-import asyncio
-import base64
-import threading
-from copy import deepcopy
-from dataclasses import asdict, dataclass
-from io import BytesIO
-from typing import Union
-
-import torch
-from transformers import AutoProcessor, AutoTokenizer
-from transformers.generation.stopping_criteria import StoppingCriteria
-from transformers.generation.streamers import BaseStreamer
-
-from .modeling_higgs_audio import (
-    ChatMLDatasetSample,
-    ChatMLSample,
-    HiggsAudioModel,
-    HiggsAudioSampleCollator,
-    load_higgs_audio_tokenizer,
-    prepare_chatml_sample,
-)
-
-
 @dataclass
 class HiggsAudioStreamerDelta:
     """Represents a chunk of generated content, either text or audio tokens."""
@@ -5264,39 +5071,13 @@ class AsyncHiggsAudioStreamer(BaseStreamer):
         self.loop = asyncio.get_running_loop()
         self.has_asyncio_timeout = hasattr(asyncio, "timeout")
 
-        # State tracking
-        self.next_tokens_are_prompt = True
-
     def put(self, value: torch.Tensor):
-        """Receives tokens and processes them as either text or audio tokens.
-        For text tokens, decodes and caches them until complete words are formed.
-        For audio tokens, directly queues them.
-        """
-        if value.shape[0] > 1 and not self.next_tokens_are_prompt:
-            # This is likely audio tokens (shape: [audio_num_codebooks])
-            assert value.shape[0] == self.audio_num_codebooks, "Number of codebooks mismatch"
-            delta = HiggsAudioStreamerDelta(audio_tokens=value)
-            if self.loop.is_running():
-                self.loop.call_soon_threadsafe(self.queue.put_nowait, delta)
-            return
-
-        # Skip prompt tokens if configured
-        if self.skip_prompt and self.next_tokens_are_prompt:
-            self.next_tokens_are_prompt = False
-            return
-
-        # Process as text tokens
-        if len(value.shape) > 1:
-            value = value[0]
-
-        text = self.tokenizer.decode(value, **self.decode_kwargs)
-        delta = HiggsAudioStreamerDelta(text=text, text_tokens=value)
+        delta = HiggsAudioStreamerDelta(audio_tokens=value)
         if self.loop.is_running():
             self.loop.call_soon_threadsafe(self.queue.put_nowait, delta)
 
     def end(self):
         """Flushes any remaining text tokens and signals the end of generation."""
-        self.next_tokens_are_prompt = True
         if self.loop.is_running():
             self.loop.call_soon_threadsafe(self.queue.put_nowait, self.stop_signal)
 

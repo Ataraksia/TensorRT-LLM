@@ -12,14 +12,8 @@ from tensorrt_llm.models.higgs_audio.model import HiggsAudioTRTRunner  # noqa: F
 # Instantiate model
 gpu_device = torch.device("cuda", 0)
 torch.cuda.set_device(gpu_device)
-audio_path = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
 
-runner = HiggsAudioTRTRunner(
-    engine_dir="/home/me/TTS/TensorRT-LLM/higgs_audio_engine/",
-    hf_model_dir="bosonai/higgs-audio-v2-generation-3B-base",
-    audio_tokenizer_dir="bosonai/higgs-audio-v2-tokenizer",
-    reference_audio=audio_path,
-)
+runner = HiggsAudioTRTRunner()
 
 input_text = "Chat, stop backseating! I totally know what I'm doing... I think"
 
