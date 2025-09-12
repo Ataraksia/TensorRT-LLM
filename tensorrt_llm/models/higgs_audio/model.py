@@ -2,8 +2,6 @@
 # ruff: noqa
 """TensorRT-LLM implementation of Higgs Audio multimodal model."""
 
-from contextlib import contextmanager
-import gc
 import os
 from typing import Optional, List
 import numpy as np
@@ -11,29 +9,23 @@ import torch
 from boson_multimodal import *
 
 from huggingface_hub import snapshot_download
-from tqdm import tqdm
 from transformers import (
     AutoModelForSpeechSeq2Seq,
     AutoProcessor,
     AutoTokenizer,
-    GenerationMixin,
-    PreTrainedModel,
-    AutoModel,
     pipeline,
 )
-import tensorrt_llm
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models.model_weights_loader import ModelWeightsLoader
 from tensorrt_llm.models.modeling_utils import (
     DecoderLayerList,
     QuantConfig,
     DecoderModelForCausalLM,
-    default_net,
 )
 from tensorrt_llm.module import Module, ModuleList
 from tensorrt_llm.quantization import QuantMode
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
-from tensorrt_llm.functional import Tensor, constant, unsqueeze, where
+from tensorrt_llm.functional import Tensor
 from tensorrt_llm.layers import (
     MLP,
     Attention,
@@ -45,28 +37,14 @@ from tensorrt_llm.layers import (
     RmsNorm,
 )
 
-
-# SPDX-License-Identifier: Apache-2.0
-# ruff: noqa
-"""Wrapper for audio tokenization."""
-
 import inspect
 import json
-import math
 import os
-import sys
-import tempfile
-import warnings
-from enum import Enum
-from functools import lru_cache
-from typing import Optional, Sequence, Tuple, Union
+from typing import Optional
 
 import librosa
 import numpy as np
-import s3fs
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from boson_multimodal import HiggsAudioTokenizer
 
 from huggingface_hub import snapshot_download
@@ -103,10 +81,6 @@ class AudioTokenizer:
     @property
     def codebook_size(self):
         return self._codebook_size
-
-    @property
-    def tps(self):
-        return self._tps
 
     def encode(
         self,
@@ -424,6 +398,16 @@ class HiggsAudioTransformer(Module):
             dtype=self.config.dtype,
         )
 
+    def _embed_audio_ids(self, audio_ids):
+        """Embed the audio ids"""
+        codebook_shift = (
+            torch.arange(self.config.audio_num_codebooks, device=audio_ids.device)
+            * self.config.audio_codebook_size
+        )
+        audio_embed = self.audio_codebook_embeddings(audio_ids + codebook_shift.unsqueeze(-1))
+        audio_embed = torch.sum(audio_embed, dim=0)
+        return audio_embed
+
     def forward(
         self,
         hidden_states: Optional[Tensor] = None,
@@ -432,7 +416,6 @@ class HiggsAudioTransformer(Module):
         attention_mask: Optional[Tensor] = None,
         kv_cache_params: Optional[KeyValueCacheParams] = None,
         attention_params: Optional[AttentionParams] = None,
-        position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
 
@@ -440,21 +423,25 @@ class HiggsAudioTransformer(Module):
         # has_audio_out = audio_mask is not None and audio_mask.shape[0] > 0
         # if has_audio_out:
         #     text_ids = where(audio_mask, self.config.text_vocab_size - 1, input_ids)
-        #     text_embeddings = self.vocab_embedding(text_ids)
+        #     text_embed = self.vocab_embedding(text_ids)
 
-        #     audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
-        #     audio_embeddings = self.audio_codebook_embeddings(audio_ids)
-        #     audio_embeddings.view(
-        #         1, -1, self.config.audio_num_codebooks, self.config.hidden_size
-        #     ).sum(dim=1)
+        #     audio_in_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
+        #     audio_embed = self._embed_audio_ids(audio_in_ids.view(0, self.config.audio_num_codebooks, -1))
 
-        #     mask_expanded = audio_mask.unsqueeze(-1)  # Add dimension for embedding size
-        #     input_embeddings = where(mask_expanded, audio_embeddings, text_embeddings)
+        #     input_embed = where(audio_mask.unsqueeze(-1), audio_embed, text_embed)
         # else:
-        input_embeddings = self.vocab_embedding(input_ids)
+        input_embed = self.vocab_embedding(input_ids)
+
+        if audio_out_ids is not None and audio_out_ids.shape[-1] > 0:
+            audio_out_ids = audio_out_ids.cuda()
+        else:
+            audio_out_ids = torch.zeros(
+                (self.audio_num_codebooks, 0), device=input_ids.device, dtype=torch.long
+            )
+        audio_out_embed = self._embed_audio_ids(audio_out_ids)
 
         hidden_states = self.layers(
-            hidden_states=input_embeddings,
+            hidden_states=input_embed,
             use_cache=use_cache,
             attention_mask=attention_mask,
             kv_cache_params=kv_cache_params,
@@ -538,7 +525,6 @@ class HiggsAudioTRTRunner:
         hf_model_dir: str,
         audio_tokenizer_dir: str,
         reference_audio: str,
-        use_delay_pattern: bool = True,
     ) -> None:
         """Initialize the TensorRT-LLM runner for HiggsAudio."""
 
@@ -551,7 +537,6 @@ class HiggsAudioTRTRunner:
         self.num_beams = 1
         self.gpu_weights_percent = 0.5
         self.max_seq_len = 2048
-        self.use_delay_pattern = use_delay_pattern
 
         # Set up device
         self.gpu_device = torch.device("cuda", 0)
@@ -600,7 +585,7 @@ class HiggsAudioTRTRunner:
                 device=audio_ids.device,
             )
             # Concatenate: BOS + audio_ids + EOS
-            audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1)
+            audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1).flatten()
 
             # Apply delay pattern
             audio_ids = _build_delay_pattern_mask(
@@ -608,6 +593,7 @@ class HiggsAudioTRTRunner:
                 bos_token_id=self.config.audio_stream_bos_id,
                 pad_token_id=self.config.audio_stream_eos_id,
             ).squeeze(0)
+            audio_ids += self.config.text_vocab_size
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # The format should include the reference audio transcription and then the target text
             pre_audio_input = (
@@ -622,27 +608,13 @@ class HiggsAudioTRTRunner:
             pre_audio_input_ids = (
                 self.tokenizer.encode(pre_audio_input, return_tensors="pt").squeeze(0).cuda()
             )
-
-            codebook_shift = (
-                torch.arange(self.config.audio_num_codebooks) * self.config.audio_codebook_size
-            ).cuda()
-            audio_ids = audio_ids + codebook_shift.unsqueeze(-1)
-            audio_ids = audio_ids.flatten()
             post_audio_input = f"<|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>"
             post_audio_input_ids = (
                 self.tokenizer.encode(post_audio_input, return_tensors="pt").squeeze(0).cuda()
             )
 
-            self.input_ids = torch.cat(
+            self.saved_input_ids = torch.cat(
                 [pre_audio_input_ids, audio_ids, post_audio_input_ids], dim=0
-            )
-            self.audio_mask = torch.cat(
-                [
-                    torch.zeros(pre_audio_input_ids.shape[0], dtype=torch.bool),
-                    torch.ones(audio_ids.shape[0], dtype=torch.bool),
-                    torch.zeros(post_audio_input_ids.shape[0], dtype=torch.bool),
-                ],
-                dim=0,
             )
         else:
             # Format without reference audio (default voice)
@@ -655,12 +627,10 @@ class HiggsAudioTRTRunner:
                 f"She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>"
                 f"<|start_header_id|>user<|end_header_id|>"
             )
-            self.input_ids = (
+            self.saved_input_ids = (
                 self.tokenizer.encode(text_input, return_tensors="pt").squeeze(0).cuda()
             )
-            self.audio_mask = torch.zeros(self.input_ids.shape[0])
 
-        # Use Python runtime runner for better compatibility during debugging
         from tensorrt_llm.runtime import ModelRunnerCpp
 
         self.runner = ModelRunnerCpp.from_dir(
@@ -680,7 +650,6 @@ class HiggsAudioTRTRunner:
         Args:
             input_text: The text prompt to convert to speech
             input_audio: Path to reference audio file for voice cloning
-            use_delay_pattern: Whether to use delay pattern for RVQ generation
 
         Returns:
             Generated audio tensor suitable for Whisper transcription"""
@@ -689,9 +658,14 @@ class HiggsAudioTRTRunner:
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         )
 
-        input_ids = self.tokenizer.encode(text_input, return_tensors="pt").squeeze(0).cuda()
-        input_ids = torch.cat([self.input_ids, input_ids], dim=0).cuda()
-        # input_ids[self.audio_mask] = input_ids[self.audio_mask] +self.config.text_vocab_size
+        text_input_ids = self.tokenizer.encode(text_input, return_tensors="pt").squeeze(0).cuda()
+        audio_input_ids = torch.as_tensor(
+            [self.config.audio_stream_bos_id + self.config.text_vocab_size]
+        )
+        input_ids = torch.cat(
+            [self.saved_input_ids, text_input_ids, audio_input_ids],
+            dim=0,
+        ).cuda()
         input_lengths = torch.tensor(
             [input_ids.size(-1)], device=self.gpu_device, dtype=torch.int32
         )
@@ -709,8 +683,8 @@ class HiggsAudioTRTRunner:
             )
         num_codebooks = self.config.audio_num_codebooks
         codebook_size = self.config.audio_codebook_size
-        eos_mask = outputs == self.config.audio_out_bos_token_id
-        start = torch.argmax(eos_mask.float()).item() + 1
+        bos_mask = outputs == self.config.audio_out_bos_token_id
+        start = torch.argmax(bos_mask.float()).item() + 1
         end = start + (len(outputs[0, 0, start:]) // num_codebooks) * num_codebooks
 
         outputs = outputs[0, 0, start:end].view(num_codebooks, -1)
