@@ -519,8 +519,6 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         self.text_vocab_size = config.text_vocab_size
         self.audio_vocab_size = config.audio_vocab_size
         self.audio_num_codebooks = config.audio_num_codebooks
-        self.audio_codebook_size = config.audio_codebook_size
-        self.audio_out_token_idx = config.audio_out_token_idx
         self.audio_stream_bos_id = config.audio_stream_bos_id
         self.audio_stream_eos_id = config.audio_stream_eos_id
 
@@ -531,7 +529,9 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         """Get or create delay pattern state for a request."""
         if req_id not in self.request_states:
             self.request_states[req_id] = {
-                "num_remaining_delays": 0,
+                # When None, we have not observed an EOS yet to start the tail delays
+                "num_remaining_delays": None,
+                # Number of activated codebooks so far (starts from 0)
                 "num_delay": 0,
             }
         return self.request_states[req_id]
@@ -544,70 +544,81 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         stream_ptr: Optional[int],
         client_id: Optional[int],
     ) -> None:
-        """Apply delay pattern logic to audio logits during generation."""
+        """Apply delay pattern logic to audio logits during generation.
+
+        This enforces the delay pattern described in the Transformers implementation by:
+        - Prefilling later codebooks with BOS until they are activated.
+        - After an EOS is generated for some codebook, pre-filling earlier codebooks with EOS
+          for a number of subsequent steps equal to the remaining codebooks in the frame.
+        - Finally, when all remaining delays are consumed, force the stream EOS to stop generation.
+        """
 
         state = self._get_or_create_state(req_id)
 
-        audio_logits = logits[0, 0, 0 : self.audio_vocab_size]
+        # token_ids is List[beam][generated_tokens]; use the first beam
+        past = token_ids[0] if token_ids and token_ids[0] is not None else []
+        tokens_generated = len(past)
 
-        if audio_logits.numel() != self.audio_vocab_size:
-            print(
-                f"Warning: Audio logits size mismatch. Expected {self.audio_vocab_size}, got {audio_logits.numel()}"
-            )
-            return
-
-        # Determine which codebook position we're currently generating for
-        # This assumes cyclic generation across codebooks
-        current_codebook_pos = len(token_ids[0]) % self.config.audio_num_codebooks
+        # Determine which codebook position we're currently generating for (cyclic)
+        current_codebook_pos = tokens_generated % self.audio_num_codebooks
 
         forced_token_id = None
 
+        # Debug (lightweight): print a few early steps and per-frame boundaries
+        if tokens_generated < 24 or current_codebook_pos == 0:
+            try:
+                print(
+                    f"[HiggsAudioLPP] step={tokens_generated} cpos={current_codebook_pos} num_delay={state['num_delay']} rem_delays={state['num_remaining_delays']} logits_shape={tuple(logits.shape)}"
+                )
+            except Exception:
+                pass
+
         # Phase 1: Apply initial delays (BOS tokens for delayed positions)
-        if state["num_delay"] + 1 < self.config.audio_num_codebooks:
+        if state["num_delay"] + 1 < self.audio_num_codebooks:
             if current_codebook_pos > state["num_delay"]:
                 forced_token_id = self.audio_stream_bos_id
             # Only increment delay counter once per complete cycle
-            if current_codebook_pos == self.config.audio_num_codebooks - 1:
+            if current_codebook_pos == self.audio_num_codebooks - 1:
                 state["num_delay"] += 1
 
-        # Phase 2: Handle remaining delays
+        # Phase 2: Handle remaining delays after encountering an EOS in any codebook
         if state["num_remaining_delays"] is not None:
             # Apply EOS tokens to positions that should end early
-            if current_codebook_pos < (
-                self.config.audio_num_codebooks - state["num_remaining_delays"]
-            ):
+            if current_codebook_pos < (self.audio_num_codebooks - state["num_remaining_delays"]):
                 forced_token_id = self.audio_stream_eos_id
 
             # Decrement remaining delays once per cycle
-            if current_codebook_pos == self.config.audio_num_codebooks - 1:
+            if current_codebook_pos == self.audio_num_codebooks - 1:
                 state["num_remaining_delays"] -= 1
         else:
             # Initialize remaining delays by finding EOS tokens in current sequence
-            eos_indices = (token_ids[0] == self.audio_stream_eos_id).nonzero(as_tuple=False)
-            if eos_indices.numel() > 0:
-                last_eos_idx = eos_indices[-1, 0].item()
-                # Calculate remaining delays based on last EOS position
-                relative_pos = last_eos_idx % self.config.audio_num_codebooks
-                state["num_remaining_delays"] = self.config.audio_num_codebooks - relative_pos - 1
+            if tokens_generated > 0:
+                past_tensor = torch.tensor(past, device=logits.device)
+                eos_positions = (past_tensor == self.audio_stream_eos_id).nonzero(as_tuple=False)
+                if eos_positions.numel() > 0:
+                    last_eos_idx = eos_positions[-1, 0].item()
+                    last_eos_pos_in_frame = last_eos_idx % self.audio_num_codebooks
+                    state["num_remaining_delays"] = (
+                        self.audio_num_codebooks - last_eos_pos_in_frame - 1
+                    )
 
-                # Force EOS for positions that should end
-                if current_codebook_pos <= relative_pos:
-                    forced_token_id = self.audio_stream_eos_id
+                    # Force EOS for positions that should end in the current frame
+                    if current_codebook_pos < last_eos_pos_in_frame:
+                        forced_token_id = self.audio_stream_eos_id
 
         # Phase 3: End generation when all delays are complete
         if state["num_remaining_delays"] is not None and state["num_remaining_delays"] <= 0:
-            forced_token_id = self.config.audio_eos_token_id
+            # In TRT-LLM audio-only generation, terminate by forcing the audio stream EOS
+            forced_token_id = self.audio_stream_eos_id
             # Reset state for potential future use
             state["num_delay"] = 0
             state["num_remaining_delays"] = None
 
-        # Apply the forced token by manipulating logits
+        # Apply the forced token by manipulating logits in-place (last dim is vocab)
         if forced_token_id is not None:
-            # Set all logits to very negative values
-            logits.fill_(-float("inf"))
-            # Set target token logit to high positive value
-            if forced_token_id < self.audio_vocab_size:
-                logits[forced_token_id] = float("inf")
+            logits[...] = -1.0e20
+            if 0 <= forced_token_id < self.audio_vocab_size:
+                logits[..., forced_token_id] = 0.0
 
 
 class HiggsAudioTRTRunner:
