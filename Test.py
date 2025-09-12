@@ -1,4 +1,5 @@
 import jiwer
+import sounddevice as sd
 import torch
 from transformers import AutoProcessor, pipeline
 
@@ -47,4 +48,4 @@ if word_error_rate > 0.25:
 else:
     print("YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!")
 
-# sd.play(audio_output, 16000, blocking=True)
+sd.play(audio_output, 16000, blocking=True)

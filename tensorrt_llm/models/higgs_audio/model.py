@@ -564,15 +564,6 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
         forced_token_id = None
 
-        # Debug (lightweight): print a few early steps and per-frame boundaries
-        if tokens_generated < 24 or current_codebook_pos == 0:
-            try:
-                print(
-                    f"[HiggsAudioLPP] step={tokens_generated} cpos={current_codebook_pos} num_delay={state['num_delay']} rem_delays={state['num_remaining_delays']} logits_shape={tuple(logits.shape)}"
-                )
-            except Exception:
-                pass
-
         # Phase 1: Apply initial delays (BOS tokens for delayed positions)
         if state["num_delay"] + 1 < self.audio_num_codebooks:
             if current_codebook_pos > state["num_delay"]:
@@ -693,14 +684,14 @@ class HiggsAudioTRTRunner:
                 device=audio_ids.device,
             )
             # Concatenate: BOS + audio_ids + EOS
-            audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1).flatten()
+            audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1)
 
             # Apply delay pattern
             audio_ids = _build_delay_pattern_mask(
                 audio_ids.unsqueeze(0),  # Add batch dimension
                 bos_token_id=self.config.audio_stream_bos_id,
                 pad_token_id=self.config.audio_stream_eos_id,
-            ).squeeze(0)
+            ).flatten()
             audio_ids += self.config.text_vocab_size
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # The format should include the reference audio transcription and then the target text
@@ -853,7 +844,7 @@ class HiggsAudioTRTRunner:
         vq_code = revert_delay_pattern(audio_tokens)
 
         # Clip to valid codebook range
-        vq_code = vq_code.clip(0, self.config.audio_codebook_size - 1)
+        vq_code = audio_tokens.clip(0, self.config.audio_codebook_size - 1)
 
         # Remove BOS/EOS tokens if present
         if vq_code.shape[1] > 0:
