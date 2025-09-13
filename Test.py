@@ -1,5 +1,6 @@
 import jiwer
 import torch
+from silero_vad import get_speech_timestamps, load_silero_vad
 from transformers import AutoProcessor, pipeline
 
 from run_chat_completion import AutoModelForSpeechSeq2Seq
@@ -22,21 +23,40 @@ audio_output = runner.generate(
 )
 
 model_id = "openai/whisper-large-v3-turbo"
-model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id)
+whisper_model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id)
 processor = AutoProcessor.from_pretrained(model_id)
+
+
+# Load VAD model
+silero_model = load_silero_vad()
+
+# Get speech timestamps
+speech_timestamps = get_speech_timestamps(
+    audio_output, silero_model, sampling_rate=16000, min_silence_duration_ms=500
+)
+
+# Extract only speech segments
+speech = []
+for segment in speech_timestamps:
+    start_sample = int(segment["start"])
+    end_sample = int(segment["end"])
+    speech.append(audio_output[start_sample:end_sample])
 
 pipe = pipeline(
     "automatic-speech-recognition",
-    model=model,
+    model=whisper_model,
     tokenizer=processor.tokenizer,
     feature_extractor=processor.feature_extractor,
     return_timestamps=True,
 )
-actual_transcription = pipe(audio_output)["text"]
-expected_transcription = input_text
+actual_transcription = ""
+for i in range(len(speech)):
+    actual_transcription += pipe(speech[i])["text"]
+
+
 # Calculate the word error rate
-word_error_rate = jiwer.wer((expected_transcription), (actual_transcription))
-print(f"Expected: {expected_transcription}")
+word_error_rate = jiwer.wer((input_text), (actual_transcription))
+print(f"Expected: {input_text}")
 print(f"Actual: {actual_transcription}")
 
 print(f"Word error rate: {word_error_rate}")
@@ -47,4 +67,6 @@ if word_error_rate > 0.25:
 else:
     print("YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!")
 
-# sd.play(audio_output, 16000, blocking=True)
+import sounddevice as sd
+
+sd.play(audio_output, 16000, blocking=True)

@@ -635,38 +635,133 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
             logits[...] = -1.0e20
             if 0 <= forced_global_id < self.audio_vocab_size:
                 logits[..., forced_global_id] = 0.0
+            print(
+                f"🔒 FORCED token at pos {tokens_generated}, cb {current_cb_pos}: local_id={forced_local_id}, global_id={forced_global_id}"
+            )
+        else:
+            print(
+                f"🎲 SAMPLING at pos {tokens_generated}, cb {current_cb_pos}: delay={state['num_delay']}, remaining_delays={state['num_remaining_delays']}"
+            )
 
-        # CRITICAL FIX: Force generation of AUDIO_OUT tokens in the text vocab space
-        # The logits tensor contains the FULL vocabulary (text + audio), not just audio!
-        # We can modify the text portion to force AUDIO_OUT token generation
+        # AUDIO-SPACE ANTI-REPETITION: operate within the current codebook slice
+        # Penalize repeating the same local id within a codebook across frames,
+        # and lightly discourage the most common continuation given the last bigram.
+        # TEMPORARILY DISABLED FOR DEBUGGING
+        if False and logits is not None and logits.numel() > 0 and tokens_generated > 0:
+            slice_size = cb_size + 2
 
-        if hasattr(logits, "shape") and len(logits.shape) > 1:
-            # The logits tensor is the full vocabulary, not just audio portion
-            # Alternate between forcing AUDIO_OUT tokens and allowing normal generation
+            # Gather local-id history for this codebook (look back up to 64 frames)
+            local_hist: List[int] = []
+            pos = tokens_generated - num_cbs  # previous time this cb was active
+            steps = 0
+            while pos >= 0 and steps < 64:
+                local_hist.append(int(past[pos] % slice_size))
+                pos -= num_cbs
+                steps += 1
 
-            # Force AUDIO_OUT token every few steps to maintain audio FFN routing
-            # but allow some normal generation for diversity
-            force_audio_out = tokens_generated % 4 == 0  # Every 4th token
+            if local_hist:
+                last_local = local_hist[0]
+                # 1) Streak penalty: discourage repeating the same id many frames in a row
+                streak = 1
+                for x in local_hist[1:]:
+                    if x == last_local:
+                        streak += 1
+                    else:
+                        break
+                # Apply increasing penalty on the last_local id within current slice
+                penalty = 0.6 * (1.25 ** max(0, streak - 2)) if streak >= 2 else 0.0
+                if penalty > 0.0:
+                    logits[..., current_base + last_local] -= penalty
 
-            if force_audio_out:
-                # Set all text tokens to very negative values except AUDIO_OUT
-                logits[..., : self.text_vocab_size] = -1.0e20
+                # 2) Bigram->next continuation penalty within this codebook
+                if len(local_hist) >= 2:
+                    bigram = (local_hist[1], local_hist[0])  # (t-2, t-1)
+                    cont_counts = {}
+                    # Build counts from sliding window over history (oldest to newest is reversed)
+                    for i in range(len(local_hist) - 2, -1, -1):
+                        a = local_hist[i + 1] if i + 1 < len(local_hist) else None
+                        b = local_hist[i]
+                        c = local_hist[i - 1] if i - 1 >= 0 else None
+                        if a is None or c is None:
+                            continue
+                        if (a, b) == bigram:
+                            cont_counts[c] = cont_counts.get(c, 0) + 1
+                    if cont_counts:
+                        worst_next = max(cont_counts, key=cont_counts.get)
+                        logits[..., current_base + worst_next] -= 0.8
 
-                # Force AUDIO_OUT token generation with high probability
-                audio_out_token_idx = self.config.audio_out_token_idx
-                if 0 <= audio_out_token_idx < self.text_vocab_size:
-                    logits[..., audio_out_token_idx] = 5.0  # Reduced from 10.0 for less forcing
+                # 3) If streak is long, encourage EOS to terminate the stream sooner
+                if streak >= 6:
+                    logits[..., eos_global] += min(4.0, 0.8 * (streak - 5))
 
-                print(
-                    f"✅ Forced AUDIO_OUT token ({audio_out_token_idx}) at step {tokens_generated}"
-                )
-            else:
-                # Allow normal text token generation but bias towards AUDIO_OUT
-                audio_out_token_idx = self.config.audio_out_token_idx
-                if 0 <= audio_out_token_idx < self.text_vocab_size:
-                    logits[..., audio_out_token_idx] += 2.0  # Small positive bias
+                # 4) Frequency-based penalty on overused local IDs in recent window
+                # Count frequencies over last up to 48 frames
+                freq_counts = {}
+                for idx, lid in enumerate(local_hist[:48]):
+                    freq_counts[lid] = freq_counts.get(lid, 0) + 1
+                if freq_counts:
+                    # Sort by frequency (desc) and penalize top few
+                    top_locals = sorted(freq_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+                    penalties = [0.6, 0.4, 0.2]
+                    for j, (lid, _) in enumerate(top_locals):
+                        if j < len(penalties):
+                            logits[..., current_base + lid] -= penalties[j]
 
-                print(f"🎯 Biased towards AUDIO_OUT token at step {tokens_generated}")
+                # 5) Simple cycle detection to break short loops (period 2..6)
+                # Detect repeating pattern at head of history (newest first)
+                def detect_cycle(seq, max_period=6, min_repeats=4):
+                    for p in range(2, max_period + 1):
+                        if len(seq) < p * min_repeats:
+                            continue
+                        pattern = seq[:p]
+                        ok = True
+                        for r in range(1, min_repeats):
+                            if seq[r * p : (r + 1) * p] != pattern:
+                                ok = False
+                                break
+                        if ok:
+                            return pattern
+                    return None
+
+                pattern = detect_cycle(local_hist, max_period=6, min_repeats=4)
+                if pattern:
+                    # Heavily penalize the next element of the detected pattern
+                    next_in_pattern = pattern[0]
+                    logits[..., current_base + next_in_pattern] -= 2.0
+                    # And nudge EOS upwards to allow graceful stop
+                    logits[..., eos_global] += 2.0
+
+            # 6) Cross-frame cycle detection across all codebooks
+            # Build recent frames of local ids (each frame has num_cbs ids)
+            frames = tokens_generated // num_cbs
+            if frames >= 6:  # need some history
+                max_frames_considered = min(frames, 96)
+                start = (frames - max_frames_considered) * num_cbs
+                flat = past[start : start + max_frames_considered * num_cbs]
+                # Build frames_local newest last
+                frames_local: List[List[int]] = []
+                for fi in range(0, len(flat), num_cbs):
+                    chunk = flat[fi : fi + num_cbs]
+                    if len(chunk) < num_cbs:
+                        break
+                    frames_local.append([int(t % slice_size) for t in chunk])
+                # Detect repeated cycle of period p repeated >=3 times
+                L = len(frames_local)
+                for p in range(2, min(12, L // 3) + 1):
+                    if (
+                        frames_local[L - p : L]
+                        == frames_local[L - 2 * p : L - p]
+                        == frames_local[L - 3 * p : L - 2 * p]
+                    ):
+                        idx_in_cycle = L % p
+                        expected_local = frames_local[L - p + idx_in_cycle][current_cb_pos]
+                        logits[..., current_base + expected_local] -= 1.2
+                        logits[..., eos_global] += 0.6
+                        break
+
+            # 7) Add tiny noise to logits to escape flat attractors
+            with torch.no_grad():
+                logits.add_(torch.empty_like(logits).uniform_(-1e-3, 1e-3))
 
 
 class HiggsAudioTRTRunner:
@@ -817,6 +912,31 @@ class HiggsAudioTRTRunner:
             dim=0,
         ).cuda()
 
+        print(f"Input construction:")
+        print(f"  saved_input_ids length: {len(self.saved_input_ids)}")
+        print(f"  text_input_ids length: {len(text_input_ids)}")
+        print(f"  audio_input_ids: {audio_input_ids}")
+        print(f"  Total input length: {len(input_ids)}")
+        print(f"  Last few input tokens: {input_ids[-10:].tolist()}")
+        print(f"  Text vocab size: {self.config.text_vocab_size}")
+        print(
+            f"  First audio token should be: {self.config.text_vocab_size + self.config.audio_stream_bos_id}"
+        )
+
+        # Check if there are any audio tokens in the input
+        audio_tokens_in_input = (input_ids >= self.config.text_vocab_size).sum().item()
+        print(f"  Audio tokens in input: {audio_tokens_in_input}")
+
+        if audio_tokens_in_input > 0:
+            print(
+                f"  Audio token positions: {torch.where(input_ids >= self.config.text_vocab_size)[0].tolist()}"
+            )
+            audio_token_values = input_ids[input_ids >= self.config.text_vocab_size]
+            print(f"  Audio token values (global): {audio_token_values.tolist()}")
+            print(
+                f"  Audio token values (local): {(audio_token_values - self.config.text_vocab_size).tolist()}"
+            )
+
         input_lengths = torch.tensor(
             [input_ids.size(-1)], device=self.gpu_device, dtype=torch.int32
         )
@@ -834,22 +954,37 @@ class HiggsAudioTRTRunner:
             ]
             stop_words = [[[eid] for eid in all_eos_ids]]
 
-            # Use improved sampling parameters
+            # Use improved sampling parameters for maximum diversity
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
                 end_id=all_eos_ids[0],
                 stop_words_list=stop_words,
-                temperature=1.2,  # Slightly higher temperature for more diversity
-                top_k=50,  # Reduced top_k for more focused sampling
-                top_p=0.8,  # Reduced top_p to avoid low-probability tokens
+                temperature=1.3,  # reduce randomness to avoid loops
+                top_k=30,
+                top_p=0.6,
+                repetition_penalty=1.2,
                 logits_processor_names=["higgs_audio_delay_pattern"],
             )
 
         # Extract and process audio tokens with proper delay pattern handling
         try:
+            print(f"Raw generation output length: {len(outputs[0, 0])}")
+            print(f"First 20 generated tokens: {outputs[0, 0][:20].tolist()}")
+            print(f"Last 20 generated tokens: {outputs[0, 0][-20:].tolist()}")
+
             vq_code = self._extract_and_process_audio_tokens(outputs[0, 0])
             print(f"Extracted audio tokens shape: {vq_code.shape}")
+            print(f"Audio token value ranges per codebook:")
+            for i in range(vq_code.shape[0]):
+                cb_tokens = vq_code[i]
+                print(
+                    f"  Codebook {i}: min={cb_tokens.min().item()}, max={cb_tokens.max().item()}, unique_vals={len(torch.unique(cb_tokens))}"
+                )
+
+            # Check for reasonable diversity in tokens
+            total_unique = len(torch.unique(vq_code))
+            print(f"Total unique audio token values across all codebooks: {total_unique}")
 
             # Decode to waveform
             waveform, sr = self.audio_tokenizer.decode(vq_code)
@@ -874,8 +1009,27 @@ class HiggsAudioTRTRunner:
         if not isinstance(generated_tokens, torch.Tensor):
             generated_tokens = torch.as_tensor(generated_tokens)
 
+        print(f"Input generated_tokens shape: {generated_tokens.shape}")
+        print(
+            f"Text vocab size: {self.config.text_vocab_size}, Audio vocab size: {self.config.audio_vocab_size}"
+        )
+
+        # Filter to only audio tokens (>= text_vocab_size)
+        audio_mask = generated_tokens >= self.config.text_vocab_size
+        audio_only = generated_tokens[audio_mask]
+        print(f"Total tokens: {len(generated_tokens)}, Audio tokens: {len(audio_only)}")
+
+        if len(audio_only) == 0:
+            raise ValueError("No audio tokens found in generation output")
+
+        # Convert back to local audio vocab space
+        audio_local = audio_only - self.config.text_vocab_size
+        print(
+            f"Audio local token ranges: min={audio_local.min().item()}, max={audio_local.max().item()}"
+        )
+
         num_codebooks = self.config.audio_num_codebooks
-        total = int(generated_tokens.numel())
+        total = int(audio_local.numel())
         if total < num_codebooks:
             raise ValueError(f"Not enough audio tokens: {total} < {num_codebooks}")
 
@@ -883,24 +1037,53 @@ class HiggsAudioTRTRunner:
         trim_len = (total // num_codebooks) * num_codebooks
         if trim_len == 0:
             raise ValueError("No valid audio tokens after trimming")
-        flat = generated_tokens[:trim_len]
+        flat = audio_local[:trim_len]
         seq_len = trim_len // num_codebooks
+
+        print(f"Trimmed to {trim_len} tokens ({seq_len} per codebook)")
 
         # De-interleave: [t0_cb0, t0_cb1, ..., t0_cbN-1, t1_cb0, ...] -> [N, T]
         audio_tokens = flat.view(seq_len, num_codebooks).transpose(0, 1).contiguous()
         print(f"De-interleaved audio tokens: {audio_tokens.shape}")
 
+        # Check token distributions before delay pattern reversion
+        print("Token distributions before delay pattern reversion:")
+        for i in range(min(num_codebooks, 4)):  # Show first few codebooks
+            cb_tokens = audio_tokens[i]
+            unique_vals = torch.unique(cb_tokens)
+            print(
+                f"  Codebook {i}: unique tokens = {len(unique_vals)}, sample = {cb_tokens[:10].tolist()}"
+            )
+
         # Apply delay pattern reversion to align codebooks in time
         vq_code = revert_delay_pattern(audio_tokens)
 
+        print(f"After delay pattern reversion: {vq_code.shape}")
+
         # Remove leading BOS and trailing EOS columns if present
+        original_width = vq_code.shape[1]
         if vq_code.shape[1] > 0 and torch.all(vq_code[:, 0] == self.config.audio_stream_bos_id):
             vq_code = vq_code[:, 1:]
+            print(f"Removed leading BOS column")
         if vq_code.shape[1] > 0 and torch.all(vq_code[:, -1] == self.config.audio_stream_eos_id):
             vq_code = vq_code[:, :-1]
+            print(f"Removed trailing EOS column")
+
+        print(f"After BOS/EOS removal: {vq_code.shape} (was {original_width})")
+
+        if vq_code.shape[1] == 0:
+            raise ValueError("No audio content after removing BOS/EOS tokens")
 
         # Clip to valid codebook range
+        before_clip_min, before_clip_max = vq_code.min().item(), vq_code.max().item()
         vq_code = vq_code.clip(0, self.config.audio_codebook_size - 1)
+        after_clip_min, after_clip_max = vq_code.min().item(), vq_code.max().item()
+
+        print(
+            f"Token clipping: [{before_clip_min}, {before_clip_max}] -> [{after_clip_min}, {after_clip_max}]"
+        )
+        print(f"Final vq_code shape: {vq_code.shape}")
+
         return vq_code
 
     def _sample_audio_tokens_multicodebook(
