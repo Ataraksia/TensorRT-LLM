@@ -67,6 +67,6 @@ if word_error_rate > 0.25:
 else:
     print("YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!")
 
-import sounddevice as sd
+# import sounddevice as sd
 
-sd.play(audio_output, 16000, blocking=True)
+# sd.play(audio_output, 16000, blocking=True)
