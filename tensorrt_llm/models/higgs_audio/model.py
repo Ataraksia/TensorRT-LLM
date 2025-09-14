@@ -407,15 +407,10 @@ class HiggsAudioTransformer(Module):
         )
 
     def _embed_audio_ids(self, audio_ids: Tensor):
-        """Embed the audio ids.
-        The audio embedding table is laid out as a concatenation of codebook slices,
-        each of length (codebook_size + 2), where the last two entries are BOS/EOS.
-        We therefore shift each codebook by (codebook_size + 2) when indexing.
-        """
+        """Embed the audio ids"""
         num_codebooks = self.config.audio_num_codebooks
         codebook_size = self.config.audio_codebook_size
-        slice_size = codebook_size + 2
-        codebook_shift = (arange(0, num_codebooks, "int32") * slice_size).unsqueeze(-1)
+        codebook_shift = (arange(0, num_codebooks, "int32") * codebook_size).unsqueeze(-1)
         audio_embed = sum(
             self.audio_codebook_embeddings(audio_ids + codebook_shift),
             dim=0,
@@ -434,7 +429,6 @@ class HiggsAudioTransformer(Module):
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
         audio_mask = input_ids > (self.config.text_vocab_size - 1)
-
         text_ids = where(audio_mask, self.config.text_vocab_size - 1, input_ids)
         text_embed = self.vocab_embedding(text_ids)
         audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
@@ -472,6 +466,9 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
             out_features=config.audio_vocab_size,
             bias=False,
             dtype=config.dtype,
+            tp_group=None,
+            tp_size=1,
+            gather_output=True,
         )
 
         super().__init__(config, transformer, lm_head)
@@ -522,6 +519,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         self.text_vocab_size = config.text_vocab_size
         self.audio_vocab_size = config.audio_vocab_size
         self.audio_num_codebooks = config.audio_num_codebooks
+        self.audio_codebook_size = config.audio_codebook_size
+        self.audio_out_token_idx = config.audio_out_token_idx
         self.audio_stream_bos_id = config.audio_stream_bos_id
         self.audio_stream_eos_id = config.audio_stream_eos_id
 
@@ -532,10 +531,9 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         """Get or create delay pattern state for a request."""
         if req_id not in self.request_states:
             self.request_states[req_id] = {
-                # When None, we have not observed an EOS yet to start the tail delays
-                "num_remaining_delays": None,
-                # Number of activated codebooks so far (starts from 0)
-                "num_delay": 0,
+                "num_audio_delay": 0,
+                "num_audio_eos": 0,
+                "active": "True",
             }
         return self.request_states[req_id]
 
@@ -547,95 +545,62 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         stream_ptr: Optional[int],
         client_id: Optional[int],
     ) -> None:
-        """Apply delay pattern logic to audio logits during generation.
+        """Apply delay pattern logic to audio logits during generation."""
 
-        Enforces the delay pattern by:
-        - Activating codebooks cyclically and masking logits to the current codebook slice.
-        - Prefilling later codebooks with BOS until they are activated.
-        - After seeing an EOS in any codebook, prefill earlier codebooks with EOS for the
-          remaining positions in the current frame and tail off in subsequent frames.
-        - Finally, when all remaining delays are consumed, force the stream EOS to stop.
-        """
+        # Handle CUDA stream
+        stream = None if stream_ptr is None else torch.cuda.ExternalStream(stream_ptr)
 
-        state = self._get_or_create_state(req_id)
+        with torch.cuda.stream(stream):
+            state = self._get_or_create_state(req_id)
 
-        # token_ids is List[beam][generated_tokens]; use the first beam
-        past = token_ids[0] if token_ids and token_ids[0] is not None else []
-        tokens_generated = len(past)
+            audio_logits = logits[0, 0, 0 : self.audio_vocab_size]
 
-        num_cbs = self.audio_num_codebooks
-        cb_size = self.config.audio_codebook_size
-        slice_size = cb_size + 2  # include BOS/EOS per slice
-
-        # Determine current codebook position (cyclic across codebooks)
-        current_cb_pos = tokens_generated % num_cbs
-        current_base = current_cb_pos * slice_size
-
-        # 1) Mask logits to only allow the current codebook slice
-        if logits is not None and logits.numel() > 0:
-            # keep only [current_base, current_base + slice_size)
-            if current_base > 0:
-                logits[..., :current_base] = -1.0e20
-            tail_start = current_base + slice_size
-            if tail_start < self.audio_vocab_size:
-                logits[..., tail_start:] = -1.0e20
-
-        forced_local_id: Optional[int] = None  # id within slice [0..slice_size-1]
-        # By default, do not allow sampling BOS/EOS unless explicitly forced
-        bos_global = current_base + self.audio_stream_bos_id
-        eos_global = current_base + self.audio_stream_eos_id
-        if logits is not None and logits.numel() > 0:
-            # Disallow BOS by default; add small bias to EOS to encourage termination
-            logits[..., bos_global] = -1.0e20
-            logits[..., eos_global] += 1.0  # Small positive bias to encourage EOS
-
-        # 2) Initial delays (force BOS for not-yet-activated codebooks)
-        if state["num_delay"] + 1 < num_cbs:
-            if current_cb_pos > state["num_delay"]:
-                forced_local_id = self.audio_stream_bos_id  # equals cb_size
-            if current_cb_pos == num_cbs - 1:
-                state["num_delay"] += 1
-
-        # 3) Tail delays after encountering any EOS in the past stream
-        if state["num_remaining_delays"] is not None:
-            # For early positions in the frame, force EOS
-            if current_cb_pos < (num_cbs - state["num_remaining_delays"]):
-                forced_local_id = self.audio_stream_eos_id
-            if current_cb_pos == num_cbs - 1:
-                state["num_remaining_delays"] -= 1
-        else:
-            if tokens_generated > 0:
-                past_tensor = torch.as_tensor(past, device=logits.device)
-                # Detect EOS irrespective of slice by modulo slice_size
-                eos_positions = ((past_tensor % slice_size) == self.audio_stream_eos_id).nonzero(
-                    as_tuple=False
+            expected_size = self.audio_vocab_size
+            if audio_logits.numel() != expected_size:
+                print(
+                    f"Warning: Audio logits size mismatch. Expected {expected_size}, got {audio_logits.numel()}"
                 )
-                if eos_positions.numel() > 0:
-                    last_eos_idx = int(eos_positions[-1, 0].item())
-                    last_eos_pos_in_frame = last_eos_idx % num_cbs
-                    state["num_remaining_delays"] = num_cbs - last_eos_pos_in_frame - 1
-                    if current_cb_pos < last_eos_pos_in_frame:
-                        forced_local_id = self.audio_stream_eos_id
+                return
 
-        # 4) End generation when all delays are consumed
-        if state["num_remaining_delays"] is not None and state["num_remaining_delays"] <= 0:
-            forced_local_id = self.audio_stream_eos_id
-            state["num_delay"] = 0
-            state["num_remaining_delays"] = None
+            audio_logits = audio_logits.view(self.audio_num_codebooks, -1)
 
-        # 5) Apply forced token inside the current slice (convert to global id)
-        if forced_local_id is not None:
-            forced_global_id = current_base + forced_local_id
-            logits[...] = -1.0e20
-            if 0 <= forced_global_id < self.audio_vocab_size:
-                logits[..., forced_global_id] = 0.0
-            print(
-                f"🔒 FORCED token at pos {tokens_generated}, cb {current_cb_pos}: local_id={forced_local_id}, global_id={forced_global_id}"
-            )
-        else:
-            print(
-                f"🎲 SAMPLING at pos {tokens_generated}, cb {current_cb_pos}: delay={state['num_delay']}, remaining_delays={state['num_remaining_delays']}"
-            )
+            self._apply_delay_pattern_logic(audio_logits, state, token_ids)
+
+            # Update the original logits tensor
+            logits[0, 0, 0 : self.audio_vocab_size] = audio_logits.view(-1)
+
+    def _apply_delay_pattern_logic(
+        self, audio_logits: torch.Tensor, state: dict, token_ids: torch.Tensor
+    ):
+        """Apply delay pattern logic to audio logits."""
+        num_audio_delay = state["num_audio_delay"]
+        num_audio_eos = state["num_audio_eos"]
+        # Generate the delayed tokens for the first few codebooks
+        if num_audio_delay < self.audio_num_codebooks:
+            # Force BOS tokens for positions from num_audio_delay onwards
+            # for i in range(num_audio_delay, self.audio_num_codebooks):
+            audio_logits[:, num_audio_delay:] = -float("inf")
+            # if 0 <= self.audio_stream_bos_id < audio_logits.shape[1]:
+            audio_logits[:, self.audio_stream_bos_id] = float("inf")
+            state["num_audio_delay"] += 1
+
+        # Handle EOS pattern
+        if num_audio_eos < self.audio_num_codebooks:
+            # Force EOS for the first num_audio_eos positions
+            # for i in range(num_audio_eos):
+            all_eos_indices = where(token_ids == self.audio_stream_eos_id)
+            if all_eos_indices.shape[0] > 0:
+                last_eos_index = all_eos_indices[-1]
+                audio_logits[:last_eos_index] = -float("inf")
+                state["num_audio_eos"] = last_eos_index + 1
+                audio_logits[:, self.audio_stream_eos_id] = float("inf")
+            # audio_logits[:, :] = -float("inf")
+            # if 0 <= self.audio_stream_eos_id < audio_logits.shape[1]:
+            # audio_logits[:, self.audio_stream_eos_id] = 10.0
+
+        elif num_audio_eos >= self.audio_num_codebooks:
+            # All codebooks have generated EOS, force EOS for all
+            state["active"] = False
 
 
 class HiggsAudioTRTRunner:
@@ -710,14 +675,14 @@ class HiggsAudioTRTRunner:
                 device=audio_ids.device,
             )
             # Concatenate: BOS + audio_ids + EOS
-            audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1)
+            audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1).flatten()
 
             # Apply delay pattern
             audio_ids = _build_delay_pattern_mask(
                 audio_ids.unsqueeze(0),  # Add batch dimension
                 bos_token_id=self.config.audio_stream_bos_id,
                 pad_token_id=self.config.audio_stream_eos_id,
-            ).flatten()
+            ).squeeze(0)
             audio_ids += self.config.text_vocab_size
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # The format should include the reference audio transcription and then the target text
@@ -771,7 +736,16 @@ class HiggsAudioTRTRunner:
         input_text: str,
         **generation_kwargs,
     ):
-        """Generate audio with improved sampling parameters and EOS handling."""
+        """Generate audio from text input and reference audio (TTS with voice cloning).
+
+        Args:
+            input_text: The text prompt to convert to speech
+            input_audio: Path to reference audio file for voice cloning
+
+        Returns:
+            Generated audio tensor suitable for Whisper transcription"""
+
+        from tensorrt_llm.models.higgs_audio.serve import create_audio_chunk
 
         text_input = (
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
@@ -783,70 +757,30 @@ class HiggsAudioTRTRunner:
             [self.saved_input_ids, text_input_ids, audio_input_ids],
             dim=0,
         ).cuda()
-
-        print(f"Input construction:")
-        print(f"  saved_input_ids length: {len(self.saved_input_ids)}")
-        print(f"  text_input_ids length: {len(text_input_ids)}")
-        print(f"  audio_input_ids: {audio_input_ids}")
-        print(f"  Total input length: {len(input_ids)}")
-        print(f"  Last few input tokens: {input_ids[-10:].tolist()}")
-        print(f"  Text vocab size: {self.config.text_vocab_size}")
-
         input_lengths = torch.tensor(
             [input_ids.size(-1)], device=self.gpu_device, dtype=torch.int32
         )
         max_input_length = torch.max(input_lengths).item()
-        max_new_tokens = min(
-            512, self.max_seq_len - max_input_length
-        )  # Reduced for faster iteration
-
+        max_new_tokens = min(1024, self.max_seq_len - max_input_length)
         with torch.no_grad():
-            # Prepare stop words: any slice-specific EOS should terminate generation
-            slice_size = self.config.audio_codebook_size + 2
-            all_eos_ids = [
-                i * slice_size + self.config.audio_stream_eos_id
-                for i in range(self.config.audio_num_codebooks)
-            ]
-            stop_words = [[[eid] for eid in all_eos_ids]]
-
-            # Use improved sampling parameters for maximum diversity
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                end_id=all_eos_ids[0],
-                stop_words_list=stop_words,
-                temperature=self.temperature,
-                top_k=self.top_k,
-                top_p=self.top_p,
-                # logits_processor_names=["higgs_audio_delay_pattern"],
+                end_id=self.config.audio_stream_eos_id,
+                stop_words_list=[[[self.config.audio_stream_eos_id]]],
+                temperature=float(self.temperature),
+                top_k=int(self.top_k),
+                top_p=float(self.top_p),
+                logits_processor_names=["higgs_audio_delay_pattern"],
             )
-
-        import numpy as np
-
-        np.savetxt("log.txt", outputs.cpu().view(-1), delimiter=",", fmt="%d")
 
         # Extract and process audio tokens with proper delay pattern handling
         try:
-            print(f"Raw generation output length: {len(outputs[0, 0])}")
-            print(f"First 20 generated tokens: {outputs[0, 0][:20].tolist()}")
-            print(f"Last 20 generated tokens: {outputs[0, 0][-20:].tolist()}")
-
             vq_code = self._extract_and_process_audio_tokens(outputs[0, 0])
+            print(f"Extracted audio tokens shape: {vq_code.shape}")
             import numpy as np
 
-            np.savetxt("log2.txt", vq_code.cpu().view(-1), delimiter=",", fmt="%d")
-            print(f"Extracted audio tokens shape: {vq_code.shape}")
-            print(f"Audio token value ranges per codebook:")
-            for i in range(vq_code.shape[0]):
-                cb_tokens = vq_code[i]
-                print(
-                    f"  Codebook {i}: min={cb_tokens.min().item()}, max={cb_tokens.max().item()}, unique_vals={len(torch.unique(cb_tokens))}"
-                )
-
-            # Check for reasonable diversity in tokens
-            total_unique = len(torch.unique(vq_code))
-            print(f"Total unique audio token values across all codebooks: {total_unique}")
-
+            np.savetxt("log.txt", outputs.cpu().view(-1), delimiter=",", fmt="%d")
             # Decode to waveform
             waveform, sr = self.audio_tokenizer.decode(vq_code)
             if isinstance(waveform, torch.Tensor):
@@ -859,82 +793,59 @@ class HiggsAudioTRTRunner:
             return waveform.astype(np.float32)
         except Exception as e:
             print(f"Error processing audio tokens: {e}")
-            return None
 
     def _extract_and_process_audio_tokens(self, generated_tokens):
-        """Extract and process audio tokens from a flat interleaved stream.
-        The runtime returns a 1D sequence of audio-vocab token IDs, interleaved across
-        codebooks in cyclic order. We first de-interleave into shape
-        (num_codebooks, seq_len_per_codebook), then revert the delay pattern.
-        """
-        if not isinstance(generated_tokens, torch.Tensor):
-            generated_tokens = torch.as_tensor(generated_tokens)
+        """Extract and process audio tokens with proper delay pattern handling."""
+        import numpy as np
 
-        print(f"Input generated_tokens shape: {generated_tokens.shape}")
-        print(
-            f"Text vocab size: {self.config.text_vocab_size}, Audio vocab size: {self.config.audio_vocab_size}"
-        )
+        # Find the audio stream BOS token (this is where audio generation starts)
+        bos_mask = generated_tokens == self.config.audio_stream_bos_id
+        if not bos_mask.any():
+            raise ValueError("No audio_stream_bos_id found in generated tokens")
 
-        # Convert back to local audio vocab space
-        audio_local = generated_tokens
-        print(
-            f"Audio local token ranges: min={audio_local.min().item()}, max={audio_local.max().item()}"
-        )
+        # Find first BOS token position
+        start_idx = torch.argmax(bos_mask.float()).item()
 
+        # Find EOS token position (end of audio generation)
+        eos_mask = generated_tokens[start_idx + 1 :] == self.config.audio_stream_eos_id
+        if eos_mask.any():
+            eos_idx = torch.argmax(eos_mask.float()).item() + start_idx
+            audio_tokens = generated_tokens[start_idx:eos_idx]
+        else:
+            # No EOS found, take all remaining tokens
+            audio_tokens = generated_tokens[start_idx:]
+        print(f"Raw audio tokens length: {len(audio_tokens)}")
+
+        # Ensure we have enough tokens for all codebooks
         num_codebooks = self.config.audio_num_codebooks
-        total = int(audio_local.numel())
-        if total < num_codebooks:
-            raise ValueError(f"Not enough audio tokens: {total} < {num_codebooks}")
+        if len(audio_tokens) < num_codebooks:
+            raise ValueError(f"Not enough audio tokens: {len(audio_tokens)} < {num_codebooks}")
 
-        # Keep full frames only
-        trim_len = (total // num_codebooks) * num_codebooks
+        # Trim to make divisible by num_codebooks
+        trim_len = (len(audio_tokens) // num_codebooks) * num_codebooks
+        audio_tokens = audio_tokens[:trim_len]
         if trim_len == 0:
             raise ValueError("No valid audio tokens after trimming")
-        flat = audio_local[:trim_len]
+
+        # Reshape to (num_codebooks, seq_len) for delay pattern processing
         seq_len = trim_len // num_codebooks
+        audio_tokens = audio_tokens.view(num_codebooks, seq_len)
+        print(f"Reshaped audio tokens: {audio_tokens.shape}")
 
-        print(f"Trimmed to {trim_len} tokens ({seq_len} per codebook)")
-
-        # De-interleave: [t0_cb0, t0_cb1, ..., t0_cbN-1, t1_cb0, ...] -> [N, T]
-        audio_tokens = flat.view(seq_len, num_codebooks).transpose(0, 1).contiguous()
-        print(f"De-interleaved audio tokens: {audio_tokens.shape}")
-
-        # Check token distributions before delay pattern reversion
-        print("Token distributions before delay pattern reversion:")
-        for i in range(min(num_codebooks, 4)):  # Show first few codebooks
-            cb_tokens = audio_tokens[i]
-            unique_vals = torch.unique(cb_tokens)
-            print(
-                f"  Codebook {i}: unique tokens = {len(unique_vals)}, sample = {cb_tokens[:10].tolist()}"
-            )
-
-        # Apply delay pattern reversion to align codebooks in time
+        # Apply delay pattern reversion
         vq_code = revert_delay_pattern(audio_tokens)
-
-        print(f"After delay pattern reversion: {vq_code.shape}")
-
-        # Remove leading BOS and trailing EOS columns if present
-        original_width = vq_code.shape[1]
-        if vq_code.shape[1] > 0 and torch.all(vq_code[:, 0] == self.config.audio_stream_bos_id):
-            vq_code = vq_code[:, 1:]
-            print(f"Removed leading BOS column")
-        if vq_code.shape[1] > 0 and torch.all(vq_code[:, -1] == self.config.audio_stream_eos_id):
-            vq_code = vq_code[:, :-1]
-            print(f"Removed trailing EOS column")
-
-        print(f"After BOS/EOS removal: {vq_code.shape} (was {original_width})")
-
-        if vq_code.shape[1] == 0:
-            raise ValueError("No audio content after removing BOS/EOS tokens")
-
         # Clip to valid codebook range
-        before_clip_min, before_clip_max = vq_code.min().item(), vq_code.max().item()
-        vq_code = vq_code.clip(0, self.config.audio_codebook_size - 1)
-        after_clip_min, after_clip_max = vq_code.min().item(), vq_code.max().item()
+        # vq_code = vq_code.clip(0, self.config.audio_codebook_size - 1)
+        # Remove BOS/EOS tokens if present
+        if vq_code.shape[1] > 0:
+            # Check if first column is all BOS tokens
+            if torch.all(vq_code[:, 0] == self.config.audio_stream_bos_id):
+                vq_code = vq_code[:, 1:]
 
-        print(
-            f"Token clipping: [{before_clip_min}, {before_clip_max}] -> [{after_clip_min}, {after_clip_max}]"
-        )
-        print(f"Final vq_code shape: {vq_code.shape}")
+            # Check if last column is all EOS tokens
+            if vq_code.shape[1] > 0 and torch.all(
+                vq_code[:, -1] == self.config.audio_stream_eos_id
+            ):
+                vq_code = vq_code[:, :-1]
 
         return vq_code
