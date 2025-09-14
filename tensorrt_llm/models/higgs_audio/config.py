@@ -176,7 +176,10 @@ class HiggsAudioConfig(PretrainedConfig):
             intermediate_size=hf_config.intermediate_size,
             num_key_value_heads=hf_config.num_key_value_heads,
             head_size=hf_config.head_dim,
-            vocab_size=hf_config.vocab_size,
+            # IMPORTANT: We generate only audio tokens in TensorRT-LLM, so the
+            # runtime's sampling vocabulary must match the audio head size.
+            # Use audio vocab (num_codebooks * (codebook_size)) instead of text vocab.
+            vocab_size=(1024 + 2) * 8,
             max_position_embeddings=hf_config.max_position_embeddings,
             rotary_embedding_dim=rotary_embedding_dim,
             hidden_act=hf_config.hidden_act,
