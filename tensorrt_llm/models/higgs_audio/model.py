@@ -462,33 +462,26 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-        # Token routing:
-        # During prefill (use_cache=False), treat ALL tokens as text to avoid misrouting low-id text tokens.
-        # During decode (use_cache=True), the single-step input_id corresponds to the previously generated token
-        # which is in the audio flattened vocab; treat it as audio.
-        if not use_cache:
-            # Create a mask of all False for prefill
-            audio_mask = input_ids != input_ids
-        else:
-            # Create a mask of all True for decode
-            audio_mask = input_ids == input_ids
 
-        # Audio tokens use flattened audio vocab ids as-is
+        bos_mask = input_ids == self.config.audio_stream_bos_id
+        # The idea here is that only on the first pass will the input_ids will be larger than audio_num_codebooks and this code is to separate the input audio and text if the a voice clone reference is being used
+        if input_ids.shape[0] > self.config.audio_num_codebooks and bos_mask.any():
+            start_idx = torch.argmax(bos_mask.float()).item()
+            eos_mask = input_ids[start_idx + 1 :] == self.config.audio_stream_eos_id
+            eos_idx = torch.argmax(eos_mask.float()).item() + start_idx
+            audio_mask = where(position_ids >= start_idx and position_ids <= eos_idx, True, False)
+        # This is all subsequent passes where I currently route everything through the audio path.  Is that the right thing to do? I have no idea.
+        elif input_ids.shape[0] <= self.config.audio_num_codebooks:
+            audio_mask = where(True, True, False)
+        # This is the first pass if no voice clone is being  used
+        else:
+            audio_mask = where(False, True, False)
+
         audio_ids = where(audio_mask, input_ids, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
-        # Broadcast mask to hidden dimension and zero-out non-audio positions with correct dtype
-        mask_b = expand_dims_like(audio_mask, audio_embed)
-        audio_embed = where(mask_b, audio_embed, audio_embed * 0)
-
-        # Text tokens for context pass; zero-out audio positions
         text_ids = where(audio_mask, 0, input_ids)
         text_embed = self.vocab_embedding(text_ids)
-        text_embed = where(mask_b, text_embed * 0, text_embed)
         input_embed = text_embed + audio_embed
-
-        # During decoding (use_cache=True), the newly generated position should follow the audio path
-        # regardless of the previous token id. Force the per-layer mask to True in that case.
-        layer_mask = mask_b if not use_cache else (mask_b == mask_b)
 
         hidden_states = self.layers(
             hidden_states=input_embed,
@@ -496,7 +489,7 @@ class HiggsAudioTransformer(Module):
             attention_mask=attention_mask,
             kv_cache_params=kv_cache_params,
             attention_params=attention_params,
-            vision_token_mask=layer_mask,
+            vision_token_mask=audio_mask.unsqueeze(-1),
         )
 
         if use_cache:
@@ -844,31 +837,11 @@ class HiggsAudioTRTRunner:
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         )
 
-        input_ids = self.tokenizer.encode(text_input, return_tensors="pt").flatten().to(self.device)
+        input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
         input_ids = torch.cat([self.saved_input_ids, input_ids])
-        # Keep on CPU; ModelRunner will handle padding and later move to CUDA
-        input_ids = input_ids.to(dtype=torch.int32)
 
-        max_input_length = input_ids.size(0)
-        max_new_tokens = max(1, self.max_num_tokens - int(max_input_length))
-
-        # Use a single global end_id that we will emit only after all codebooks are closed:
-        # choose the EOS of the last codebook in the flattened audio vocab
-        end_id_global = (
-            self.config.audio_num_codebooks - 1
-        ) * self.config.audio_codebook_size + self.config.audio_stream_eos_id
-
-        # Create a fresh sampling_config for each call with the correct end_id
-        from tensorrt_llm.runtime import SamplingConfig
-
-        sampling_config = SamplingConfig(
-            end_id=int(end_id_global),
-            pad_id=self.config.pad_token_id,
-            temperature=float(self.temperature),
-            top_k=int(self.top_k),
-            top_p=float(self.top_p),
-            num_beams=self.num_beams,
-        )
+        max_input_length = torch.tensor([input_ids.size(0)], dtype=torch.int32).max().item()
+        max_new_tokens = self.max_num_tokens - max_input_length
 
         with torch.no_grad():
             outputs = self.runner.generate(
@@ -885,15 +858,7 @@ class HiggsAudioTRTRunner:
         try:
             import numpy as np
 
-            out_ids = outputs["output_ids"]
-            seq_lens = outputs["sequence_lengths"]
-            # slice out only the generated portion
-            prompt_len = input_ids.size(0)
-            end_len = int(seq_lens[0][0])
-            gen_slice = out_ids[0, 0, prompt_len:end_len]
-            np.savetxt("log.txt", gen_slice.cpu().view(-1), delimiter=",", fmt="%d")
-            print(gen_slice)
-            vq_code = self._extract_and_process_audio_tokens(gen_slice)
+            vq_code = self._extract_and_process_audio_tokens(outputs[0, 0])
             print(f"Extracted audio tokens shape: {vq_code.shape}")
 
             # Decode to waveform
