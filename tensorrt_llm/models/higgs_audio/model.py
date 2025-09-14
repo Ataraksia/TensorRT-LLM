@@ -239,20 +239,51 @@ def revert_delay_pattern(data):
 
 
 def _build_delay_pattern_mask(input_ids: torch.LongTensor, bos_token_id: int, pad_token_id: int):
-    """Implement the delay pattern proposed in "Simple and Controllable Music Generation".
+    """Implement the delay pattern proposed in "Simple and Controllable Music Generation", https://arxiv.org/pdf/2306.05284
 
     In the delay pattern, each codebook is offset by the previous codebook by
-    one. We insert a special delay token at the start of the sequence if its delayed,
-    and append pad token once the sequence finishes.
+    one. We insert a special delay token at the start of the sequence if its delayed, and append pad token once the sequence finishes.
+
+    Take the example where there are 4 codebooks and audio sequence length=8. After shifting, the output should have length seq_len + num_codebooks - 1
+
+    - [ *,  *,  *,  *,  *,  *,  *,  *, P, P, P]
+    - [ B,  *,  *,  *,  *,  *,  *,  *, *, P, P]
+    - [ B,  B,  *,  *,  *,  *,  *,  *, *, *, P]
+    - [ B,  B,  B,  *,  *,  *,  *,  *, *, *, *]
+
+    where B indicates the delay token id, P is the special padding token id and `*` indicates that the original audio token.
+
+    Now let's consider the case where we have a sequence of audio tokens to condition on.
+    The audio tokens were originally in the following non-delayed form:
+
+    - [a, b]
+    - [c, d]
+    - [e, f]
+    - [g, h]
+
+    After conversion, we get the following delayed form:
+    - [a, b, -1, -1, -1]
+    - [B, c,  d, -1, -1]
+    - [B, B,  e,  f, -1]
+    - [B, B,  B,  g,  h]
+
+    Note that we have a special token `-1` that indicates it should be replaced by a new token we see in the generation phase.
+    In that case, we should override the `-1` tokens in auto-regressive generation.
 
     Args:
-        input_ids: The input ids of the prompt. Shape (num_codebooks, seq_len).
-        bos_token_id: The id of the special delay token
-        pad_token_id: The id of the padding token. Should be the same as eos_token_id.
+        input_ids (:obj:`torch.LongTensor`):
+            The input ids of the prompt. It will have shape (num_codebooks, seq_len).
+        bos_token_id (:obj:`int`):
+            The id of the special delay token
+        pad_token_id (:obj:`int`):
+            The id of the padding token. Should be the same as eos_token_id.
 
     Returns:
-        input_ids: The transformed input ids with delay pattern applied.
-                  Shape (num_codebooks, seq_len + num_codebooks - 1).
+        input_ids (:obj:`torch.LongTensor`):
+            The transformed input ids with delay pattern applied. It will have shape ( num_codebooks, seq_len + num_codebooks - 1).
+        input_ids_with_gen_mask (:obj:`torch.LongTensor`):
+            The transformed input ids with delay pattern applied. The -1 in the output indicates new tokens that should be generated.
+
     """
     num_codebooks, seq_len = input_ids.shape
 
@@ -432,13 +463,16 @@ class HiggsAudioTransformer(Module):
         """Forward pass for Higgs Audio transformer with multimodal support."""
 
         bos_mask = input_ids == self.config.audio_stream_bos_id
+        # The idea here is that only on the first pass will the input_ids will be larger than audio_num_codebooks and this code is to separate the input audio and text if the a voice clone reference is being used
         if input_ids.shape[0] > self.config.audio_num_codebooks and bos_mask.any():
             start_idx = torch.argmax(bos_mask.float()).item()
             eos_mask = input_ids[start_idx + 1 :] == self.config.audio_stream_eos_id
             eos_idx = torch.argmax(eos_mask.float()).item() + start_idx
             audio_mask = where(position_ids >= start_idx and position_ids <= eos_idx, True, False)
+        # This is all subsequent passes where I currently route everything through the audio path.  Is that the right thing to do? I have no idea.
         elif input_ids.shape[0] <= self.config.audio_num_codebooks:
             audio_mask = where(True, True, False)
+        # This is the first pass if no voice clone is being  used
         else:
             audio_mask = where(False, True, False)
 
@@ -527,6 +561,7 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
     def __init__(self, config: HiggsAudioConfig):
         self.config = config
+
         self.vocab_size = config.audio_vocab_size
         self.num_codebooks = config.audio_num_codebooks
         self.codebook_size = config.audio_codebook_size
@@ -559,7 +594,7 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
         with torch.cuda.stream(stream):
             state = self._get_or_create_state(req_id)
-
+            # I think there's likely an issue with how this whole section is setup. I find the whole interleaved, delayed audio thing extremely confusing.  Maybe you can sort it out.
             last_token_id: int = token_ids[0][-1]
             audio_logits = (
                 logits[0, 0, 0 : self.vocab_size]
@@ -574,8 +609,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
     def _apply_delay_pattern_logic(self, logits: torch.Tensor, state: dict, last_token_id: int):
         """Apply delay pattern logic to audio logits."""
-        # if (last_token_id == self.config.audio_out_bos_token_id):
 
+        # Look at the _build_delay_pattern_mask description to get a sense of what this is trying to do. Right now, it's having issues.  It's not generating the stream_bos_ids for some reason.
         if state["num_delay"] < self.num_codebooks:
             logits[state["num_delay"] :] = -float("inf")
             logits[state["num_delay"] :, self.stream_bos_id] = float("inf")
@@ -663,14 +698,14 @@ class HiggsAudioTRTRunner:
             audio_ids = torch.cat([bos_tokens, audio_ids, eos_tokens], dim=-1)
 
             # Apply delay pattern
-            audio_ids = (
-                _build_delay_pattern_mask(
-                    audio_ids,
-                    bos_token_id=self.config.audio_stream_bos_id,
-                    pad_token_id=self.config.audio_stream_eos_id,
-                ).flatten()
-                + self.config.text_vocab_size
-            )
+            audio_ids = _build_delay_pattern_mask(
+                audio_ids,
+                bos_token_id=self.config.audio_stream_bos_id,
+                pad_token_id=self.config.audio_stream_eos_id,
+            ).flatten()
+            import numpy as np
+
+            np.savetxt("log2.txt", audio_ids.cpu().view(-1), delimiter=",", fmt="%d")
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # The format should include the reference audio transcription and then the target text
             pre_audio_input = (
