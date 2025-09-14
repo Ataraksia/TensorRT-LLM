@@ -20,6 +20,8 @@ The model includes:
 - HiggsAudioConfig: Main configuration for the multimodal model
 """
 
+import json
+from pathlib import Path
 from typing import Dict, Union
 
 import transformers
@@ -39,6 +41,7 @@ class HiggsAudioConfig(PretrainedConfig):
     def __init__(
         self,
         *,
+        build_config: Dict,
         audio_adapter_type: str = "dual_ffn_fast_forward",
         audio_dual_ffn_layers: list = None,
         audio_ffn_hidden_size: int = 3072,
@@ -66,6 +69,8 @@ class HiggsAudioConfig(PretrainedConfig):
     ):
         self.text_vocab_size = text_vocab_size
         self.audio_vocab_size = audio_vocab_size
+
+        self.build_config = build_config
 
         # Initialize base PretrainedConfig
         super().__init__(**kwargs)
@@ -129,7 +134,10 @@ class HiggsAudioConfig(PretrainedConfig):
     @classmethod
     def from_hugging_face(
         cls,
-        hf_config_or_dir: Union[str, "transformers.PretrainedConfig"],
+        hf_config_or_dir: Union[
+            str, "transformers.PretrainedConfig"
+        ] = "bosonai/higgs-audio-v2-generation-3B-base",
+        engine_dir: str = "./higgs_audio_engine",
         dtype: str = "bfloat16",
         **kwargs,
     ) -> "HiggsAudioConfig":
@@ -157,10 +165,11 @@ class HiggsAudioConfig(PretrainedConfig):
         num_labels = 1
         dtype = infer_dtype(dtype, getattr(hf_config, "torch_dtype", None))
         rotary_embedding_dim = None
-
+        engine_config = json.load(Path(engine_dir + "/config.json").open("r"))
         return cls(
             architecture=hf_config.architectures[0],
             dtype=dtype,
+            build_config=engine_config["build_config"],
             num_hidden_layers=hf_config.num_hidden_layers,
             num_attention_heads=hf_config.num_attention_heads,
             hidden_size=hf_config.hidden_size,

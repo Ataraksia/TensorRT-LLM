@@ -14,8 +14,10 @@ def main():
     build_config = BuildConfig()
     build_config.max_batch_size = 1
     build_config.max_input_len = 2048
+    build_config.max_num_tokens = 2048
+    build_config.plugin_config._remove_input_padding = True
     # Enable generation logits capture for per-step multi-codebook sampling
-    build_config.gather_generation_logits = True
+    # build_config.gather_generation_logits = True
     # build_config.plugin_config.dtype = "bfloat16"
     # build_config.plugin_config.gpt_attention_plugin = "bfloat16"
     # build_config.plugin_config.gemm_plugin = "bfloat16"
