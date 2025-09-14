@@ -11,13 +11,16 @@ from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM
 def main():
     logger.set_level("info")
 
+    gpu_device = torch.device("cuda", 0)
+    torch.cuda.set_device(gpu_device)
+
+    max_num_tokens = 2048
+
     build_config = BuildConfig()
     build_config.max_batch_size = 1
-    build_config.max_input_len = 2048
-    build_config.max_num_tokens = 2048
+    build_config.max_input_len = max_num_tokens
+    build_config.max_num_tokens = max_num_tokens
     build_config.plugin_config._remove_input_padding = True
-    # Enable generation logits capture for per-step multi-codebook sampling
-    # build_config.gather_generation_logits = True
     # build_config.plugin_config.dtype = "bfloat16"
     # build_config.plugin_config.gpt_attention_plugin = "bfloat16"
     # build_config.plugin_config.gemm_plugin = "bfloat16"
@@ -41,10 +44,9 @@ def main():
     # build_config.plugin_config._pp_reduce_scatter = True
     # build_config.plugin_config._use_fused_mlp = True
 
-    gpu_device = torch.device("cuda", 0)
-    torch.cuda.set_device(gpu_device)
     trtllm_model = HiggsAudioForCausalLM.from_hugging_face()
-    # trtllm_model.save_checkpoint("./higgs_audio_engine")
+    trtllm_model.config.max_position_embeddings = max_num_tokens
+
     engine = build(trtllm_model, build_config)
     engine.save("./higgs_audio_engine")
 

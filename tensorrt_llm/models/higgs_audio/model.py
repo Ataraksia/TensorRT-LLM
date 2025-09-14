@@ -41,6 +41,7 @@ from tensorrt_llm.functional import (
     where,
     sum,
     mean,
+    concat,
 )
 from tensorrt_llm.layers import (
     MLP,
@@ -429,18 +430,23 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-        if input_ids.shape[0] == 1:
-            audio_mask = [1]
-        else:
-            audio_mask = input_ids >= self.config.text_vocab_size
 
+        bos_mask = input_ids == self.config.audio_stream_bos_id
+        if input_ids.shape[0] > self.config.audio_num_codebooks and bos_mask.any():
+            start_idx = torch.argmax(bos_mask.float()).item()
+            eos_mask = input_ids[start_idx + 1 :] == self.config.audio_stream_eos_id
+            eos_idx = torch.argmax(eos_mask.float()).item() + start_idx
+            audio_mask = where(position_ids >= start_idx and position_ids <= eos_idx, True, False)
+        elif input_ids.shape[0] <= self.config.audio_num_codebooks:
+            audio_mask = where(True, True, False)
+        else:
+            audio_mask = where(False, True, False)
+
+        audio_ids = where(audio_mask, input_ids, 0)
+        audio_embed = self._embed_audio_ids(audio_ids)
         text_ids = where(audio_mask, 0, input_ids)
         text_embed = self.vocab_embedding(text_ids)
-
-        audio_ids = where(audio_mask, input_ids - self.config.text_vocab_size, 0)
-        audio_embed = self._embed_audio_ids(audio_ids)
-
-        input_embed = where(unsqueeze(audio_mask, -1), audio_embed, text_embed)
+        input_embed = text_embed + audio_embed
 
         hidden_states = self.layers(
             hidden_states=input_embed,
@@ -555,18 +561,19 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
             state = self._get_or_create_state(req_id)
 
             last_token_id: int = token_ids[0][-1]
-            logits = (
+            audio_logits = (
                 logits[0, 0, 0 : self.vocab_size]
                 # .repeat_interleave(self.num_codebooks)
                 .view(self.num_codebooks, -1)
             )
-            self._apply_delay_pattern_logic(logits, state, last_token_id)
+            self._apply_delay_pattern_logic(audio_logits, state, last_token_id)
 
             # Update the original logits tensor
-            logits = logits.view(1, 1, -1)
+            logits[0, 0, 0 : self.vocab_size] = audio_logits.view(-1)
 
     def _apply_delay_pattern_logic(self, logits: torch.Tensor, state: dict, last_token_id: int):
         """Apply delay pattern logic to audio logits."""
+        # if (last_token_id == self.config.audio_out_bos_token_id):
 
         if state["num_delay"] < self.num_codebooks:
             logits[state["num_delay"] :] = -float("inf")
@@ -603,10 +610,6 @@ class HiggsAudioTRTRunner:
         self.num_beams = 1
         self.gpu_weights_percent = 0.5
         self.max_num_tokens = self.config.build_config["max_num_tokens"]
-
-        self.audio_in_start_idx = 0
-        self.audio_in_end_idx = 0
-        self.audio_out_start_idx = 0
 
         # Set up device
         self.device = torch.device("cuda", 0)
@@ -690,9 +693,6 @@ class HiggsAudioTRTRunner:
             )
 
             self.saved_input_ids = torch.cat([pre_audio_input_ids, audio_ids, post_audio_input_ids])
-
-            self.audio_in_start_idx = pre_audio_input_ids.shape[0]
-            self.audio_in_end_idx = pre_audio_input_ids.shape[0] + audio_ids.shape[0] - 1
         else:
             # Format without reference audio (default voice)
             # Simplified format for direct text-to-speech without voice cloning
@@ -742,12 +742,6 @@ class HiggsAudioTRTRunner:
         max_input_length = torch.tensor([input_ids.size(0)], dtype=torch.int32).max().item()
         max_new_tokens = self.max_num_tokens - max_input_length
 
-        self.audio_out_start_idx = input_ids.size(0)
-        print(
-            self.audio_in_start_idx,
-            self.audio_in_end_idx,
-            self.audio_out_start_idx,
-        )
         with torch.no_grad():
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
@@ -764,7 +758,7 @@ class HiggsAudioTRTRunner:
             import numpy as np
 
             np.savetxt("log.txt", outputs.cpu().view(-1), delimiter=",", fmt="%d")
-            print(outputs[0, 0])
+            print(outputs)
             vq_code = self._extract_and_process_audio_tokens(outputs[0, 0])
             print(f"Extracted audio tokens shape: {vq_code.shape}")
 
@@ -789,6 +783,15 @@ class HiggsAudioTRTRunner:
             generated_tokens = torch.as_tensor(generated_tokens)
 
         print(f"Input generated_tokens shape: {generated_tokens.shape}")
+
+        # Find the initial prompt
+        bos_mask = generated_tokens == self.config.audio_out_bos_token_id
+        if not bos_mask.any():
+            raise ValueError("No audio_out_bos_token_id found in the prompt tokens")
+
+        # Find prompt BOS token position
+        start_idx = torch.argmax(bos_mask.float()).item() + 1
+        audio_tokens = generated_tokens[start_idx:]
 
         # Find the audio stream BOS token (this is where audio generation starts)
         bos_mask = generated_tokens == self.config.audio_stream_bos_id
