@@ -50,7 +50,7 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_vocab_size: int = 8208,
         # Audio codebook configuration
         audio_num_codebooks: int = 8,
-        audio_codebook_size: int = 1024,
+        audio_codebook_size: int = 1024 + 2,  # +2 for special tokens
         audio_stream_bos_id: int = 1024,
         audio_stream_eos_id: int = 1025,
         # Special tokens

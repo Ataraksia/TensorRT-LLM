@@ -43,10 +43,7 @@ def main():
 
     gpu_device = torch.device("cuda", 0)
     torch.cuda.set_device(gpu_device)
-    trtllm_model = HiggsAudioForCausalLM.from_hugging_face(
-        "bosonai/higgs-audio-v2-generation-3B-base"
-    )
-
+    trtllm_model = HiggsAudioForCausalLM.from_hugging_face()
     # trtllm_model.save_checkpoint("./higgs_audio_engine")
     engine = build(trtllm_model, build_config)
     engine.save("./higgs_audio_engine")
