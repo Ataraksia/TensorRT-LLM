@@ -566,10 +566,11 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                 # .repeat_interleave(self.num_codebooks)
                 .view(self.num_codebooks, -1)
             )
+
             self._apply_delay_pattern_logic(audio_logits, state, last_token_id)
 
             # Update the original logits tensor
-            logits[0, 0, 0 : self.vocab_size] = audio_logits.view(-1)
+            logits = audio_logits.view(-1)
 
     def _apply_delay_pattern_logic(self, logits: torch.Tensor, state: dict, last_token_id: int):
         """Apply delay pattern logic to audio logits."""
@@ -587,7 +588,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
         if state["num_eos"] == self.num_codebooks:
             # TODO DO something to stop generation
-            pass
+            logits[:] = -float("inf")
+            logits[: state["num_eos"], self.stream_eos_id] = float("inf")
 
 
 class HiggsAudioTRTRunner:
@@ -621,7 +623,7 @@ class HiggsAudioTRTRunner:
 
         # Create custom logits processor for delay pattern handling
         self.audio_logits_processor = HiggsAudioLogitsProcessor(self.config)
-        # self.reference_audio = ""
+        self.reference_audio = ""
         # Preload the part of the input that doesn't change
         if self.reference_audio and self.audio_tokenizer:
             # Load and transcribe reference audio for voice cloning
