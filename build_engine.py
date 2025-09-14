@@ -22,7 +22,7 @@ def main():
     build_config.max_num_tokens = max_num_tokens
     # For simplicity during development, disable padding removal so context prompts
     # are provided as full input_ids sequences instead of packed inputs.
-    build_config.plugin_config._remove_input_padding = False
+    build_config.plugin_config.remove_input_padding = True
     # build_config.plugin_config.dtype = "bfloat16"
     # build_config.plugin_config.gpt_attention_plugin = "bfloat16"
     # build_config.plugin_config.gemm_plugin = "bfloat16"

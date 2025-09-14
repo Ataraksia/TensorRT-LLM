@@ -53,6 +53,7 @@ from tensorrt_llm.layers import (
     KeyValueCacheParams,
     RmsNorm,
 )
+import copy
 import inspect
 import json
 import os
@@ -440,8 +441,15 @@ class HiggsAudioTransformer(Module):
         )
 
     def _embed_audio_ids(self, audio_ids: Tensor):
-        """Embed audio ids from flattened audio vocabulary [0, audio_vocab_size)."""
-        return self.audio_codebook_embeddings(audio_ids)
+        """Embed the audio ids"""
+        num_codebooks = self.config.audio_num_codebooks
+        codebook_size = self.config.audio_codebook_size
+        codebook_shift = (arange(0, num_codebooks, "int32") * codebook_size).unsqueeze(-1)
+        audio_embed = sum(
+            self.audio_codebook_embeddings(audio_ids + codebook_shift),
+            dim=0,
+        )
+        return audio_embed
 
     def forward(
         self,
@@ -459,9 +467,11 @@ class HiggsAudioTransformer(Module):
         # During decode (use_cache=True), the single-step input_id corresponds to the previously generated token
         # which is in the audio flattened vocab; treat it as audio.
         if not use_cache:
-            audio_mask = torch.zeros_like(input_ids, dtype=torch.bool)
+            # Create a mask of all False for prefill
+            audio_mask = input_ids != input_ids
         else:
-            audio_mask = torch.ones_like(input_ids, dtype=torch.bool)
+            # Create a mask of all True for decode
+            audio_mask = input_ids == input_ids
 
         # Audio tokens use flattened audio vocab ids as-is
         audio_ids = where(audio_mask, input_ids, 0)
@@ -701,10 +711,10 @@ class HiggsAudioTRTRunner:
         self.audio_tokenizer_dir = "bosonai/higgs-audio-v2-tokenizer"
         self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
-        # Default sampling settings
-        self.temperature = 0.7
+
+        self.temperature = 1.0
         self.top_k = 50
-        self.top_p = 0.92
+        self.top_p = 0.95
         self.num_beams = 1
         self.gpu_weights_percent = 0.5
         self.max_num_tokens = self.config.build_config["max_num_tokens"]
@@ -778,18 +788,19 @@ class HiggsAudioTRTRunner:
                 f"<|start_header_id|>user<|end_header_id|>{transcription}<|eot_id|>"
                 f"<|start_header_id|>assistant<|end_header_id|><|audio_bos|>"
             )
-            pre_audio_input_ids = self.tokenizer.encode(
-                pre_audio_input, return_tensors="pt"
-            ).flatten()
-            post_audio_input = f"<|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>"
-            post_audio_input_ids = self.tokenizer.encode(
-                post_audio_input, return_tensors="pt"
-            ).flatten()
-
-            # Ensure CPU tensors for Python runtime padding path
-            self.saved_input_ids = torch.cat(
-                [pre_audio_input_ids.cpu(), audio_ids.cpu(), post_audio_input_ids.cpu()]
+            pre_audio_input_ids = (
+                self.tokenizer.encode(pre_audio_input, return_tensors="pt")
+                .to(self.device)
+                .flatten()
             )
+            post_audio_input = f"<|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>"
+            post_audio_input_ids = (
+                self.tokenizer.encode(post_audio_input, return_tensors="pt")
+                .to(self.device)
+                .flatten()
+            )
+
+            self.saved_input_ids = torch.cat([pre_audio_input_ids, audio_ids, post_audio_input_ids])
         else:
             # Format without reference audio (default voice)
             # Simplified format for direct text-to-speech without voice cloning
@@ -801,125 +812,19 @@ class HiggsAudioTRTRunner:
                 f"She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>"
                 f"<|start_header_id|>user<|end_header_id|>"
             )
-            self.saved_input_ids = self.tokenizer.encode(text_input, return_tensors="pt").flatten()
+            self.saved_input_ids = (
+                self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
+            )
 
-        # Use Python ModelRunner to avoid stricter inflight-batching plugin constraints
-        from tensorrt_llm.runtime import ModelRunner
+        from tensorrt_llm.runtime import ModelRunnerCpp
 
-        self.runner = ModelRunner.from_dir(engine_dir=self.engine_dir)
-        # We rely on the Python-side logits processor passed to generate();
-        # avoid registering any C++/engine-side processors to prevent interference.
-
-        # Python-side logits processor for delay pattern when using ModelRunner (Python)
-        class PythonHiggsAudioLogitsProcessor:
-            def __init__(self, config: HiggsAudioConfig):
-                self.num_codebooks = config.audio_num_codebooks
-                self.codebook_size = config.audio_codebook_size
-                self.bos_id = config.audio_stream_bos_id
-                self.eos_id = config.audio_stream_eos_id
-                self.local_vocab_size = self.codebook_size - 2
-                # state across steps
-                self.num_delay = 0
-                self.closed = [False] * self.num_codebooks
-                self.counts = [0] * self.num_codebooks
-                self.step_mod = 0
-                self.prev_cb = None
-                self.min_tokens_per_cb = 160
-                self._dbg_steps = 0
-
-            def __call__(self, step: int, final_output_ids: torch.Tensor, logits: torch.Tensor):
-                # logits: [batch*beam, vocab]
-                # assume batch=1, beam=1
-                l = logits[0]
-                # Preserve original distribution for allowed tokens
-                orig = l.clone()
-                try:
-                    if self._dbg_steps < 48:
-                        with open("lp_debug.txt", "a") as f:
-                            f.write(
-                                f"step={step} num_delay={self.num_delay} counts={self.counts} closed={self.closed}\n"
-                            )
-                        self._dbg_steps += 1
-                except Exception:
-                    pass
-                # Warmup: emit BOS for each codebook sequentially
-                if self.num_delay < self.num_codebooks:
-                    current_cb = self.num_delay
-                    l[:] = -float("inf")
-                    # Encourage BOS for the current codebook (keep simple constant boost)
-                    l[current_cb * self.codebook_size + self.bos_id] = 0.0
-                    self.num_delay += 1
-                    self.step_mod = (current_cb + 1) % self.num_codebooks
-                    self.prev_cb = current_cb
-                    return logits
-
-                # After warmup: update previous cb state based on last token (only if it's an audio token)
-                if self.prev_cb is not None:
-                    last_id = int(final_output_ids[0, -1].item())
-                    audio_vocab_size = self.num_codebooks * self.codebook_size
-                    cb_from_last = -1
-                    local = -1
-                    if 0 <= last_id < audio_vocab_size:
-                        cb_from_last = last_id // self.codebook_size
-                        local = last_id % self.codebook_size
-                        # Skip updates if it was a BOS marker
-                        if cb_from_last == self.prev_cb and local != self.bos_id:
-                            if local == self.eos_id:
-                                self.closed[self.prev_cb] = True
-                            elif 0 <= local < self.local_vocab_size:
-                                self.counts[self.prev_cb] += 1
-                    try:
-                        if self._dbg_steps <= 48:
-                            with open("lp_debug.txt", "a") as f:
-                                f.write(
-                                    f"  last_id={last_id} cb_from_last={cb_from_last} local={local} prev_cb={self.prev_cb}\n"
-                                )
-                    except Exception:
-                        pass
-
-                # If all codebooks closed, allow EOS at last row to encourage stop
-                if all(self.closed):
-                    l[:] = -float("inf")
-                    # finalize on last codebook's EOS (preserve original score if available)
-                    idx = (self.num_codebooks - 1) * self.codebook_size + self.eos_id
-                    l[idx] = orig[idx]
-                    return logits
-
-                # Pick next open codebook starting from step_mod
-                current_cb = self.step_mod
-                for _ in range(self.num_codebooks):
-                    if not self.closed[current_cb]:
-                        break
-                    current_cb = (current_cb + 1) % self.num_codebooks
-                try:
-                    if self._dbg_steps <= 48:
-                        with open("lp_debug.txt", "a") as f:
-                            f.write(f"  target_cb={current_cb} step_mod={self.step_mod}\n")
-
-                except Exception:
-                    pass
-
-                # Mask everything except current codebook
-                l[:] = -float("inf")
-                # In current codebook, disallow BOS, gate EOS based on minimal length
-                base = current_cb * self.codebook_size
-                # allow local token range by preserving original logits
-                l[base + 0 : base + self.local_vocab_size] = orig[
-                    base + 0 : base + self.local_vocab_size
-                ]
-                # disallow BOS
-                l[base + self.bos_id] = -float("inf")
-                # delay EOS if too short
-                if self.counts[current_cb] < self.min_tokens_per_cb:
-                    l[base + self.eos_id] = -float("inf")
-                else:
-                    l[base + self.eos_id] = orig[base + self.eos_id]
-
-                self.step_mod = (current_cb + 1) % self.num_codebooks
-                self.prev_cb = current_cb
-                return logits
-
-        self.python_logits_processor = PythonHiggsAudioLogitsProcessor(self.config)
+        self.runner = ModelRunnerCpp.from_dir(
+            engine_dir=self.engine_dir,
+            kv_cache_free_gpu_memory_fraction=0.5,
+            # use_gpu_direct_storage=True,
+            # cuda_graph_mode=True,
+            logits_processor_map={"higgs_audio_logit_processor": self.audio_logits_processor},
+        )
 
     def generate(
         self,
@@ -939,7 +844,7 @@ class HiggsAudioTRTRunner:
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
         )
 
-        input_ids = self.tokenizer.encode(text_input, return_tensors="pt").flatten()
+        input_ids = self.tokenizer.encode(text_input, return_tensors="pt").flatten().to(self.device)
         input_ids = torch.cat([self.saved_input_ids, input_ids])
         # Keep on CPU; ModelRunner will handle padding and later move to CUDA
         input_ids = input_ids.to(dtype=torch.int32)
@@ -953,18 +858,27 @@ class HiggsAudioTRTRunner:
             self.config.audio_num_codebooks - 1
         ) * self.config.audio_codebook_size + self.config.audio_stream_eos_id
 
+        # Create a fresh sampling_config for each call with the correct end_id
+        from tensorrt_llm.runtime import SamplingConfig
+
+        sampling_config = SamplingConfig(
+            end_id=int(end_id_global),
+            pad_id=self.config.pad_token_id,
+            temperature=float(self.temperature),
+            top_k=int(self.top_k),
+            top_p=float(self.top_p),
+            num_beams=self.num_beams,
+        )
+
         with torch.no_grad():
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                end_id=int(end_id_global),
-                pad_id=self.config.pad_token_id,
+                end_id=self.config.audio_stream_eos_id,
                 temperature=float(self.temperature),
                 top_k=int(self.top_k),
                 top_p=float(self.top_p),
-                output_sequence_lengths=True,
-                return_dict=True,
-                logits_processor=self.python_logits_processor,
+                logits_processor_names=["higgs_audio_logit_processor"],
             )
 
         # Extract and process audio tokens with proper delay pattern handling
