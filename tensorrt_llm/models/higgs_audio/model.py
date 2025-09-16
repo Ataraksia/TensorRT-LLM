@@ -5,12 +5,11 @@
 import librosa
 from collections.abc import AsyncGenerator, Sequence
 import os
-from typing import Any, Optional, List, OrderedDict
+from typing import Any, Optional, List, OrderedDict, Union
 import numpy as np
 from openai.types.chat import ChatCompletionAudio
 import tensorrt
 import torch
-from boson_multimodal import *
 from starlette.datastructures import State
 from huggingface_hub import snapshot_download
 from torch import nn
@@ -20,7 +19,10 @@ from transformers import (
     AutoTokenizer,
     pipeline,
 )
+import torchaudio
 import tensorrt_llm
+import torch.nn.functional as F
+
 from tensorrt_llm.bindings import INT32
 from tensorrt_llm.mapping import Mapping
 
@@ -61,6 +63,9 @@ import inspect
 import json
 import os
 from typing import Optional
+from .descriptaudiocodec.dac.model import dac as dac2
+from .quantization.vq import ResidualVectorQuantizer
+from .semantic.semantic_module import Encoder, Decoder
 
 
 class EncodedResult:
@@ -90,7 +95,7 @@ class HiggsAudioTokenizer(nn.Module):
         target_bandwidths: Sequence[Union[int, float]] = [1, 1.5, 2, 4, 6],
         ratios: Sequence[int] = [8, 5, 4, 2],  # downsampling by 320
         sample_rate: int = 16000,
-        bins: int = 1024,
+        bins: int = [1024],
         n_q: int = 8,
         codebook_dim: int = None,
         normalize: bool = False,
@@ -164,9 +169,9 @@ class HiggsAudioTokenizer(nn.Module):
 
         # out_D=D+768
         if isinstance(bins, int):  # RVQ
-            self.quantizer = ResidualVectorQuantizer(
-                dimension=self.quantizer_dim, codebook_dim=codebook_dim, n_q=n_q, bins=bins
-            )
+            # self.quantizer = ResidualVectorQuantizer(
+            #     dimension=self.quantizer_dim, codebook_dim=codebook_dim, n_q=n_q, bins=bins
+            # )
             self.quantizer_type = "RVQ"
         else:  # RFSQ
             self.quantizer = ResidualFSQ(dim=self.quantizer_dim, levels=bins, num_quantizers=n_q)
@@ -300,8 +305,8 @@ class HiggsAudioTokenizer(nn.Module):
             meter = pyln.Meter(sr)
             l = meter.integrated_loudness(wv)
             wv = pyln.normalize.loudness(wv, l, loudness_threshold)
-        if sr != self.sampling_rate:
-            wv = librosa.resample(wv, orig_sr=sr, target_sr=self.sampling_rate)
+        if sr != self.sample_rate:
+            wv = librosa.resample(wv, orig_sr=sr, target_sr=self.sample_rate)
         if self.audio_tokenizer_feature_extractor is not None:
             inputs = self.audio_tokenizer_feature_extractor(
                 raw_audio=wv,
@@ -349,85 +354,7 @@ class HiggsAudioTokenizer(nn.Module):
         # return codes
         return EncodedResult(codes)
 
-    def decode(self, vq_code: torch.Tensor) -> torch.Tensor:
-        vq_code = vq_code.to(self.device)
-
-        if self.quantizer_type == "RVQ":
-            vq_code = vq_code.permute(1, 0, 2)
-            quantized = self.quantizer.decode(vq_code)
-            quantized = quantized.transpose(1, 2)
-        else:
-            vq_code = vq_code.permute(0, 2, 1)
-            quantized = self.quantizer.get_output_from_indices(vq_code)
-        quantized_acoustic = self.fc_post2(quantized).transpose(1, 2)
-
-        o = self.decoder_2(quantized_acoustic)
-        return o.detach().cpu().numpy()
-
-
-def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
-    is_local = os.path.exists(tokenizer_name_or_path)
-    if not is_local:
-        tokenizer_path = snapshot_download(tokenizer_name_or_path)
-    else:
-        tokenizer_path = tokenizer_name_or_path
-    config_path = os.path.join(tokenizer_path, "config.json")
-    model_path = os.path.join(tokenizer_path, "model.pth")
-    config = json.load(open(config_path))
-    model = HiggsAudioTokenizer(
-        **config,
-        device=device,
-    )
-    parameter_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(parameter_dict, strict=False)
-    model.to(device)
-    model.eval()
-    return model
-
-
-class AudioTokenizer:
-    """Common interface for audio tokenizers."""
-
-    def __init__(self, model, device="cuda:0"):
-        self._model = model
-        self._device = device
-        self.audio_tokenizer_model = load_higgs_audio_tokenizer(
-            model,
-            device=device,
-        )
-        self._tps = self.audio_tokenizer_model.frame_rate
-        self._sampling_rate = self.audio_tokenizer_model.sample_rate
-        self._num_codebooks = self.audio_tokenizer_model.n_q
-        self._codebook_size = self.audio_tokenizer_model.quantizer_dim
-
-    @property
-    def tps(self):
-        return self._tps
-
-    @property
-    def sampling_rate(self):
-        return self._sampling_rate
-
-    @property
-    def num_codebooks(self):
-        return self._num_codebooks
-
-    @property
-    def codebook_size(self):
-        return self._codebook_size
-
-    def encode(
-        self,
-        audio_path_or_wv,
-        sr=None,
-        loudness_normalize=False,
-        loudness_threshold=-23.0,
-    ):
-        return self.audio_tokenizer_model.encode(
-            audio_path_or_wv, sr, loudness_normalize, loudness_threshold
-        )
-
-    def decode(self, vq_code, return_cuda_tensor=False):
+    def decode(self, vq_code):
         """Decode the audio codes to waveform.
 
         Parameters:
@@ -444,67 +371,70 @@ class AudioTokenizer:
         """
         with torch.no_grad():
             if isinstance(vq_code, torch.Tensor):
-                vq_code = vq_code.to(self._device)
+                vq_code = vq_code.to(self.device)
             else:
-                vq_code = torch.from_numpy(vq_code).to(self._device)
-            decoded_wv = xcodec_decode_chunk_by_chunk(
-                self.audio_tokenizer_model,
-                vq_code.unsqueeze(0),
-                chunk_size=60 * self.tps,
-            )[0, 0]
+                vq_code = torch.from_numpy(vq_code).to(self.device)
+            codes = vq_code.unsqueeze(0)
+            overlap_width = 16
+            chunk_size = 60 * self.frame_rate
+            chunk_output_length = self.xcodec_get_output_length(chunk_size)
+            outputs = []
+            # split the codes into chunks, with overlap at the beginning and end
+            for i in range(0, codes.shape[-1], chunk_size):
+                begin = max(0, i - overlap_width)
+                end = min(i + chunk_size + overlap_width, codes.shape[-1])
+                chunk = codes[:, :, begin:end]
+                output = self._xcodec_decode(chunk)
+                if i == 0:
+                    output = output[:, :, :chunk_output_length]
+                elif i + chunk_size >= codes.shape[-1]:
+                    last_chunk_size = codes.shape[-1] - i
+                    last_chunk_output_length = self.xcodec_get_output_length(last_chunk_size)
+                    output = output[:, :, -last_chunk_output_length:]
+                else:
+                    extra_length = (
+                        self.xcodec_get_output_length(chunk_size + overlap_width * 2)
+                        - chunk_output_length
+                    ) // 2
+                    output = output[:, :, extra_length:-extra_length]
+                outputs.append(output)
 
-            if not return_cuda_tensor:
-                return decoded_wv, self.sampling_rate
+            decoded_wv = np.concatenate(outputs, axis=2)[0, 0]
 
-            sampling_rate = self.sampling_rate
-            return torch.from_numpy(decoded_wv), sampling_rate
+            return decoded_wv, self.sample_rate
 
+    def _xcodec_decode(self, vq_code: torch.Tensor) -> torch.Tensor:
+        vq_code = vq_code.to(self.device)
 
-def xcodec_get_output_length(input_length: int):
-    conv_transpose_layers = [
-        dict(kernel_size=16, stride=8, padding=4, output_padding=0),
-        dict(kernel_size=10, stride=5, padding=3, output_padding=1),
-        dict(kernel_size=8, stride=4, padding=2, output_padding=0),
-        dict(kernel_size=4, stride=2, padding=1, output_padding=0),
-        dict(kernel_size=6, stride=3, padding=2, output_padding=1),
-    ]
-    length = input_length
-    for layer in conv_transpose_layers:
-        length = (
-            (length - 1) * layer["stride"]
-            - 2 * layer["padding"]
-            + layer["kernel_size"]
-            + layer["output_padding"]
-        )
-    return length
-
-
-def xcodec_decode_chunk_by_chunk(
-    xcodec_model: torch.nn.Module, codes: torch.Tensor, chunk_size: int = 750
-):
-    overlap_width = 16
-    chunk_output_length = xcodec_get_output_length(chunk_size)
-    outputs = []
-    # split the codes into chunks, with overlap at the beginning and end
-    for i in range(0, codes.shape[-1], chunk_size):
-        begin = max(0, i - overlap_width)
-        end = min(i + chunk_size + overlap_width, codes.shape[-1])
-        chunk = codes[:, :, begin:end]
-        output = xcodec_model.decode(chunk)
-        if i == 0:
-            output = output[:, :, :chunk_output_length]
-        elif i + chunk_size >= codes.shape[-1]:
-            last_chunk_size = codes.shape[-1] - i
-            last_chunk_output_length = xcodec_get_output_length(last_chunk_size)
-            output = output[:, :, -last_chunk_output_length:]
+        if self.quantizer_type == "RVQ":
+            vq_code = vq_code.permute(1, 0, 2)
+            quantized = self.quantizer.decode(vq_code)
+            quantized = quantized.transpose(1, 2)
         else:
-            extra_length = (
-                xcodec_get_output_length(chunk_size + overlap_width * 2) - chunk_output_length
-            ) // 2
-            output = output[:, :, extra_length:-extra_length]
-        outputs.append(output)
+            vq_code = vq_code.permute(0, 2, 1)
+            quantized = self.quantizer.get_output_from_indices(vq_code)
+        quantized_acoustic = self.fc_post2(quantized).transpose(1, 2)
 
-    return np.concatenate(outputs, axis=2)
+        o = self.decoder_2(quantized_acoustic)
+        return o.detach().cpu().numpy()
+
+    def xcodec_get_output_length(self, input_length: int):
+        conv_transpose_layers = [
+            dict(kernel_size=16, stride=8, padding=4, output_padding=0),
+            dict(kernel_size=10, stride=5, padding=3, output_padding=1),
+            dict(kernel_size=8, stride=4, padding=2, output_padding=0),
+            dict(kernel_size=4, stride=2, padding=1, output_padding=0),
+            dict(kernel_size=6, stride=3, padding=2, output_padding=1),
+        ]
+        length = input_length
+        for layer in conv_transpose_layers:
+            length = (
+                (length - 1) * layer["stride"]
+                - 2 * layer["padding"]
+                + layer["kernel_size"]
+                + layer["output_padding"]
+            )
+        return length
 
 
 def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
@@ -534,13 +464,6 @@ def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
     model.to(device)
     model.eval()
     return model
-
-
-def get_feat_extract_output_lengths(input_lengths: torch.LongTensor):
-    """Computes the output length of the convolutional layers and the output length of the audio encoder"""
-    input_lengths = (input_lengths - 1) // 2 + 1
-    output_lengths = (input_lengths - 2) // 2 + 1
-    return input_lengths, output_lengths
 
 
 def revert_delay_pattern(data):
@@ -1092,7 +1015,7 @@ class HiggsAudioTRTRunner:
 
         # Load components
         self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_dir, trust_remote_code=True)
-        self.audio_tokenizer = AudioTokenizer(self.audio_tokenizer_dir)
+        self.audio_tokenizer = HiggsAudioTokenizer(self.audio_tokenizer_dir)
 
         # Create custom logits processor for delay pattern handling
         self.audio_logits_processor = HiggsAudioLogitsProcessor(self.config)
@@ -1127,7 +1050,7 @@ class HiggsAudioTRTRunner:
             if not os.path.exists(self.reference_audio):
                 raise FileNotFoundError(f"Reference audio file not found: {self.reference_audio}")
 
-            audio_ids = self.audio_tokenizer.encode(self.reference_audio, sr=24000)
+            audio_ids = self.audio_tokenizer.encode(self.reference_audio, sr=16000)
             # Apply delay pattern if requested and we have multiple codebooks
             # Add BOS and EOS tokens using correct token IDs
             bos_tokens = torch.full(
@@ -1271,9 +1194,11 @@ class HiggsAudioTRTRunner:
 
     def _extract_and_process_audio_tokens(self, generated_tokens):
         """Extract and process audio tokens with proper delay pattern handling."""
+        print(generated_tokens.device)
         if not isinstance(generated_tokens, torch.Tensor):
             generated_tokens = torch.as_tensor(generated_tokens)
 
+        print(generated_tokens.device)
         print(f"Input generated_tokens shape: {generated_tokens.shape}")
 
         # Identify start of audio generation right AFTER all codebooks emitted BOS once
