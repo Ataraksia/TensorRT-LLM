@@ -21,10 +21,12 @@ The model includes:
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, Union
 
 import transformers
+from huggingface_hub import hf_hub_download, repo_exists
 
 from tensorrt_llm.models.convert_utils import infer_dtype
 from tensorrt_llm.models.modeling_utils import PretrainedConfig
@@ -134,28 +136,27 @@ class HiggsAudioConfig(PretrainedConfig):
     @classmethod
     def from_hugging_face(
         cls,
-        hf_config_or_dir: Union[
+        hf_config_or_path_or_dir: Union[
             str, "transformers.PretrainedConfig"
         ] = "bosonai/higgs-audio-v2-generation-3B-base",
         engine_dir: str = "./higgs_audio_engine",
         dtype: str = "bfloat16",
         **kwargs,
     ) -> "HiggsAudioConfig":
-        trust_remote_code = kwargs.pop("trust_remote_code", True)
-
-        if isinstance(hf_config_or_dir, transformers.PretrainedConfig):
-            hf_config = hf_config_or_dir
+        if isinstance(hf_config_or_path_or_dir, transformers.PretrainedConfig):
+            hf_config = hf_config_or_path_or_dir
+            hf_config = hf_config.text_config
         else:
-            hf_config_dir = str(hf_config_or_dir)
-
-            hf_config = transformers.AutoConfig.from_pretrained(
-                hf_config_dir, trust_remote_code=trust_remote_code
-            )
-
-        hf_config = hf_config.text_config
+            hf_path_or_dir = str(hf_config_or_path_or_dir)
+            if os.path.isdir(hf_path_or_dir):
+                hf_config = json.load(Path(hf_path_or_dir + "/config.json").open("r"))
+            elif repo_exists(hf_path_or_dir):
+                config_file = hf_hub_download(repo_id=hf_path_or_dir, filename="config.json")
+                hf_config = json.load(Path(config_file).open("r"))
+            hf_config = hf_config["text_config"]
         # Keep the custom architecture name for our model; we'll extend the TRT-LLM
         # builder to recognize it as a decoder-only model when preparing inputs.
-        hf_config.architectures = ["HiggsAudioForCausalLM"]
+        hf_config["architectures"] = ["HiggsAudioForCausalLM"]
         attn_bias = False  # All existing Qwen models have attn bias
         rotary_scaling = getattr(hf_config, "rope_scaling", None)
         seq_length = getattr(hf_config, "seq_length", 2048)
@@ -167,23 +168,23 @@ class HiggsAudioConfig(PretrainedConfig):
         rotary_embedding_dim = None
         engine_config = json.load(Path(engine_dir + "/config.json").open("r"))
         return cls(
-            architecture=hf_config.architectures[0],
+            architecture=hf_config["architectures"][0],
             dtype=dtype,
             build_config=engine_config["build_config"],
-            num_hidden_layers=hf_config.num_hidden_layers,
-            num_attention_heads=hf_config.num_attention_heads,
-            hidden_size=hf_config.hidden_size,
-            intermediate_size=hf_config.intermediate_size,
-            num_key_value_heads=hf_config.num_key_value_heads,
-            head_size=hf_config.head_dim,
+            num_hidden_layers=hf_config["num_hidden_layers"],
+            num_attention_heads=hf_config["num_attention_heads"],
+            hidden_size=hf_config["hidden_size"],
+            intermediate_size=hf_config["intermediate_size"],
+            num_key_value_heads=hf_config["num_key_value_heads"],
+            head_size=hf_config["head_dim"],
             # IMPORTANT: We generate only audio tokens in TensorRT-LLM, so the
             # runtime's sampling vocabulary must match the audio head size.
             # Use audio vocab (num_codebooks * (codebook_size)) instead of text vocab.
             vocab_size=(1024 + 2) * 8,
-            max_position_embeddings=hf_config.max_position_embeddings,
+            max_position_embeddings=hf_config["max_position_embeddings"],
             rotary_embedding_dim=rotary_embedding_dim,
-            hidden_act=hf_config.hidden_act,
-            norm_epsilon=hf_config.rms_norm_eps,
+            hidden_act=hf_config["hidden_act"],
+            norm_epsilon=hf_config["rms_norm_eps"],
             attn_bias=attn_bias,
             rotary_base=rotary_base,
             rotary_scaling=rotary_scaling,
@@ -191,6 +192,6 @@ class HiggsAudioConfig(PretrainedConfig):
             seq_length=seq_length,
             use_logn_attn=use_logn_attn,
             num_labels=num_labels,
-            tie_word_embeddings=hf_config.tie_word_embeddings,
+            tie_word_embeddings=hf_config["tie_word_embeddings"],
             **kwargs,
         )

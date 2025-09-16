@@ -14,6 +14,7 @@ from starlette.datastructures import State
 from huggingface_hub import snapshot_download
 from torch import nn
 from transformers import (
+    AutoModel,
     AutoModelForSpeechSeq2Seq,
     AutoProcessor,
     AutoTokenizer,
@@ -66,6 +67,7 @@ from typing import Optional
 from .descriptaudiocodec.dac.model import dac as dac2
 from .quantization.vq import ResidualVectorQuantizer
 from .semantic.semantic_module import Encoder, Decoder
+from vector_quantize_pytorch import ResidualFSQ
 
 
 class EncodedResult:
@@ -95,7 +97,7 @@ class HiggsAudioTokenizer(nn.Module):
         target_bandwidths: Sequence[Union[int, float]] = [1, 1.5, 2, 4, 6],
         ratios: Sequence[int] = [8, 5, 4, 2],  # downsampling by 320
         sample_rate: int = 16000,
-        bins: int = [1024],
+        bins: int = 1024,
         n_q: int = 8,
         codebook_dim: int = None,
         normalize: bool = False,
@@ -168,13 +170,14 @@ class HiggsAudioTokenizer(nn.Module):
         )
 
         # out_D=D+768
-        if isinstance(bins, int):  # RVQ
-            # self.quantizer = ResidualVectorQuantizer(
-            #     dimension=self.quantizer_dim, codebook_dim=codebook_dim, n_q=n_q, bins=bins
-            # )
+
+        if False:  # isinstance(bins, int):  # RVQ
+            self.quantizer = ResidualVectorQuantizer(
+                dimension=self.quantizer_dim, codebook_dim=codebook_dim, n_q=n_q, bins=bins
+            )
             self.quantizer_type = "RVQ"
         else:  # RFSQ
-            self.quantizer = ResidualFSQ(dim=self.quantizer_dim, levels=bins, num_quantizers=n_q)
+            self.quantizer = ResidualFSQ(dim=self.quantizer_dim, levels=[bins], num_quantizers=n_q)
             self.quantizer_type = "RFSQ"
 
         self.fc_prior = nn.Linear(D + self.encoder_semantic_dim, self.quantizer_dim)
@@ -1015,7 +1018,7 @@ class HiggsAudioTRTRunner:
 
         # Load components
         self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_dir, trust_remote_code=True)
-        self.audio_tokenizer = HiggsAudioTokenizer(self.audio_tokenizer_dir)
+        self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir)
 
         # Create custom logits processor for delay pattern handling
         self.audio_logits_processor = HiggsAudioLogitsProcessor(self.config)
@@ -1157,7 +1160,6 @@ class HiggsAudioTRTRunner:
 
             vq_code = self._extract_and_process_audio_tokens(outputs[0, 0])
             print(f"Extracted audio tokens shape: {vq_code.shape}")
-
             # Decode to waveform
             waveform, sr = self.audio_tokenizer.decode(vq_code)
 
@@ -1194,11 +1196,9 @@ class HiggsAudioTRTRunner:
 
     def _extract_and_process_audio_tokens(self, generated_tokens):
         """Extract and process audio tokens with proper delay pattern handling."""
-        print(generated_tokens.device)
         if not isinstance(generated_tokens, torch.Tensor):
             generated_tokens = torch.as_tensor(generated_tokens)
 
-        print(generated_tokens.device)
         print(f"Input generated_tokens shape: {generated_tokens.shape}")
 
         # Identify start of audio generation right AFTER all codebooks emitted BOS once
