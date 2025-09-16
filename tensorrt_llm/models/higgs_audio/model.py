@@ -177,7 +177,9 @@ class HiggsAudioTokenizer(nn.Module):
             )
             self.quantizer_type = "RVQ"
         else:  # RFSQ
-            self.quantizer = ResidualFSQ(dim=self.quantizer_dim, levels=[bins], num_quantizers=n_q)
+            self.quantizer = ResidualFSQ(
+                dim=self.quantizer_dim, levels=[bins] * 8, num_quantizers=n_q
+            )
             self.quantizer_type = "RFSQ"
 
         self.fc_prior = nn.Linear(D + self.encoder_semantic_dim, self.quantizer_dim)
@@ -408,13 +410,16 @@ class HiggsAudioTokenizer(nn.Module):
 
     def _xcodec_decode(self, vq_code: torch.Tensor) -> torch.Tensor:
         vq_code = vq_code.to(self.device)
-
+        print(vq_code.permute(1, 0, 2).shape)
+        print(vq_code.shape)
         if self.quantizer_type == "RVQ":
             vq_code = vq_code.permute(1, 0, 2)
             quantized = self.quantizer.decode(vq_code)
             quantized = quantized.transpose(1, 2)
         else:
             vq_code = vq_code.permute(0, 2, 1)
+            print(vq_code)
+            print(vq_code.shape)
             quantized = self.quantizer.get_output_from_indices(vq_code)
         quantized_acoustic = self.fc_post2(quantized).transpose(1, 2)
 
@@ -762,7 +767,7 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
 
         lm_head = ColumnLinear(
             in_features=config.hidden_size,
-            out_features=config.audio_vocab_size,
+            out_features=config.audio_vocab_size,  # audio vocab size
             bias=False,
             dtype=config.dtype,
         )
@@ -856,10 +861,10 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
             # The runtime passes logits as shape [batch=1, beam=1, vocab_size_total].
             # Our lm_head outputs only audio vocab, so slice to that range.
-            view_logits = logits[0, 0, : self.vocab_size]
-            audio_logits_2d = view_logits.view(self.num_codebooks, -1)
+            logits = logits[0, 0, 0 : self.vocab_size]
+            # audio_logits_2d = view_logits.view(self.num_codebooks, -1)
 
-            self._apply_delay_pattern_logic(audio_logits_2d, state, last_token_id)
+            # self._apply_delay_pattern_logic(audio_logits_2d, state, last_token_id)
 
             # Flatten back; modification is in-place via view
 
@@ -1077,9 +1082,7 @@ class HiggsAudioTRTRunner:
                 bos_token_id=self.config.audio_stream_bos_id,
                 pad_token_id=self.config.audio_stream_eos_id,
             ).flatten()
-            import numpy as np
 
-            np.savetxt("log2.txt", audio_ids.cpu().view(-1), delimiter=",", fmt="%d")
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # The format should include the reference audio transcription and then the target text
             pre_audio_input = (
@@ -1138,11 +1141,16 @@ class HiggsAudioTRTRunner:
         )
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
-        input_ids = torch.cat([self.saved_input_ids, input_ids])
+        bos_tokens = torch.full(
+            (1,),
+            self.config.audio_stream_bos_id,
+            dtype=input_ids.dtype,
+            device=self.device,
+        )
+        input_ids = torch.cat([self.saved_input_ids, input_ids, bos_tokens])
 
         max_input_length = torch.tensor([input_ids.size(0)], dtype=torch.int32).max().item()
         max_new_tokens = self.max_num_tokens - max_input_length
-
         with torch.no_grad():
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
@@ -1158,26 +1166,27 @@ class HiggsAudioTRTRunner:
         try:
             import numpy as np
 
-            vq_code = self._extract_and_process_audio_tokens(outputs[0, 0])
+            np.savetxt("log1.txt", outputs.cpu().view(-1), delimiter=",", fmt="%d")
+            vq_code = outputs[0, 0].view(
+                self.config.audio_num_codebooks, -1
+            )  #   self._extract_and_process_audio_tokens(outputs[0, 0])
             print(f"Extracted audio tokens shape: {vq_code.shape}")
-            # Decode to waveform
-            waveform, sr = self.audio_tokenizer.decode(vq_code)
 
             # Save waveform debug safely for both numpy and torch tensors
             try:
-                if isinstance(waveform, torch.Tensor):
+                if isinstance(vq_code, torch.Tensor):
                     np.savetxt(
                         "log2.txt",
-                        waveform.detach().cpu().view(-1).numpy(),
+                        vq_code.detach().cpu().view(-1).numpy(),
                         delimiter=",",
                         fmt="%d",
                     )
                 else:
-                    np.savetxt(
-                        "log2.txt", np.asarray(waveform).reshape(-1), delimiter=",", fmt="%d"
-                    )
+                    np.savetxt("log2.txt", np.asarray(vq_code).reshape(-1), delimiter=",", fmt="%d")
+
             except Exception:
                 pass
+            waveform, sr = self.audio_tokenizer.decode(vq_code)
             if isinstance(waveform, torch.Tensor):
                 waveform = waveform.detach().cpu().numpy()
             if sr != 16000 and isinstance(waveform, np.ndarray):
@@ -1258,7 +1267,7 @@ class HiggsAudioTRTRunner:
 
                     c = collections.Counter(vals)
                     # top 10 most common
-                    common = c.most_common(10)
+                    common = c.most_common(100)
                     fh.write(f"cb{cb}: {common}\n")
         except Exception:
             pass
@@ -1293,7 +1302,7 @@ class HiggsAudioTRTRunner:
 
         # Remove delay pattern to align time frames across codebooks
         vq_delayed = grid
-        vq_code_local = revert_delay_pattern(vq_delayed)
+        vq_code_local = vq_delayed  # revert_delay_pattern(vq_delayed)
         # Ensure we only return local token range [0..local_vocab_size-1]
         vq_code_local = torch.clamp(vq_code_local, 0, local_vocab_size - 1)
         print(f"Reshaped audio tokens: {vq_code_local.shape}")
