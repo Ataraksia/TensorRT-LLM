@@ -562,18 +562,18 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         return trtllm_model
 
 
-class HiggsAudioLogitsProcessor:
-    """TensorRT-LLM C++ runtime logits processor for Higgs Audio delay pattern."""
+class HiggsAudioLogitsProcessor(LogitsProcessor):
+    """Custom logits processor for HiggsAudio that applies delay pattern logic during generation."""
 
-    def __init__(self, config):
-        """Initialize the logits processor with model configuration."""
+    def __init__(self, config: HiggsAudioConfig):
         self.config = config
+
+        self.vocab_size = config.audio_vocab_size
         self.num_codebooks = config.audio_num_codebooks
         self.codebook_size = config.audio_codebook_size
-        self.vocab_size = config.audio_vocab_size  # Should be num_codebooks * codebook_size
         self.stream_bos_id = config.audio_stream_bos_id
         self.stream_eos_id = config.audio_stream_eos_id
-        self.request_states = {}  # Track states per request
+        self.request_states = {}  # Track delay pattern state per request
 
     def _get_or_create_state(self, req_id: int) -> dict:
         """Get or create state for a request."""
@@ -677,7 +677,7 @@ class HiggsAudioLogitsProcessor:
         logits[current_cb, self.stream_bos_id] = -float("inf")
 
         # Delay EOS until we have enough local tokens for this codebook
-        min_tokens_per_cb = 100  # Much higher requirement to delay EOS longer
+        min_tokens_per_cb = 200  # Much higher requirement to delay EOS longer
 
         # Only allow EOS if:
         # 1. We have enough local tokens for this codebook, AND
@@ -760,7 +760,6 @@ class HiggsAudioTRTRunner:
         self.top_k = 50
         self.top_p = 0.95
         self.num_beams = 1
-        self.gpu_weights_percent = 0.5
         self.max_num_tokens = self.config.build_config["max_num_tokens"]
 
         # Set up device
@@ -778,7 +777,10 @@ class HiggsAudioTRTRunner:
 
         self.runner = ModelRunnerCpp.from_dir(
             engine_dir=self.engine_dir,
-            rank=tensorrt_llm.mpi_rank(),
+            kv_cache_free_gpu_memory_fraction=0.5,
+            # use_gpu_direct_storage=True,
+            # cuda_graph_mode=True,
+            logits_processor_map={"higgs_audio_logit_processor": self.audio_logits_processor},
         )
 
         # Preload the part of the input that doesn't change
@@ -866,16 +868,6 @@ class HiggsAudioTRTRunner:
             self.saved_input_ids = (
                 self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
             )
-
-        from tensorrt_llm.runtime import ModelRunnerCpp
-
-        self.runner = ModelRunnerCpp.from_dir(
-            engine_dir=self.engine_dir,
-            kv_cache_free_gpu_memory_fraction=0.5,
-            # use_gpu_direct_storage=True,
-            # cuda_graph_mode=True,
-            logits_processor_map={"higgs_audio_logit_processor": self.audio_logits_processor},
-        )
 
     def generate(
         self,
