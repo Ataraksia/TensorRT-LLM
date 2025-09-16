@@ -19,6 +19,7 @@ from transformers import (
     AutoTokenizer,
     pipeline,
 )
+import tensorrt_llm
 from tensorrt_llm.bindings import INT32
 from tensorrt_llm.mapping import Mapping
 
@@ -561,172 +562,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         return trtllm_model
 
 
-class HiggsAudioLogitsProcessor(LogitsProcessor):
-    """Custom logits processor for HiggsAudio that applies delay pattern logic during generation."""
-
-    def __init__(self, config: HiggsAudioConfig):
-        self.config = config
-
-        self.vocab_size = config.audio_vocab_size
-        self.num_codebooks = config.audio_num_codebooks
-        self.codebook_size = config.audio_codebook_size
-        self.stream_bos_id = config.audio_stream_bos_id
-        self.stream_eos_id = config.audio_stream_eos_id
-        # Track delay pattern state per request
-        self.request_states = {}
-
-    def _get_or_create_state(self, req_id: int):
-        """Get or create delay pattern state for a request."""
-        if req_id not in self.request_states:
-            self.request_states[req_id] = {
-                "num_delay": 0,  # how many BOS emitted (one per codebook)
-                "closed": [False] * self.num_codebooks,  # codebooks that emitted EOS
-                "step_mod": 0,  # rotating pointer among open codebooks
-                "prev_cb": None,  # codebook used in previous step
-                "counts": [0] * self.num_codebooks,  # local tokens emitted per codebook
-                "step": 0,  # total generation steps
-            }
-        return self.request_states[req_id]
-
-    def __call__(
-        self,
-        req_id: int,
-        logits: torch.Tensor,
-        token_ids: List[List[int]],
-        stream_ptr: Optional[int],
-        client_id: Optional[int],
-    ) -> None:
-        """Apply delay pattern logic to audio logits during generation."""
-
-        stream = None if stream_ptr is None else torch.cuda.ExternalStream(stream_ptr)
-
-        with torch.cuda.stream(stream):
-            state = self._get_or_create_state(req_id)
-            last_token_id: int = token_ids[0][-1]
-
-            # The runtime passes logits as shape [batch=1, beam=1, vocab_size_total].
-            # Our lm_head outputs only audio vocab, so slice to that range.
-            view_logits = logits[0, 0, : self.vocab_size]
-            audio_logits_2d = view_logits.view(self.num_codebooks, -1)
-
-            self._apply_delay_pattern_logic(audio_logits_2d, state, last_token_id)
-
-            # Flatten back; modification is in-place via view
-
-
-class PythonHiggsAudioLogitsProcessor:
-    """Python-side logits processor for Higgs Audio delay pattern."""
-
-    def __init__(self, config):
-        """Initialize the processor."""
-        self.config = config
-        # State for delay pattern logic
-        self.state = {
-            "num_delay": 0,  # tracks delay tokens emitted
-            "closed": [False]
-            * config.audio_num_codebooks,  # tracks which codebooks finished with EOS
-            "step_mod": 0,  # rotating pointer among open codebooks
-            "prev_cb": None,  # codebook used in previous step
-            "counts": [0] * config.audio_num_codebooks,  # local tokens emitted per codebook
-            "step": 0,  # total generation steps
-        }
-
-    def __call__(self, input_ids, scores):
-        """Apply delay pattern logic."""
-        # Clear debug file for fresh run
-        if self.state["step"] == 0:
-            with open("/home/me/TTS/TensorRT-LLM/lp_debug.txt", "w") as f:
-                f.write("Python logits processor debug log\n")
-
-        # Get last token
-        last_token_id = input_ids[0, -1].item()
-
-        # Apply the same delay pattern logic
-        audio_logits_2d = scores[0, : self.config.audio_vocab_size].view(
-            self.config.audio_num_codebooks, -1
-        )
-
-        # Apply delay pattern
-        self._apply_delay_pattern_logic(audio_logits_2d, last_token_id)
-
-        # Write back to scores
-        scores[0, : self.config.audio_vocab_size] = audio_logits_2d.flatten()
-
-        return scores
-
-    def _apply_delay_pattern_logic(self, logits, last_token_id):
-        """Apply the delay pattern logic."""
-        state = self.state
-
-        # Clear old debug log entry
-        with open("/home/me/TTS/TensorRT-LLM/lp_debug.txt", "a") as f:
-            f.write(f"Step {state['step']}: last_token={last_token_id}\n")
-
-        state["step"] += 1
-
-        # Same logic as before but simpler for Python runtime
-        num_codebooks = self.config.audio_num_codebooks
-        codebook_size = self.config.audio_codebook_size
-        stream_bos_id = self.config.audio_stream_bos_id
-        stream_eos_id = self.config.audio_stream_eos_id
-
-        # Delay phase: emit BOS for first few tokens
-        if state["num_delay"] < num_codebooks:
-            # Force BOS token only for the codebook corresponding to this delay step
-            target_cb = state["num_delay"] % num_codebooks
-            logits[:, :] = -float("inf")  # Mask everything
-            logits[target_cb, stream_bos_id] = 0.0  # Allow BOS for target codebook
-            state["num_delay"] += 1
-            return
-
-        # Generation phase: apply delay pattern constraints
-        # Count tokens for this codebook
-        last_local = last_token_id % codebook_size
-        last_cb = (last_token_id // codebook_size) % num_codebooks
-
-        if 0 <= last_local < (codebook_size - 2):
-            state["counts"][last_cb] += 1
-        if last_local == stream_eos_id:
-            state["closed"][last_cb] = True
-
-        # If all codebooks closed: force EOS at last row to terminate
-        if all(state["closed"]):
-            logits[:, :] = -float("inf")
-            logits[-1, stream_eos_id] = 0.0
-            return
-
-        # Find next open codebook to target
-        start = state["step_mod"] % num_codebooks
-        current_cb = start
-        for _ in range(num_codebooks):
-            if not state["closed"][current_cb]:
-                break
-            current_cb = (current_cb + 1) % num_codebooks
-
-        # Mask all other codebooks
-        if current_cb + 1 < num_codebooks:
-            logits[current_cb + 1 :, :] = -float("inf")
-        if current_cb > 0:
-            logits[:current_cb, :] = -float("inf")
-
-        # In current codebook: disallow BOS, control EOS based on thresholds
-        logits[current_cb, stream_bos_id] = -float("inf")
-
-        # Very restrictive EOS gating
-        min_tokens_per_cb = 100
-        enough_local = state["counts"][current_cb] >= min_tokens_per_cb
-        total_tokens = sum(state["counts"])
-
-        # Extremely high thresholds to prevent early termination
-        allow_eos = enough_local and total_tokens >= 1000 and state["step"] > 1200
-
-        if not allow_eos:
-            logits[current_cb, stream_eos_id] = -float("inf")
-
-        # Update step counter
-        state["step_mod"] = (current_cb + 1) % num_codebooks
-
-
 class HiggsAudioLogitsProcessor:
     """TensorRT-LLM C++ runtime logits processor for Higgs Audio delay pattern."""
 
@@ -917,7 +752,7 @@ class HiggsAudioTRTRunner:
         self.hf_model_dir = "bosonai/higgs-audio-v2-generation-3B-base"
         self.audio_tokenizer_dir = "bosonai/higgs-audio-v2-tokenizer"
         self.reference_audio = None  # Disable reference audio loading for faster testing
-        #self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
+        # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
 
         self.config = HiggsAudioConfig.from_hugging_face()
 
