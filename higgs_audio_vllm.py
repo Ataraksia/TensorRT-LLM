@@ -89,9 +89,6 @@ from vllm.sequence import IntermediateTensors
 from vllm.v1.multimodal.metadata import MultimodalMetadata
 from vllm.v1.sample.metadata import SamplingMetadata
 
-from .higgs_audio_config import HiggsAudioConfig, HiggsAudioEncoderConfig
-from .higgs_audio_tokenizer import AudioTokenizer
-
 logger = init_logger(__name__)
 
 _KEYS_TO_MODIFY_MAPPING = {
@@ -125,9 +122,7 @@ def _validate_and_reshape_mm_tensor(
     pad_with: Optional[int] = None,
 ) -> torch.Tensor:
     if not isinstance(mm_input, (torch.Tensor, list)):
-        raise ValueError(
-            f"Incorrect type of {name}. Got type: {type(mm_input)}"
-        )
+        raise ValueError(f"Incorrect type of {name}. Got type: {type(mm_input)}")
     if isinstance(mm_input, torch.Tensor):
         return torch.concat(list(mm_input))
     else:
@@ -139,14 +134,10 @@ def _validate_and_reshape_mm_tensor(
             # dimension
             padded_tensors = []
             for tensor in mm_input:
-                pad_size = max_size - tensor.size(
-                    -1
-                )  # Calculate how much padding is needed
+                pad_size = max_size - tensor.size(-1)  # Calculate how much padding is needed
                 if pad_size > 0:
                     # Pad tensor along the last dimension (right side)
-                    padded_tensor = torch.nn.functional.pad(
-                        tensor, (0, pad_size)
-                    )
+                    padded_tensor = torch.nn.functional.pad(tensor, (0, pad_size))
                 else:
                     padded_tensor = tensor
                 padded_tensors.append(padded_tensor)
@@ -288,9 +279,7 @@ def get_processor(
     # it will call torch.cuda.device_count()
     from transformers import AutoFeatureExtractor
 
-    HIGGS_AUDIO_TOKENIZER = os.getenv(
-        "HIGGS_AUDIO_TOKENIZER", "openai/whisper-large-v3-turbo"
-    )
+    HIGGS_AUDIO_TOKENIZER = os.getenv("HIGGS_AUDIO_TOKENIZER", "openai/whisper-large-v3-turbo")
 
     audio_stream_bos_id = kwargs.pop("audio_stream_bos_id", None)
     audio_stream_eos_id = kwargs.pop("audio_stream_eos_id", None)
@@ -361,19 +350,13 @@ class HFHiggsAudioProcessor(ProcessorMixin):
         if chat_template is None:
             chat_template = self.default_chat_template
         self.audio_token = (
-            tokenizer.audio_token
-            if hasattr(tokenizer, "audio_token")
-            else audio_token
+            tokenizer.audio_token if hasattr(tokenizer, "audio_token") else audio_token
         )
         self.audio_bos_token = (
-            tokenizer.audio_bos_token
-            if hasattr(tokenizer, "audio_bos_token")
-            else audio_bos_token
+            tokenizer.audio_bos_token if hasattr(tokenizer, "audio_bos_token") else audio_bos_token
         )
         self.audio_eos_token = (
-            tokenizer.audio_eos_token
-            if hasattr(tokenizer, "audio_eos_token")
-            else audio_eos_token
+            tokenizer.audio_eos_token if hasattr(tokenizer, "audio_eos_token") else audio_eos_token
         )
 
         self.audio_stream_bos_id = audio_stream_bos_id
@@ -381,9 +364,7 @@ class HFHiggsAudioProcessor(ProcessorMixin):
         # HACK: Workaround the class check in the base class
         if feature_extractor is not None:
             self.feature_extractor_class = feature_extractor.__class__.__name__
-        super().__init__(
-            feature_extractor, tokenizer, chat_template=chat_template
-        )
+        super().__init__(feature_extractor, tokenizer, chat_template=chat_template)
 
     def __call__(
         self,
@@ -445,15 +426,11 @@ class HFHiggsAudioProcessor(ProcessorMixin):
         elif isinstance(text, str):
             text = [text]
         elif not isinstance(text, list) and not isinstance(text[0], str):
-            raise ValueError(
-                "Invalid input text. Please provide a string, or a list of strings"
-            )
+            raise ValueError("Invalid input text. Please provide a string, or a list of strings")
 
         if audio is not None:
             # ensure we have as much audios as audio tokens
-            num_audio_tokens = sum(
-                sample.count(self.audio_token) for sample in text
-            )
+            num_audio_tokens = sum(sample.count(self.audio_token) for sample in text)
             num_audios = 1 if type(audio) is np.ndarray else len(audio)
             if num_audio_tokens != num_audios:
                 raise ValueError(
@@ -509,11 +486,9 @@ class HFHiggsAudioProcessor(ProcessorMixin):
                 audio_in_ids = _validate_and_reshape_mm_tensor(
                     audio_ids, "audio_in_ids", pad_with=0
                 )
-                audio_feature_attention_mask = torch.arange(
-                    audio_in_ids.shape[-1]
-                ).expand(audio_in_ids.shape[0], audio_in_ids.shape[-1]).to(
-                    audio_in_ids_length.device
-                ) < audio_in_ids_length.unsqueeze(-1)
+                audio_feature_attention_mask = torch.arange(audio_in_ids.shape[-1]).expand(
+                    audio_in_ids.shape[0], audio_in_ids.shape[-1]
+                ).to(audio_in_ids_length.device) < audio_in_ids_length.unsqueeze(-1)
                 audio_inputs = {
                     "input_features": audio_in_ids,
                     "audio_feature_attention_mask": audio_feature_attention_mask,
@@ -609,9 +584,7 @@ class HiggsAudioProcessingInfo(BaseProcessingInfo):
             "HIGGS_AUDIO_TOKENIZER", "openai/whisper-large-v3-turbo"
         )
         if self.audio_tokenizer_type == "openai/whisper-large-v3-turbo":
-            max_source_position = (
-                hf_config.audio_encoder_config.max_source_positions
-            )
+            max_source_position = hf_config.audio_encoder_config.max_source_positions
             max_output_lengths = (max_source_position - 2) // 2 + 1
         else:
             max_output_lengths = (
@@ -623,22 +596,16 @@ class HiggsAudioProcessingInfo(BaseProcessingInfo):
         return {"audio": max_output_lengths}
 
 
-class HiggsAudioMultiModalProcessor(
-    BaseMultiModalProcessor[HiggsAudioProcessingInfo]
-):
+class HiggsAudioMultiModalProcessor(BaseMultiModalProcessor[HiggsAudioProcessingInfo]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.audio_tokenizer_type = os.getenv(
             "HIGGS_AUDIO_TOKENIZER", "openai/whisper-large-v3-turbo"
         )
-        self.use_whisper_tokenizer = (
-            self.audio_tokenizer_type == "openai/whisper-large-v3-turbo"
-        )
+        self.use_whisper_tokenizer = self.audio_tokenizer_type == "openai/whisper-large-v3-turbo"
 
     def _get_data_parser(self) -> MultiModalDataParser:
-        return MultiModalDataParser(
-            target_sr=self.info.get_feature_extractor().sampling_rate
-        )
+        return MultiModalDataParser(target_sr=self.info.get_feature_extractor().sampling_rate)
 
     def _call_hf_processor(
         self,
@@ -651,13 +618,9 @@ class HiggsAudioMultiModalProcessor(
         if not mm_data.get("audios", []):
             # Set add_special_tokens=False to avoid
             # adding an extra begin of text token
-            prompt_ids = self.info.get_tokenizer().encode(
-                prompt, add_special_tokens=False
-            )
+            prompt_ids = self.info.get_tokenizer().encode(prompt, add_special_tokens=False)
             prompt_ids = self._apply_hf_processor_tokens_only(prompt_ids)
-            batch_data = BatchFeature(
-                dict(input_ids=[prompt_ids]), tensor_type="pt"
-            )
+            batch_data = BatchFeature(dict(input_ids=[prompt_ids]), tensor_type="pt")
             return batch_data
 
         feature_extractor = self.info.get_feature_extractor(**mm_kwargs)
@@ -700,9 +663,7 @@ class HiggsAudioMultiModalProcessor(
         audio_token = getattr(processor, "audio_token", "<|AUDIO|>")
         audio_token_id = vocab[audio_token]
 
-        audio_feature_attention_mask = out_mm_kwargs.get(
-            "audio_feature_attention_mask"
-        )
+        audio_feature_attention_mask = out_mm_kwargs.get("audio_feature_attention_mask")
         if audio_feature_attention_mask is None:
             audio_output_lengths = []
         else:
@@ -723,8 +684,7 @@ class HiggsAudioMultiModalProcessor(
                 audio_len = audios.get_audio_length(item_idx)
 
                 raise ValueError(
-                    f"The audio (len={audio_len}) is too short "
-                    "to be represented inside the model"
+                    f"The audio (len={audio_len}) is too short to be represented inside the model"
                 )
 
             audio_tokens = [audio_token_id] * num_features
@@ -742,9 +702,7 @@ class HiggsAudioMultiModalProcessor(
         ]
 
 
-class HiggsAudioDummyInputsBuilder(
-    BaseDummyInputsBuilder[HiggsAudioProcessingInfo]
-):
+class HiggsAudioDummyInputsBuilder(BaseDummyInputsBuilder[HiggsAudioProcessingInfo]):
     def get_dummy_text(self, mm_counts: Mapping[str, int]) -> str:
         num_audios = mm_counts.get("audio", 0)
         # Use the processor's placeholder for audio inputs.
@@ -765,11 +723,7 @@ class HiggsAudioDummyInputsBuilder(
             audio_len = 30 * sampling_rate
         num_audios = mm_counts.get("audio", 0)
 
-        return {
-            "audio": self._get_dummy_audios(
-                length=audio_len, num_audios=num_audios
-            )
-        }
+        return {"audio": self._get_dummy_audios(length=audio_len, num_audios=num_audios)}
 
     def get_dummy_processor_inputs(
         self,
@@ -786,11 +740,7 @@ class HiggsAudioDummyInputsBuilder(
             audio_len = 30 * sampling_rate
         num_audios = mm_counts.get("audio", 0)
 
-        mm_data = {
-            "audio": self._get_dummy_audios(
-                length=audio_len, num_audios=num_audios
-            )
-        }
+        mm_data = {"audio": self._get_dummy_audios(length=audio_len, num_audios=num_audios)}
 
         return ProcessorInputs(
             prompt="<|AUDIO|>" * num_audios,
@@ -861,12 +811,10 @@ class HiggsAudioDualFFNDecoderLayer(nn.Module):
             rope_scaling["original_max_position_embeddings"] = (
                 text_config.original_max_position_embeddings
             )
-        max_position_embeddings = getattr(
-            text_config, "max_position_embeddings", 8192
+        max_position_embeddings = getattr(text_config, "max_position_embeddings", 8192)
+        attention_bias = getattr(text_config, "attention_bias", False) or getattr(
+            text_config, "bias", False
         )
-        attention_bias = getattr(
-            text_config, "attention_bias", False
-        ) or getattr(text_config, "bias", False)
         self.self_attn = LlamaAttention(
             config=text_config,
             hidden_size=self.hidden_size,
@@ -941,9 +889,7 @@ class HiggsAudioDualFFNDecoderLayer(nn.Module):
                 text_config.hidden_size, eps=text_config.rms_norm_eps
             )
 
-        self.input_layernorm = RMSNorm(
-            text_config.hidden_size, eps=text_config.rms_norm_eps
-        )
+        self.input_layernorm = RMSNorm(text_config.hidden_size, eps=text_config.rms_norm_eps)
         self.post_attention_layernorm = RMSNorm(
             text_config.hidden_size, eps=text_config.rms_norm_eps
         )
@@ -963,9 +909,7 @@ class HiggsAudioDualFFNDecoderLayer(nn.Module):
         # if self.fast_forward and has_audio_out:
         #     original_hidden_states = hidden_states.clone()
 
-        audio_out_mask = (
-            get_forward_context().multimodal_metadata.token_mm_map.unsqueeze(-1)
-        )
+        audio_out_mask = get_forward_context().multimodal_metadata.token_mm_map.unsqueeze(-1)
         if not self.fast_forward:
             hidden_states = torch.where(
                 audio_out_mask,
@@ -1005,27 +949,17 @@ class HiggsAudioDualFFNDecoderLayer(nn.Module):
         residual = hidden_states
 
         if not self.fast_forward:
-            text_hidden_states = torch.masked_fill(
-                hidden_states, audio_out_mask, 0
-            )
-            text_hidden_states = self.post_attention_layernorm(
-                text_hidden_states
-            )
-            audio_hidden_states = torch.masked_fill(
-                hidden_states, ~audio_out_mask, 0
-            )
-            audio_hidden_states = self.audio_post_attention_layernorm(
-                audio_hidden_states
-            )
+            text_hidden_states = torch.masked_fill(hidden_states, audio_out_mask, 0)
+            text_hidden_states = self.post_attention_layernorm(text_hidden_states)
+            audio_hidden_states = torch.masked_fill(hidden_states, ~audio_out_mask, 0)
+            audio_hidden_states = self.audio_post_attention_layernorm(audio_hidden_states)
             text_hidden_states = self.mlp(text_hidden_states)
             residual += text_hidden_states
             audio_hidden_states = self.audio_mlp(audio_hidden_states)
             residual += audio_hidden_states
             hidden_states = residual
         else:
-            hidden_states, residual = self.post_attention_layernorm(
-                hidden_states, residual
-            )
+            hidden_states, residual = self.post_attention_layernorm(hidden_states, residual)
             hidden_states = self.mlp(hidden_states)
             hidden_states = residual + hidden_states
 
@@ -1112,9 +1046,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             raise NotImplementedError(
                 f"Audio adapter type {config.audio_adapter_type} not implemented."
             )
-        self.norm = RMSNorm(
-            config.text_config.hidden_size, eps=config.text_config.rms_norm_eps
-        )
+        self.norm = RMSNorm(config.text_config.hidden_size, eps=config.text_config.rms_norm_eps)
 
         is_neox_style = True
         if quant_config is not None and quant_config.get_name() == "gguf":
@@ -1140,9 +1072,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         self.audio_tokenizer_type = os.getenv(
             "HIGGS_AUDIO_TOKENIZER", "openai/whisper-large-v3-turbo"
         )
-        self.use_whisper_tokenizer = (
-            self.audio_tokenizer_type == "openai/whisper-large-v3-turbo"
-        )
+        self.use_whisper_tokenizer = self.audio_tokenizer_type == "openai/whisper-large-v3-turbo"
 
         if config.use_audio_out_embed_projector:
             self.audio_out_embed_projector = nn.Linear(
@@ -1185,40 +1115,28 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             )
             self.sampler = get_sampler()
 
-    def _parse_and_validate_audio_input(
-        self, **kwargs: object
-    ) -> Optional[HiggsAudioInputs]:
+    def _parse_and_validate_audio_input(self, **kwargs: object) -> Optional[HiggsAudioInputs]:
         audio_out_ids = kwargs.pop("audio_out_ids", None)
         if audio_out_ids is None:
             return None
 
         if audio_out_ids is not None:
-            audio_out_ids = _validate_and_reshape_mm_tensor(
-                audio_out_ids, "audio_out_ids"
-            )
+            audio_out_ids = _validate_and_reshape_mm_tensor(audio_out_ids, "audio_out_ids")
             # audio_out_ids_length = _validate_and_reshape_mm_tensor(
             #     audio_out_ids_length, "audio_out_ids_length")
         return HiggsAudioInputs(
             audio_out_ids=audio_out_ids,
         )
 
-    def _process_audio_input(
-        self, audio_input: HiggsAudioInputs
-    ) -> torch.Tensor:
+    def _process_audio_input(self, audio_input: HiggsAudioInputs) -> torch.Tensor:
         audio_features = audio_input["audio_features"]
-        audio_feature_attention_mask = audio_input[
-            "audio_feature_attention_mask"
-        ]
+        audio_feature_attention_mask = audio_input["audio_feature_attention_mask"]
 
         audio_features_flattened = audio_features.transpose(1, 0).reshape(
             audio_features.shape[1], -1
         )
-        audio_features_embeddings = self._embed_audio_ids(
-            audio_features_flattened
-        )
-        audio_features_attention_mask_flattened = (
-            audio_feature_attention_mask.flatten()
-        )
+        audio_features_embeddings = self._embed_audio_ids(audio_features_flattened)
+        audio_features_attention_mask_flattened = audio_feature_attention_mask.flatten()
         masked_audio_features_embeddings = audio_features_embeddings[
             audio_features_attention_mask_flattened
         ]
@@ -1260,9 +1178,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             audio_out_ids = kwargs["audio_out_ids"]
             audio_out_flattened = audio_out_ids.transpose(1, 0)
             audio_out_embeddings = self._embed_audio_ids(audio_out_flattened)
-            audio_out_embeddings = torch.chunk(
-                audio_out_embeddings, audio_out_ids.shape[0], dim=0
-            )
+            audio_out_embeddings = torch.chunk(audio_out_embeddings, audio_out_ids.shape[0], dim=0)
             if masked_audio_features is not None:
                 masked_audio_features.extend(audio_out_embeddings)
             else:
@@ -1323,9 +1239,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             # this condition is for v0 compatibility.
             if inputs_embeds is None:
                 multimodal_embeddings = self.get_multimodal_embeddings(**kwargs)
-                inputs_embeds = self.get_input_embeddings(
-                    input_ids, multimodal_embeddings
-                )
+                inputs_embeds = self.get_input_embeddings(input_ids, multimodal_embeddings)
                 input_ids = None
             hidden_states = inputs_embeds
             residual = None
@@ -1350,9 +1264,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                 )
 
         if not get_pp_group().is_last_rank:
-            return IntermediateTensors(
-                {"hidden_states": hidden_states, "residual": residual}
-            )
+            return IntermediateTensors({"hidden_states": hidden_states, "residual": residual})
 
         if residual is not None:
             hidden_states, _ = self.norm(hidden_states, residual)
@@ -1366,13 +1278,9 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         hidden_states: torch.Tensor,
         sampling_metadata: SamplingMetadata,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        text_logits = self.logits_processor(
-            self.text_lm_head, hidden_states, sampling_metadata
-        )
+        text_logits = self.logits_processor(self.text_lm_head, hidden_states, sampling_metadata)
         if self.generate_audio_out_token:
-            audio_logits = self.audio_logits_processor(
-                self.audio_lm_head, hidden_states, None
-            )
+            audio_logits = self.audio_logits_processor(self.audio_lm_head, hidden_states, None)
             audio_logits = audio_logits.view(
                 -1, self.audio_num_codebooks, self.audio_codebook_size
             ).float()
@@ -1406,18 +1314,14 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         audio_generation_mode = [0] * n_reqs
         if self.generate_audio_out_token:
             for i in range(n_reqs):
-                last_prompt_token_id = (
-                    multimodal_metadata.last_prompt_token_ids[i]
-                )
+                last_prompt_token_id = multimodal_metadata.last_prompt_token_ids[i]
                 output_token_ids = sampling_metadata.output_token_ids[i]
                 if (
                     len(output_token_ids) > 0
-                    and output_token_ids[-1]
-                    == self.config.audio_out_bos_token_id
+                    and output_token_ids[-1] == self.config.audio_out_bos_token_id
                 ) or (
                     len(output_token_ids) == 0
-                    and last_prompt_token_id
-                    == self.config.audio_out_bos_token_id
+                    and last_prompt_token_id == self.config.audio_out_bos_token_id
                 ):
                     # check if the previous token is audio_out_bos. If so, we should always generate <|AUDIO_OUT|>
                     # Start the audio generation mode
@@ -1431,23 +1335,17 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
 
             assert audio_logits is not None
             audio_logits = audio_logits.reshape(-1, self.audio_codebook_size)
-            mm_sampling_metadata = self.prepare_mm_sampling_metadata(
-                sampling_metadata
-            )
+            mm_sampling_metadata = self.prepare_mm_sampling_metadata(sampling_metadata)
             next_mm_tokens = self.sampler(audio_logits, mm_sampling_metadata)
-            next_mm_tokens.sampled_token_ids = (
-                next_mm_tokens.sampled_token_ids.reshape(
-                    -1, self.audio_num_codebooks
-                )
+            next_mm_tokens.sampled_token_ids = next_mm_tokens.sampled_token_ids.reshape(
+                -1, self.audio_num_codebooks
             )
 
             # Check if we are generating the audio tokens
             for i in range(n_reqs):
                 if audio_generation_mode[i] == 1:
                     # Generate start of the audio stream
-                    next_mm_tokens.sampled_token_ids[i] = (
-                        self.config.audio_stream_bos_id
-                    )
+                    next_mm_tokens.sampled_token_ids[i] = self.config.audio_stream_bos_id
                 elif audio_generation_mode[i] == 2:
                     # Update the next mm tokens based on the delay pattern
                     num_audio_delay = multimodal_metadata.num_audio_delays[i]
@@ -1455,21 +1353,20 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
 
                     # Generate the delayed for the first few tokens
                     if num_audio_delay < self.audio_num_codebooks:
-                        next_mm_tokens.sampled_token_ids[i][
-                            num_audio_delay:
-                        ] = self.config.audio_stream_bos_id
+                        next_mm_tokens.sampled_token_ids[i][num_audio_delay:] = (
+                            self.config.audio_stream_bos_id
+                        )
 
                     # Generate the eos token for the last few tokens
                     if num_audio_eos < self.audio_num_codebooks:
                         all_eos_indices = torch.where(
-                            next_mm_tokens.sampled_token_ids[i]
-                            == self.config.audio_stream_eos_id
+                            next_mm_tokens.sampled_token_ids[i] == self.config.audio_stream_eos_id
                         )[0]
                         if all_eos_indices.shape[0] > 0:
                             last_eos_index = all_eos_indices[-1]
-                            next_mm_tokens.sampled_token_ids[i][
-                                :last_eos_index
-                            ] = self.config.audio_stream_eos_id
+                            next_mm_tokens.sampled_token_ids[i][:last_eos_index] = (
+                                self.config.audio_stream_eos_id
+                            )
                     elif num_audio_eos >= self.audio_num_codebooks:
                         # We already generated the last audio token,
                         # so we should just generate the eos token for the text
@@ -1480,31 +1377,23 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
 
         return next_tokens, next_mm_tokens
 
-    def prepare_mm_sampling_metadata(
-        self, sampling_metadata: SamplingMetadata
-    ) -> SamplingMetadata:
+    def prepare_mm_sampling_metadata(self, sampling_metadata: SamplingMetadata) -> SamplingMetadata:
         mm_sampling_metadata = copy.copy(sampling_metadata)
         if sampling_metadata.top_k is not None:
             mm_sampling_metadata.top_k = sampling_metadata.top_k.clip(
                 max=self.audio_codebook_size
             ).repeat_interleave(self.audio_num_codebooks)
         if sampling_metadata.top_p is not None:
-            mm_sampling_metadata.top_p = (
-                sampling_metadata.top_p.repeat_interleave(
-                    self.audio_num_codebooks
-                )
+            mm_sampling_metadata.top_p = sampling_metadata.top_p.repeat_interleave(
+                self.audio_num_codebooks
             )
         if sampling_metadata.temperature is not None:
-            mm_sampling_metadata.temperature = (
-                sampling_metadata.temperature.repeat_interleave(
-                    self.audio_num_codebooks
-                )
+            mm_sampling_metadata.temperature = sampling_metadata.temperature.repeat_interleave(
+                self.audio_num_codebooks
             )
         return mm_sampling_metadata
 
-    def load_weights(
-        self, weights: Iterable[Tuple[str, torch.Tensor]]
-    ) -> Set[str]:
+    def load_weights(self, weights: Iterable[Tuple[str, torch.Tensor]]) -> Set[str]:
         stacked_params_mapping = [
             # (param_name, shard_name, shard_id)
             (".qkv_proj", ".q_proj", "q"),
@@ -1534,18 +1423,14 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                 scale_name := self.quant_config.get_cache_scale(name)
             ):  # Loading kv cache scales for compressed-tensors quantization
                 param = params_dict[scale_name]
-                weight_loader = getattr(
-                    param, "weight_loader", default_weight_loader
-                )
+                weight_loader = getattr(param, "weight_loader", default_weight_loader)
                 loaded_weight = loaded_weight[0]
                 weight_loader(param, loaded_weight)
                 continue
 
             if "audio_tower" in name:
                 param = params_dict[name]
-                weight_loader = getattr(
-                    param, "weight_loader", default_weight_loader
-                )
+                weight_loader = getattr(param, "weight_loader", default_weight_loader)
                 weight_loader(param, loaded_weight)
                 continue
 
@@ -1578,7 +1463,5 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                     continue
 
                 param = params_dict[name]
-                weight_loader = getattr(
-                    param, "weight_loader", default_weight_loader
-                )
+                weight_loader = getattr(param, "weight_loader", default_weight_loader)
                 weight_loader(param, loaded_weight)
