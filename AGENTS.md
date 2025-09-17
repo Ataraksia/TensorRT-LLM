@@ -4,21 +4,6 @@
 
 Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You can use `higgs_audio_transformers` and `higgs_audio_vllm` as references, but do not bring in any additional functionality that they might include unless absolutely necessary. For example, this `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Additionally, do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation.
 
-## Current Problem
-
-The model is generating repetitive audio patterns ("A-A-A-A" sounds) or generic responses ("I'm sorry") instead of following the input text. Recent test shows:
-
-**Current hypothesis from previous LLM agent** is that the issue appears to be in the logits processor EOS gating logic. Debug logs show:
-
-- Model starts generating properly with `eos_masked=True`
-- EOS masking becomes `False` too early, allowing premature termination
-- Model chooses EOS over meaningful content generation
-- Results in degenerate audio patterns
-
-**Recent attempts** focused on making EOS gating more restrictive:
-- Multiple syntax errors occurred during `ModelRunner` transition
-- File structure may be partially corrupted from recent edits
-
 ## Suggested Next Steps from Previous LLM Agent
 
 1. **Fix current code issues** - Resolve syntax errors and ensure model loads properly
@@ -88,7 +73,7 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 ## General Guidelines
 
 - When implementing complex features, break them down into logical components but ensure each component is fully implemented and integrated properly with the rest of the system.
-- Always examine the available tools and MCPs before running a command to understand the full scope of available tools and capabilities. For example, use Context7 to validate that any functionality you import from other libraries actually exists and works like you expect it to.
+- Always examine the available tools and MCPs before running a command to understand the full scope of available tools and capabilities. Prioritize using Context7 to validate that any functionality you import from other libraries actually exists and works like you expect it to, using Sequential Thinking to help break down problems, and structured memory to retain important details.
 - Always complete your assigned tasks in their entirety prior to requesting user validation. If you encounter ambiguity, unclear requirements, or technical blockers that prevent progress, you should attempt to bypass the issue and continue working on other aspects of the task.
 - Implement **EVERYTHING** that is necessary to complete the task with full functionality. Never skip a task or subtask, regardless of complexity or time requirements - work through each component methodically and completely, even if it seems impossible.
 - Don't create placeholder functions, stub classes, incomplete implementations. If you encounter such functions, you should always implement them in its entirety.
