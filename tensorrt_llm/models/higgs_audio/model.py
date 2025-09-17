@@ -943,19 +943,81 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         self.stream_eos_id = config.audio_stream_eos_id
         self.request_states = {}  # Track delay pattern state per request
 
-    def _get_or_create_state(self, req_id: int) -> dict:
-        """Get or create state for a request."""
+    def _get_or_create_state(self, req_id: int, token_ids: List[List[int]]) -> dict:
+        """Get or create generation state for a request."""
         if req_id not in self.request_states:
+            prompt_len = self.config.input_length
+            sequence = token_ids[0]
+            if prompt_len > len(sequence):
+                prompt_len = len(sequence)
+
+            # Capture the final audio frame from the prompt (initial delay tokens).
+            start = max(0, prompt_len - self.num_codebooks)
+            initial_frame_tokens = sequence[start:prompt_len]
+            if len(initial_frame_tokens) != self.num_codebooks:
+                initial_frame = [self.stream_bos_id] * self.num_codebooks
+            else:
+                initial_frame = [self._decode_audio_token(tok) for tok in initial_frame_tokens]
+
+            num_delay = 0
+            if initial_frame:
+                bos_count = np.sum([int(tok == self.stream_bos_id) for tok in initial_frame])
+                num_delay = max(0, min(self.num_codebooks - 1, self.num_codebooks - bos_count - 1))
+
             self.request_states[req_id] = {
-                # I've left these previous state variables created by the previous LLM agent, but I don't necessarily want to use them all.  Try to keep this implementation as relatively simplistic as the Transformers one.
-                "num_delay": 0,  # tracks delay tokens emitted
-                "closed": [False] * self.num_codebooks,  # tracks which codebooks finished with EOS
-                "step_mod": 0,  # rotating pointer among open codebooks
-                "prev_cb": None,  # codebook used in previous step
-                "counts": [0] * self.num_codebooks,  # local tokens emitted per codebook
-                "step": 0,  # total generation steps
+                "prompt_len": prompt_len,
+                "processed_tokens": prompt_len,
+                "num_delay": max(num_delay, 0),
+                "num_remaining_delays": None,
+                "frames": [initial_frame],
+                "current_frame": [self.stream_bos_id] * self.num_codebooks,
+                "codebook_index": 0,
+                "frame_counter": 0,
+                "all_audio_finished": False,
+                "min_content_frames": self.num_codebooks,  # heuristic gate for EOS
             }
         return self.request_states[req_id]
+
+    def _decode_audio_token(self, token: int) -> int:
+        return int(token % self.codebook_size)
+
+    def _mask_except(self, vector: torch.Tensor, keep_idx: int) -> None:
+        original = vector[keep_idx]
+        vector.fill_(torch.finfo(vector.dtype).min)
+        vector[keep_idx] = original
+
+    def _suppress_token(self, vector: torch.Tensor, idx: int) -> None:
+        vector[idx] = torch.finfo(vector.dtype).min
+
+    def _ingest_token(self, state: dict, token: int) -> None:
+        value = self._decode_audio_token(token)
+        cb = state["codebook_index"]
+        state["current_frame"][cb] = value
+
+        if cb == self.num_codebooks - 1:
+            completed_frame = state["current_frame"]
+            state["frames"].append(completed_frame.copy())
+            state["current_frame"] = [self.stream_bos_id] * self.num_codebooks
+            state["codebook_index"] = 0
+            state["frame_counter"] += 1
+
+            if state["num_delay"] + 1 < self.num_codebooks:
+                state["num_delay"] += 1
+
+            eos_indices = [
+                idx for idx, val in enumerate(completed_frame) if val == self.stream_eos_id
+            ]
+            if eos_indices:
+                last_eos_idx = eos_indices[-1]
+                state["num_remaining_delays"] = self.num_codebooks - last_eos_idx - 1
+                if last_eos_idx == self.num_codebooks - 1 and state["num_remaining_delays"] == 0:
+                    state["all_audio_finished"] = True
+            elif state["num_remaining_delays"] is not None:
+                state["num_remaining_delays"] = max(state["num_remaining_delays"] - 1, 0)
+                if state["num_remaining_delays"] == 0:
+                    state["all_audio_finished"] = True
+        else:
+            state["codebook_index"] += 1
 
     def __call__(
         self,
@@ -970,14 +1032,44 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         stream = None if stream_ptr is None else torch.cuda.ExternalStream(stream_ptr)
 
         with torch.cuda.stream(stream):
-            state = self._get_or_create_state(req_id)
-            last_token_id: int = token_ids[0][-1]
+            if req_id in self.request_states:
+                prev_prompt_len = self.request_states[req_id]["prompt_len"]
+                if len(token_ids[0]) <= prev_prompt_len:
+                    self.request_states.pop(req_id, None)
+
+            state = self._get_or_create_state(req_id, token_ids)
             # The runtime passes logits as shape [batch=1, beam=1, vocab_size_total].
             # Our lm_head outputs only audio vocab, so slice to that range.
             logits = logits[0, 0, 0 : self.vocab_size]
 
-    def _apply_delay_pattern_logic(self, logits: torch.Tensor, state: dict, last_token_id: int):
-        """Apply delay pattern logic to audio logits."""
+            total_len = len(token_ids[0])
+            if total_len > state["processed_tokens"]:
+                for idx in range(state["processed_tokens"], total_len):
+                    if idx < state["prompt_len"]:
+                        continue
+                    self._ingest_token(state, token_ids[0][idx])
+                state["processed_tokens"] = total_len
+
+            logits = logits.view(self.num_codebooks, self.codebook_size)
+            cb = state["codebook_index"]
+            vector = logits[cb]
+
+            if state["all_audio_finished"]:
+                self._mask_except(vector, self.stream_eos_id)
+                return
+
+            if state["num_remaining_delays"] is not None:
+                eos_boundary = self.num_codebooks - max(state["num_remaining_delays"], 0)
+                if cb < eos_boundary:
+                    self._mask_except(vector, self.stream_eos_id)
+                    return
+
+            if cb > state["num_delay"]:
+                self._mask_except(vector, self.stream_bos_id)
+                return
+
+            if state["frame_counter"] < state["min_content_frames"]:
+                self._suppress_token(vector, self.stream_eos_id)
 
 
 class HiggsAudioTRTRunner:
@@ -1007,6 +1099,7 @@ class HiggsAudioTRTRunner:
         self.num_codebooks = self.config.audio_num_codebooks
         self.stream_bos_id = self.config.audio_stream_bos_id
         self.stream_eos_id = self.config.audio_stream_eos_id
+        self.audio_codebook_size = self.config.audio_codebook_size
 
         # Set up device
         self.device = torch.device("cuda", 0)
@@ -1153,29 +1246,46 @@ class HiggsAudioTRTRunner:
             raise
 
     def process_audio(self, data):
-        audio_data = data[self.config.input_length :].view(self.num_codebooks, -1)
-        print(f"Extracted audio tokens shape: {audio_data.shape}")
-        separator = np.array([self.stream_eos_id] * self.num_codebooks)
-        audio_data = audio_data.cpu().numpy()
-        # TODO: This section was taken from the vLLM implementation.  I haven't tested it yet, but it doesn't seem quite right, not sure.
-        split_indices = np.all(audio_data == separator, axis=1).nonzero()[0]
-        print(split_indices)
-        start = 0
-        audio_codes = []
-        for idx in split_indices:
-            audio_codes.append(audio_data[start:idx])
-            start = idx + 1
-        if start < len(audio_data):
-            audio_codes.append(audio_data[start:])
+        generated = data[self.config.input_length :]
+        if generated.numel() == 0:
+            raise RuntimeError("No audio tokens were generated by the model.")
 
-        waveforms = []
-        for code in audio_codes:
-            code = np.array(code, dtype=np.int64)[1:-1, :]
-            reverted_code = revert_delay_pattern(code.transpose(1, 0))
-            reverted_code = reverted_code.clip(0, self.audio_codebook_size - 1)
-            waveform, sr = self.audio_tokenizer.decode(reverted_code)
+        frames = generated.view(-1, self.num_codebooks).cpu().numpy()
+        separator = np.full((self.num_codebooks,), self.stream_eos_id, dtype=frames.dtype)
+
+        groups: list[np.ndarray] = []
+        eos_rows = np.where(np.all(frames == separator, axis=1))[0]
+        start = 0
+        for idx in eos_rows:
+            if idx > start:
+                groups.append(frames[start:idx])
+            start = idx + 1
+        if start < len(frames):
+            groups.append(frames[start:])
+
+        waveforms: list[np.ndarray] = []
+        sr = 16000
+        for audio_data in groups:
+            if audio_data.size == 0:
+                continue
+            if np.all(audio_data[0] == self.stream_bos_id):
+                audio_data = audio_data[1:]
+            if audio_data.size == 0:
+                continue
+            if np.all(audio_data[-1] == self.stream_eos_id):
+                audio_data = audio_data[:-1]
+            if audio_data.size == 0:
+                continue
+
+            codes = revert_delay_pattern(audio_data.transpose(1, 0))
+            codes = np.asarray(codes, dtype=np.int64).clip(0, self.audio_codebook_size - 1)
+            waveform, sr = self.audio_tokenizer.decode(codes)
             waveforms.append(waveform)
-        waveforms = np.concatenate(waveforms)
+
+        if not waveforms:
+            raise RuntimeError("Unable to reconstruct any audio waveform from generated tokens.")
+
+        waveform = np.concatenate(waveforms).astype(np.float32)
         if sr != 16000:
-            waveforms = librosa.resample(waveforms.astype(np.float32), orig_sr=sr, target_sr=16000)
-        return waveforms
+            waveform = librosa.resample(waveform, orig_sr=sr, target_sr=16000)
+        return waveform
