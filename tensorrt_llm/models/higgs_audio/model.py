@@ -5,6 +5,7 @@
 import librosa
 from collections.abc import AsyncGenerator, Sequence
 import os
+from pathlib import Path
 from typing import Any, Optional, List, OrderedDict, Union
 import numpy as np
 from openai.types.chat import ChatCompletionAudio
@@ -974,6 +975,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                 "codebook_index": 0,
                 "frame_counter": 0,
                 "all_audio_finished": False,
+                "countdown_active": False,
+                "last_eos_index": -1,
                 "min_content_frames": self.num_codebooks,  # heuristic gate for EOS
             }
         return self.request_states[req_id]
@@ -1004,18 +1007,30 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
             if state["num_delay"] + 1 < self.num_codebooks:
                 state["num_delay"] += 1
 
+            prev_last_eos = state["last_eos_index"]
             eos_indices = [
                 idx for idx, val in enumerate(completed_frame) if val == self.stream_eos_id
             ]
+            new_eos_detected = False
             if eos_indices:
                 last_eos_idx = eos_indices[-1]
-                state["num_remaining_delays"] = self.num_codebooks - last_eos_idx - 1
-                if last_eos_idx == self.num_codebooks - 1 and state["num_remaining_delays"] == 0:
-                    state["all_audio_finished"] = True
-            elif state["num_remaining_delays"] is not None:
-                state["num_remaining_delays"] = max(state["num_remaining_delays"] - 1, 0)
+                if last_eos_idx > prev_last_eos:
+                    remaining = self.num_codebooks - last_eos_idx - 1
+                    state["last_eos_index"] = last_eos_idx
+                    state["num_remaining_delays"] = max(remaining, 0)
+                    state["countdown_active"] = remaining > 0
+                    new_eos_detected = True
+            if state["countdown_active"] and state["num_remaining_delays"] is not None:
+                if not new_eos_detected:
+                    state["num_remaining_delays"] = max(state["num_remaining_delays"] - 1, 0)
                 if state["num_remaining_delays"] == 0:
-                    state["all_audio_finished"] = True
+                    state["countdown_active"] = False
+
+            if (
+                state["last_eos_index"] == self.num_codebooks - 1
+                and state["num_remaining_delays"] == 0
+            ):
+                state["all_audio_finished"] = True
         else:
             state["codebook_index"] += 1
 
@@ -1080,12 +1095,21 @@ class HiggsAudioTRTRunner:
     ) -> None:
         """Initialize the TensorRT-LLM runner for HiggsAudio."""
 
-        self.engine_dir = "/home/me/TTS/TensorRT-LLM/higgs_audio_engine/"
+        repo_root = Path(__file__).resolve().parents[3]
+        default_engine_dir = repo_root / "higgs_audio_engine"
+        engine_dir_env = os.environ.get("HIGGS_AUDIO_ENGINE_DIR")
+        engine_path = Path(engine_dir_env) if engine_dir_env else default_engine_dir
+        if not engine_path.exists():
+            raise FileNotFoundError(
+                "Higgs Audio TensorRT engine not found. Build the engine with "
+                "build_engine.py or set HIGGS_AUDIO_ENGINE_DIR to the engine directory."
+            )
+        self.engine_dir = str(engine_path)
         self.hf_model_dir = "bosonai/higgs-audio-v2-generation-3B-base"
         self.audio_tokenizer_dir = "bosonai/higgs-audio-v2-tokenizer"
         self.reference_audio = None  # Disable reference audio loading for faster testing
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
-        self.config = HiggsAudioConfig.from_hugging_face()
+        self.config = HiggsAudioConfig.from_hugging_face(engine_dir=self.engine_dir)
         self.config.audio_in_start = 0
         self.config.audio_in_end = 0
 
@@ -1198,14 +1222,15 @@ class HiggsAudioTRTRunner:
         input_text: str,
         **generation_kwargs,
     ):
-        """Generate audio from text input and reference audio (TTS with voice cloning).
-        y
-                Args:
-                    input_text: The text prompt to convert to speech
-                    input_audio: Path to reference audio file for voice cloning
+        """Generate audio from text input and optional reference audio.
 
-                Returns:
-                    Generated audio tensor suitable for Whisper transcription"""
+        Args:
+            input_text: The text prompt to convert to speech.
+
+        Returns:
+            A waveform tensor containing the generated audio suitable for
+            Whisper transcription.
+        """
 
         # Don't change this!
         text_input = (

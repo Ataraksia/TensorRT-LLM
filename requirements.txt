@@ -335,7 +335,6 @@ tokenizers==0.21.4
 toml==0.10.2
 torch==2.7.1+cu128
 torch-stoi==0.2.3
-torch-tensorrt==2.8.0+cu129
 torchaudio==2.7.1+cu128
 torchprofile==0.0.4
 torchvision==0.22.1+cu128
