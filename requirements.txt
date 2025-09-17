@@ -328,8 +328,6 @@ tensorrt-cu12-libs==10.12.0.36
 tensorrt-cu13==10.13.2.6
 tensorrt-cu13-bindings==10.13.2.6
 tensorrt-cu13-libs==10.13.2.6
-tensorrt-llm==0.20.0
-tensorrt-llm==1.1.0rc1
 termcolor==3.1.0
 threadpoolctl==3.6.0
 tiktoken==0.11.0
