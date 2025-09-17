@@ -943,6 +943,14 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         self.stream_bos_id = config.audio_stream_bos_id
         self.stream_eos_id = config.audio_stream_eos_id
         self.request_states = {}  # Track delay pattern state per request
+        self.temperature = 1.0
+        self.top_k = 0
+        self.top_p = 0.0
+
+    def set_sampling_params(self, temperature: float, top_k: int, top_p: float) -> None:
+        self.temperature = float(temperature)
+        self.top_k = int(top_k)
+        self.top_p = float(top_p)
 
     @staticmethod
     def _sync_stream(stream: Optional[torch.cuda.Stream]) -> None:
@@ -954,30 +962,14 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
     def _get_or_create_state(self, req_id: int, token_ids: List[List[int]]) -> dict:
         """Get or create generation state for a request."""
         if req_id not in self.request_states:
-            prompt_len = self.config.input_length
-            sequence = token_ids[0]
-            if prompt_len > len(sequence):
-                prompt_len = len(sequence)
-
-            # Capture the final audio frame from the prompt (initial delay tokens).
-            start = max(0, prompt_len - self.num_codebooks)
-            initial_frame_tokens = sequence[start:prompt_len]
-            if len(initial_frame_tokens) != self.num_codebooks:
-                initial_frame = [self.stream_bos_id] * self.num_codebooks
-            else:
-                initial_frame = [self._decode_audio_token(tok) for tok in initial_frame_tokens]
-
-            num_delay = 0
-            if initial_frame:
-                bos_count = np.sum([int(tok == self.stream_bos_id) for tok in initial_frame])
-                num_delay = max(0, min(self.num_codebooks - 1, self.num_codebooks - bos_count - 1))
+            prompt_len = min(self.config.input_length, len(token_ids[0]))
 
             self.request_states[req_id] = {
                 "prompt_len": prompt_len,
                 "processed_tokens": prompt_len,
-                "num_delay": max(num_delay, 0),
+                "num_delay": 0,
                 "num_remaining_delays": None,
-                "frames": [initial_frame],
+                "frames": [],
                 "current_frame": [self.stream_bos_id] * self.num_codebooks,
                 "codebook_index": 0,
                 "frame_counter": 0,
@@ -1026,9 +1018,6 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
             if state["repeat_count"] >= state["max_repeat_frames"]:
                 state["all_audio_finished"] = True
 
-            if state["num_delay"] + 1 < self.num_codebooks:
-                state["num_delay"] += 1
-
             prev_last_eos = state["last_eos_index"]
             eos_indices = [
                 idx for idx, val in enumerate(completed_frame) if val == self.stream_eos_id
@@ -1052,11 +1041,17 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                     state["countdown_active"] = False
                     state["all_audio_finished"] = True
 
+            if state["all_audio_finished"]:
+                state["num_delay"] = 0
+
             if (
                 state["last_eos_index"] == self.num_codebooks - 1
                 and state["num_remaining_delays"] == 0
             ):
                 state["all_audio_finished"] = True
+
+            if state["all_audio_finished"]:
+                state["num_delay"] = 0
         else:
             state["codebook_index"] += 1
 
@@ -1094,41 +1089,79 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
             logits = logits.view(self.num_codebooks, self.codebook_size)
             original_logits = logits.clone()
+            working_logits = original_logits.to(torch.float32)
             min_val = torch.finfo(logits.dtype).min
 
-            eos_threshold = None
-            if state["all_audio_finished"]:
-                eos_threshold = self.num_codebooks
-            elif state["num_remaining_delays"] is not None:
-                eos_threshold = self.num_codebooks - max(state["num_remaining_delays"], 0)
+            selected_tokens = torch.empty(
+                (self.num_codebooks,), dtype=torch.int64, device=logits.device
+            )
+
+            current_delay = state["num_delay"]
+            remaining_delays = state["num_remaining_delays"]
 
             for idx in range(self.num_codebooks):
-                row = original_logits[idx]
-                force_token = None
-                if state["all_audio_finished"]:
-                    force_token = self.stream_eos_id
-                else:
-                    if eos_threshold is not None and idx < eos_threshold:
-                        force_token = self.stream_eos_id
-                    elif idx > state["num_delay"]:
-                        force_token = self.stream_bos_id
-
-                if force_token is not None:
-                    logits[idx].fill_(min_val)
-                    logits[idx, force_token] = 0.0
-                    continue
-
-                logits[idx] = row
+                row = working_logits[idx]
 
                 if state["frame_counter"] < state["min_content_frames"]:
-                    logits[idx, self.stream_eos_id] = min_val
+                    row[self.stream_eos_id] = -torch.inf
 
                 if (
                     state["repeat_count"] >= state["max_repeat_frames"]
                     and state["last_frame"] is not None
                 ):
                     prev_val = state["last_frame"][idx]
-                    logits[idx, prev_val] = min_val
+                    row[prev_val] = -torch.inf
+
+                adjusted_row = row.clone()
+
+                temperature = getattr(self, "temperature", 1.0)
+                top_k = getattr(self, "top_k", 0)
+                top_p = getattr(self, "top_p", 0.0)
+
+                if temperature is not None and temperature != 1.0:
+                    adjusted_row = adjusted_row / temperature
+
+                if top_k is not None and top_k > 0 and top_k < self.codebook_size:
+                    topk_vals, _ = torch.topk(adjusted_row, top_k)
+                    kth_val = topk_vals[-1]
+                    adjusted_row = torch.where(
+                        adjusted_row < kth_val,
+                        torch.full_like(adjusted_row, -torch.inf),
+                        adjusted_row,
+                    )
+
+                if top_p is not None and 0.0 < top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(adjusted_row, descending=True)
+                    probs = torch.softmax(sorted_logits, dim=-1)
+                    cumulative_probs = torch.cumsum(probs, dim=-1)
+                    mask = cumulative_probs > top_p
+                    mask[..., 0] = False
+                    sorted_logits[mask] = -torch.inf
+                    adjusted_row = torch.full_like(adjusted_row, -torch.inf)
+                    adjusted_row[sorted_indices] = sorted_logits
+
+                probs = torch.softmax(adjusted_row, dim=-1)
+                if torch.isnan(probs).any() or torch.sum(probs) == 0:
+                    token = torch.argmax(adjusted_row).item()
+                else:
+                    token = torch.multinomial(probs, 1).item()
+                selected_tokens[idx] = token
+
+            if state["all_audio_finished"]:
+                selected_tokens.fill_(self.stream_eos_id)
+            else:
+                if current_delay + 1 < self.num_codebooks:
+                    selected_tokens[current_delay + 1 :] = self.stream_bos_id
+                    state["num_delay"] = current_delay + 1
+                if remaining_delays is not None:
+                    leading = self.num_codebooks - max(remaining_delays, 0)
+                    if leading > 0:
+                        selected_tokens[:leading] = self.stream_eos_id
+
+            for idx in range(self.num_codebooks):
+                logits[idx].fill_(min_val)
+                token = int(selected_tokens[idx].item())
+                logits[idx, token] = 0.0
 
             logits_tensor[0, 0, 0 : self.vocab_size] = logits.view(-1)
 
@@ -1161,9 +1194,9 @@ class HiggsAudioTRTRunner:
         self.config.audio_in_start = 0
         self.config.audio_in_end = 0
 
-        self.temperature = 0.6
-        self.top_k = 0
-        self.top_p = 0.8
+        self.temperature = 1.0
+        self.top_k = 50
+        self.top_p = 0.95
         self.num_beams = 1
         self.max_num_tokens = self.config.max_num_tokens
         self.input_length = 0
@@ -1183,6 +1216,9 @@ class HiggsAudioTRTRunner:
 
         # Create custom logits processor for delay pattern handling
         self.audio_logits_processor = HiggsAudioLogitsProcessor(self.config)
+        self.audio_logits_processor.set_sampling_params(
+            self.temperature, self.top_k, self.top_p
+        )
 
         from tensorrt_llm.runtime import ModelRunnerCpp
 
@@ -1231,20 +1267,22 @@ class HiggsAudioTRTRunner:
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # Don't change this!
             pre_audio_input = (
-                f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>"
+                f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
                 f"Generate audio following instruction.<|scene_desc_start|>"
                 f"Audio is recorded from a quiet room."
                 f"Speaker is an enthusiastic young Australian woman in her early 20s."
                 f"She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>"
-                f"<|start_header_id|>user<|end_header_id|>{transcription}<|eot_id|>"
-                f"<|start_header_id|>assistant<|end_header_id|><|audio_bos|>"
+                f"<|start_header_id|>user<|end_header_id|>\n\n{transcription}<|eot_id|>"
+                f"<|start_header_id|>assistant<|end_header_id|>\n\n<|audio_bos|>"
             )
             pre_audio_input_ids = (
                 self.tokenizer.encode(pre_audio_input, return_tensors="pt")
                 .to(self.device)
                 .flatten()
             )
-            post_audio_input = f"<|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>"
+            post_audio_input = (
+                f"<|audio_eos|><|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"
+            )
             post_audio_input_ids = (
                 self.tokenizer.encode(post_audio_input, return_tensors="pt")
                 .to(self.device)
@@ -1258,11 +1296,11 @@ class HiggsAudioTRTRunner:
             # Don't change this!
             text_input = (
                 f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>"
-                f"Generate audio following instruction.<|scene_desc_start|>"
+                f"\n\nGenerate audio following instruction.<|scene_desc_start|>"
                 f"Audio is recorded from a quiet room."
                 f"Speaker is an enthusiastic young Australian woman in her early 20s."
                 f"She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>"
-                f"<|start_header_id|>user<|end_header_id|>"
+                f"<|start_header_id|>user<|end_header_id|>\n\n"
             )
             input_ids = (
                 self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
@@ -1287,20 +1325,19 @@ class HiggsAudioTRTRunner:
 
         # Don't change this!
         text_input = (
-            f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|><|audio_out_bos|>"
+            f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+            f"<|audio_out_bos|><|AUDIO_OUT|>"
         )
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
-        bos_tokens = (
-            torch.arange(self.num_codebooks, device=self.device, dtype=input_ids.dtype)
-            * self.audio_codebook_size
-            + self.stream_bos_id
-        )
-        input_ids = torch.cat([self.saved_input_ids, input_ids, bos_tokens])
+        input_ids = torch.cat([self.saved_input_ids, input_ids])
         # np.savetxt("log0.5.txt", input_ids.cpu(), delimiter=",", fmt="%d")
         self.config.input_length = input_ids.size(0)
-        max_input_length = torch.tensor(input_ids.size(0), dtype=torch.int32).max().item()
+        max_input_length = int(input_ids.size(0))
         max_new_tokens = self.max_num_tokens - max_input_length
+
+        # Reset logits processor state for a fresh generation run.
+        self.audio_logits_processor.request_states.clear()
 
         # Only terminate once the final codebook emits EOS. The runtime flattens
         # the (codebook, token) pair into a single id, so account for the stride.
@@ -1368,7 +1405,8 @@ class HiggsAudioTRTRunner:
             codes = revert_delay_pattern(audio_data.transpose(1, 0))
             codes = np.asarray(codes, dtype=np.int64)
             valid_codebook_limit = self.audio_codebook_size - 2
-            codes = np.clip(codes, 0, valid_codebook_limit - 1)
+            # Treat special stream BOS/EOS markers as padding before decoding.
+            codes = np.where(codes >= valid_codebook_limit, 0, codes)
             waveform, sr = self.audio_tokenizer.decode(codes)
             waveforms.append(waveform)
 
