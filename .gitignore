@@ -105,7 +105,7 @@ AussieGirl.wav
 # tasks.json
 # tasks/
 higgs-audio-v2-generation-3B-base*/**
-log1.txt
-log2.txt
+log*.txt
 lp_debug.txt
 token_hist.txt
+*.wav

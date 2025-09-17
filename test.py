@@ -70,3 +70,6 @@ else:
 # import sounddevice as sd
 
 # sd.play(audio_output, 16000, blocking=True)
+import soundfile as sf
+
+sf.write("output.wav", audio_output, 16000)

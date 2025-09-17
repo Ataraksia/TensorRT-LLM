@@ -43,12 +43,12 @@ class HiggsAudioConfig(PretrainedConfig):
     def __init__(
         self,
         *,
-        build_config: Dict,
         audio_adapter_type: str = "dual_ffn_fast_forward",
         audio_dual_ffn_layers: list = None,
         audio_ffn_hidden_size: int = 3072,
         audio_ffn_intermediate_size: int = 8192,
         text_vocab_size: int = 128256,
+        audio_vocab_size: int = 8208,
         # Audio codebook configuration
         audio_num_codebooks: int = 8,
         audio_codebook_size: int = 1024 + 2,  # +2 for special tokens
@@ -66,12 +66,14 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_in_token_idx: int = 128015,
         audio_out_token_idx: int = 128016,
         pad_token_id: int = 128001,
+        audio_in_start: int = -1,
+        audio_in_end: int = -1,
+        input_length: int = 0,
+        max_num_tokens=2048,
         **kwargs,
     ):
         self.text_vocab_size = text_vocab_size
-        self.audio_vocab_size = audio_codebook_size * audio_num_codebooks
-
-        self.build_config = build_config
+        self.audio_vocab_size = audio_vocab_size
 
         # Initialize base PretrainedConfig
         super().__init__(**kwargs)
@@ -99,6 +101,11 @@ class HiggsAudioConfig(PretrainedConfig):
         self.audio_in_token_idx = audio_in_token_idx
         self.audio_out_token_idx = audio_out_token_idx
         self.pad_token_id = pad_token_id
+
+        self.audio_in_start = audio_in_start
+        self.audio_in_end = audio_in_end
+        self.input_length = input_length
+        self.max_num_tokens = max_num_tokens
 
     def to_dict(self) -> Dict:
         output = super().to_dict()
@@ -165,11 +172,9 @@ class HiggsAudioConfig(PretrainedConfig):
         num_labels = 1
         dtype = infer_dtype(dtype, getattr(hf_config, "torch_dtype", None))
         rotary_embedding_dim = None
-        engine_config = json.load(Path(engine_dir + "/config.json").open("r"))
         return cls(
             architecture=hf_config["architectures"][0],
             dtype=dtype,
-            build_config=engine_config["build_config"],
             num_hidden_layers=hf_config["num_hidden_layers"],
             num_attention_heads=hf_config["num_attention_heads"],
             hidden_size=hf_config["hidden_size"],
