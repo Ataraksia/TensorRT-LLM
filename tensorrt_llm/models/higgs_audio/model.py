@@ -966,7 +966,7 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         client_id: Optional[int],
     ) -> None:
         """Apply delay pattern logic to audio logits during generation."""
-
+        # TODO set this all up properly
         stream = None if stream_ptr is None else torch.cuda.ExternalStream(stream_ptr)
 
         with torch.cuda.stream(stream):
