@@ -110,3 +110,4 @@ lp_debug.txt
 token_hist.txt
 *.wav
 .roo/mcp.json
+.kilocode/mcp.json
