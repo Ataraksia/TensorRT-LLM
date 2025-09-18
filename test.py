@@ -1,4 +1,5 @@
 import base64
+import os
 import re
 
 import jiwer
@@ -73,7 +74,13 @@ else:
     print("YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!")
 
 
-client = OpenAI()
+openai_key = os.getenv("OPENAI_API_KEY")
+if not openai_key:
+    raise RuntimeError(
+        "OPENAI_API_KEY environment variable is required to call the audio judge."
+    )
+
+client = OpenAI(api_key=openai_key)
 
 
 sf.write("output.wav", audio_output, 16000)

@@ -2,15 +2,7 @@
 
 ## Primary Objective
 
-Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You can use `higgs_audio_transformers` and `higgs_audio_vllm` as references, but do not bring in any additional functionality that they might include unless absolutely necessary. For example, this `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Additionally, do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation.
-
-## Suggested Next Steps from Previous LLM Agent
-
-1. **Fix current code issues** - Resolve syntax errors and ensure model loads properly
-2. **Debug logits processor** - Investigate why EOS gating isn't working as expected
-3. **Test generation patterns** - Verify model is actually following input text conditioning
-4. **Validate audio extraction** - Ensure delay pattern logic correctly processes tokens
-5. **Achieve WER < 0.25** - Run `test.py` until success criteria met
+Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You can use `higgs_audio_transformers` and `higgs_audio_vllm` as references, but do not bring in any additional functionality that they might include unless absolutely necessary. For example, this `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Additionally, do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.
 
 ## Success Criteria
 

@@ -979,6 +979,7 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                 "history": [[] for _ in range(self.num_codebooks)],
                 "max_frames": 160,
                 "global_counts": [defaultdict(int) for _ in range(self.num_codebooks)],
+                "global_repeat_threshold": 12,
             }
         return self.request_states[req_id]
 
@@ -1154,11 +1155,17 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                                 row[val] = min_val
 
                 for val, count in state["global_counts"][idx].items():
-                    if count >= 32:
+                    if count >= state["global_repeat_threshold"]:
                         row[val] = min_val
 
                 if not torch.isfinite(row).any():
-                    row.copy_(original_logits[idx])
+                    row.fill_(min_val)
+                    fallback_token = int(torch.argmax(original_logits[idx]).item())
+                    if idx > state["num_delay"]:
+                        fallback_token = self.stream_bos_id
+                    elif eos_threshold is not None and idx < eos_threshold:
+                        fallback_token = self.stream_eos_id
+                    row[fallback_token] = 0.0
 
             logits_tensor[0, 0, 0 : self.vocab_size].copy_(logits.view(-1))
 
@@ -1191,9 +1198,9 @@ class HiggsAudioTRTRunner:
         self.config.audio_in_start = 0
         self.config.audio_in_end = 0
 
-        self.temperature = 0.8
-        self.top_k = 0
-        self.top_p = 0.8
+        self.temperature = 1.05
+        self.top_k = 100
+        self.top_p = 0.95
         self.num_beams = 1
         self.max_num_tokens = self.config.max_num_tokens
         self.input_length = 0
