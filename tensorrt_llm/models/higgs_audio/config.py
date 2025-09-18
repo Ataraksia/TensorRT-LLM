@@ -77,6 +77,7 @@ class HiggsAudioConfig(PretrainedConfig):
 
         # Initialize base PretrainedConfig
         super().__init__(**kwargs)
+        self.model_type = "higgs_audio"
         # Adapter configuration
         self.audio_adapter_type = audio_adapter_type
         self.audio_dual_ffn_layers = audio_dual_ffn_layers or list(range(28))  # Default: all layers

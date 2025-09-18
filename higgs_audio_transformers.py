@@ -7,7 +7,7 @@ from typing import Any, Optional, Union
 
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedModel
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
 from transformers.generation import (
     GenerationConfig,
@@ -26,11 +26,21 @@ from transformers.models.llama.modeling_llama import (
 )
 from transformers.utils import ModelOutput, logging
 
+from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
+
 logger = logging.get_logger(__name__)
 
 AUDIO_IN_TOKEN = "<|AUDIO|>"
 AUDIO_OUT_TOKEN = "<|AUDIO_OUT|>"
 EOS_TOKEN = "<|end_of_text|>"
+
+
+class HiggsAudioPreTrainedModel(PreTrainedModel):
+    config_class = HiggsAudioConfig
+    base_model_prefix = "higgs_audio"
+
+    def _init_weights(self, module):
+        pass
 
 
 class GenerationMode(Enum):

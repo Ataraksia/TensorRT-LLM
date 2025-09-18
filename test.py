@@ -1,5 +1,10 @@
+import base64
+import re
+
 import jiwer
+import soundfile as sf
 import torch
+from openai import OpenAI
 from silero_vad import get_speech_timestamps, load_silero_vad
 from transformers import AutoProcessor, pipeline
 
@@ -67,9 +72,40 @@ if word_error_rate > 0.25:
 else:
     print("YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!")
 
-# import sounddevice as sd
 
-# sd.play(audio_output, 16000, blocking=True)
-import soundfile as sf
+client = OpenAI()
+
 
 sf.write("output.wav", audio_output, 16000)
+
+with open("output.wav", "rb") as f:
+    wav_data = f.read()
+
+encoded_string = base64.b64encode(wav_data).decode("utf-8")
+
+completion = client.chat.completions.create(
+    model="gpt-4o-audio-preview",
+    modalities=["text", "audio"],
+    audio={"voice": "alloy", "format": "wav"},
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Please rate this on a scale of 1 to 10 on how human-like it sounds.  Rate a 5 if it sounds like a robot speaking gibberish.",  # noqa: E501
+                },
+                {"type": "input_audio", "input_audio": {"data": encoded_string, "format": "wav"}},
+            ],
+        },
+    ],
+)
+
+transcript = completion.choices[0].message.audio.transcript
+print(transcript)
+
+
+match = re.search(r"([0-9]+(?:\.[0-9]+)?)", transcript)
+if match:
+    rating = float(match.group(1))
+    print(f"Judge rating: {rating}")
