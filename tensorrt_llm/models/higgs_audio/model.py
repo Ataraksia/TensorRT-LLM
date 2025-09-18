@@ -4,6 +4,7 @@
 
 import builtins
 import librosa
+from collections import defaultdict
 from collections.abc import AsyncGenerator, Sequence
 import os
 from pathlib import Path
@@ -976,6 +977,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                 "last_column": [self.stream_bos_id] * self.num_codebooks,
                 "pending_column": [],
                 "history": [[] for _ in range(self.num_codebooks)],
+                "max_frames": 160,
+                "global_counts": [defaultdict(int) for _ in range(self.num_codebooks)],
             }
         return self.request_states[req_id]
 
@@ -1000,9 +1003,10 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         cb = state["codebook_index"]
         state["current_frame"][cb] = value
         state["history"][cb].append(value)
-        history_window = 64
+        history_window = 256
         if len(state["history"][cb]) > history_window:
             state["history"][cb] = state["history"][cb][-history_window:]
+        state["global_counts"][cb][value] += 1
 
         if cb == self.num_codebooks - 1:
             completed_frame = state["current_frame"]
@@ -1012,6 +1016,8 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
             state["frame_counter"] += 1
             state["last_column"] = state["pending_column"].copy()
             state["pending_column"] = []
+            if state["frame_counter"] >= state["max_frames"]:
+                state["all_audio_finished"] = True
 
             if state["last_frame"] is not None and state["last_frame"] == completed_frame:
                 state["repeat_count"] += 1
@@ -1138,7 +1144,7 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
 
                 history = state["history"][idx]
                 if history:
-                    ras_window = history[-24:]
+                    ras_window = history[-64:]
                     if ras_window:
                         counts = {}
                         for val in ras_window:
@@ -1146,6 +1152,10 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
                         for val, count in counts.items():
                             if count >= 2:
                                 row[val] = min_val
+
+                for val, count in state["global_counts"][idx].items():
+                    if count >= 32:
+                        row[val] = min_val
 
                 if not torch.isfinite(row).any():
                     row.copy_(original_logits[idx])
