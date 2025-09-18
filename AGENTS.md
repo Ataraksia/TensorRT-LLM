@@ -65,7 +65,7 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 ## General Guidelines
 
 - When implementing complex features, break them down into logical components but ensure each component is fully implemented and integrated properly with the rest of the system.
-- Always examine the available tools and MCPs before running a command to understand the full scope of available tools and capabilities. Prioritize using Context7 to validate that any functionality you import from other libraries actually exists and works like you expect it to, using Sequential Thinking to help break down problems, and structured memory to retain important details.
+- Always use Context7 to validate that any functionality you import from other libraries actually exists and works like you expect it to.  Always invoke Sequential Thinking at the start of each subtask.
 - Always complete your assigned tasks in their entirety prior to requesting user validation. If you encounter ambiguity, unclear requirements, or technical blockers that prevent progress, you should attempt to bypass the issue and continue working on other aspects of the task.
 - Implement **EVERYTHING** that is necessary to complete the task with full functionality. Never skip a task or subtask, regardless of complexity or time requirements - work through each component methodically and completely, even if it seems impossible.
 - Don't create placeholder functions, stub classes, incomplete implementations. If you encounter such functions, you should always implement them in its entirety.
@@ -224,3 +224,5 @@ ________________________________________________________________________________
     """
 ________________________________________________________________________________________________
 ```
+
+## Current Agent Thoughts
