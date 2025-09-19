@@ -520,8 +520,8 @@ def load_higgs_audio_tokenizer(tokenizer_name_or_path, device="cuda"):
     return model
 
 
-class HiggsAudioTRTRunner:
-    """TensorRT-LLM inference wrapper for HiggsAudio using ModelRunnerCpp."""
+class HiggsAudioInfer:
+    """TensorRT-LLM inference wrapper for HiggsAudio ."""
 
     def __init__(
         self,
@@ -562,7 +562,6 @@ class HiggsAudioTRTRunner:
         self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_dir, trust_remote_code=True)
         self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir)
 
-        # from tensorrt_llm.models.higgs_audio.model import HiggsAudioModelRunner
         from tensorrt_llm.runtime.higgs_audio_model_runner import HiggsAudioModelRunner
 
         self.runner = HiggsAudioModelRunner.from_dir(
@@ -846,7 +845,7 @@ if __name__ == "__main__":
     gpu_device = torch.device("cuda", 0)
     torch.cuda.set_device(gpu_device)
 
-    runner = HiggsAudioTRTRunner("/home/me/TTS/TensorRT-LLM/")
+    runner = HiggsAudioInfer("/home/me/TTS/TensorRT-LLM/")
 
     input_text = "Chat, stop backseating! I totally know what I'm doing... I think"
 

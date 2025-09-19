@@ -55,9 +55,10 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 
 ## Key Files & Components
 
-- `model.py` - Core model, logits processor, runner
+- `model.py` - Core model
+- `higgs_audio_model_runner.py` - Custom model runner for Higgs Audio
 - `config.py` - Model configuration
-- `test.py` - End-to-end validation using speech-to-text and WER
+- `test.py` - Inference and End-to-end validation using speech-to-text and WER
 - `build_engine.py` - rebuild the engine
 - `higgs_audio_transformers.py` - condensed Higgs Audio Transformers implementation
 - `higgs_audio_vllm.py` - condensed Higgs Audio vLLM implementation
