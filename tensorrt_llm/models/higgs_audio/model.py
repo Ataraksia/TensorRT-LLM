@@ -774,123 +774,21 @@ class HiggsAudioTransformer(Module):
         return hidden_states
 
 
-class HiggsAudioForCausalLM(PretrainedModel):
-    def __init__(self, config: PretrainedConfig):
-        super().__init__(config)
-        self.transformer = HiggsAudioTransformer(config)
+class HiggsAudioForCausalLM(DecoderModelForCausalLM):
+    """TensorRT-LLM implementation of Higgs Audio multimodal model."""
 
-        self.lm_head = ColumnLinear(
+    def __init__(self, config: HiggsAudioConfig):
+        # Initialize the transformer component
+        transformer = HiggsAudioTransformer(config)
+
+        lm_head = ColumnLinear(
             in_features=config.hidden_size,
             out_features=config.audio_vocab_size,
             bias=False,
             dtype=config.dtype,
         )
 
-        self.mup_width_multiplier = getattr(config, "mup_width_multiplier", None)
-        Attention.create_attention_const_params(self, config)
-        self.position_embedding_type = config.position_embedding_type
-
-    def forward(
-        self,
-        input_ids: Tensor,
-        position_ids=None,
-        use_cache=False,
-        last_token_ids=None,
-        attention_mask=None,
-        kv_cache_params=None,
-        attention_params=None,
-        mrope_params=None,
-        hidden_states=None,
-        prompt_embedding_table: Optional[Tensor] = None,
-        prompt_tasks: Optional[Tensor] = None,
-        prompt_vocab_size: Optional[Tensor] = None,
-        lora_params=None,
-        spec_decoding_params=None,
-    ):
-        # fill attention params.
-        attention_params = Attention.fill_attention_params(self, attention_params)
-
-        # split the sequence for context parallelism
-        if self.config.mapping.cp_size > 1:
-            if len(input_ids.shape) == 1:
-                # input shape is [-1]
-                input_ids, cp_join_index = cp_split_plugin(
-                    input_ids,
-                    attention_params.host_request_types,
-                    attention_params.host_context_lengths,
-                    self.config.mapping.cp_size,
-                    self.config.mapping.cp_rank,
-                )
-            else:
-                assert False, "Context parallelism with non-remove-padding is not supported yet."
-
-        kwargs = {
-            "input_ids": input_ids,
-            "position_ids": position_ids,
-            "use_cache": use_cache,
-            "attention_mask": attention_mask,
-            "kv_cache_params": kv_cache_params,
-            "attention_params": attention_params,
-        }
-        if lora_params is not None:
-            kwargs["lora_params"] = lora_params
-        if hidden_states is not None:
-            kwargs["hidden_states"] = hidden_states
-        if prompt_embedding_table is not None:
-            kwargs["prompt_embedding_table"] = prompt_embedding_table
-        if prompt_tasks is not None:
-            kwargs["prompt_tasks"] = prompt_tasks
-        if prompt_vocab_size is not None:
-            kwargs["prompt_vocab_size"] = prompt_vocab_size
-
-        if spec_decoding_params is not None:
-            kwargs["spec_decoding_params"] = spec_decoding_params
-        if mrope_params is not None:
-            kwargs["mrope_params"] = mrope_params
-
-        hidden_states = self.transformer.forward(**kwargs)
-
-        if use_cache:
-            hidden_states, presents = hidden_states
-
-        # All gather and rebuild sequence after transformer layer for context parallelism
-        if self.config.mapping.cp_size > 1:
-            if len(hidden_states.shape) == 2:
-                hidden_states = allgather(hidden_states, self.config.mapping.cp_group, gather_dim=0)
-                hidden_states = view(hidden_states, [-1, hidden_states.shape[-1]])
-                hidden_states = index_select(hidden_states, 0, cp_join_index)
-            else:
-                assert False, "Context parallelism with non-remove-padding is not supported yet."
-
-        if self.config.mapping.is_last_pp_rank():
-            all_hidden_states = hidden_states
-            hidden_states = gather_last_token_logits(
-                hidden_states, last_token_ids, default_net().plugin_config.remove_input_padding
-            )
-
-            # [batch_size, hidden_size] -> [batch_size, vocab_size]
-            lm_logits = self.lm_head(hidden_states)
-            if hasattr(self.config, "output_multiplier_scale"):
-                lm_logits *= getattr(self.config, "output_multiplier_scale", 1)
-            if self.mup_width_multiplier is not None:
-                lm_logits = lm_logits / self.mup_width_multiplier
-            lm_logits.mark_output("logits", self.config.logits_dtype)
-
-        else:
-            hidden_states.mark_output("hidden_states_output", self.config.dtype)
-
-        if use_cache and not default_net().plugin_config.paged_kv_cache:
-            for i, present in zip(
-                self.config.mapping.pp_layers(self.config.num_hidden_layers), presents
-            ):
-                present.mark_output(f"present_key_value_{i}", self.config.kv_dtype)
-            if self.config.mapping.is_last_pp_rank():
-                return (lm_logits, presents, hidden_states)
-            return (hidden_states, presents)
-        else:
-            if self.config.mapping.is_last_pp_rank():
-                return lm_logits, hidden_states, all_hidden_states
-            return hidden_states
+        super().__init__(config, transformer, lm_head)
 
     @classmethod
     def from_hugging_face(
@@ -1173,8 +1071,8 @@ class HiggsAudioTRTRunner:
                 .to(self.device)
                 .flatten()
             )
-            # self.config.audio_in_start = pre_audio_input_ids.size(0)
-            # self.config.audio_in_end = pre_audio_input_ids.size(0) + audio_ids.size(0) - 1
+            # self.config.audio_in_start = pre_audio_input_ids.shape[0]
+            # self.config.audio_in_end = pre_audio_input_ids.shape[0] + audio_ids.shape[0] - 1
             input_ids = torch.cat([pre_audio_input_ids, audio_ids, post_audio_input_ids])
             np.savetxt("audio_ids_in.txt", audio_ids.cpu().view(8, -1), delimiter=",", fmt="%d")
         else:
@@ -1223,13 +1121,13 @@ class HiggsAudioTRTRunner:
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
         input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
-        self.config.input_length = input_ids.size(0)
+        self.config.input_length = input_ids.shape[0]
         self.config.audio_in_start = 0
         self.config.audio_in_end = self.config.input_length - 1
         max_new_tokens = self.max_num_tokens - self.config.input_length
 
         with torch.no_grad():
-            self.config.input_length = input_ids.size(0)
+            self.config.input_length = input_ids.shape[0]
             self.audio_logits_processor.config = self.config
 
             outputs = self.runner.generate(
@@ -1241,53 +1139,72 @@ class HiggsAudioTRTRunner:
                 top_p=float(self.top_p),
                 logits_processor_names=["higgs_audio_logit_processor"],
             )
+        np.savetxt(
+            "1.txt",
+            outputs[0, 0].cpu(),
+            delimiter=",",
+            fmt="%d",
+        )
+        audio_tokens = outputs[0, 0, self.config.input_length :]
+        np.savetxt(
+            "2.txt",
+            audio_tokens.cpu(),
+            delimiter=",",
+            fmt="%d",
+        )
+        waveform = self.process_audio(audio_tokens)
+        print(f"Successfully generated audio: {len(waveform)} samples")
+        return waveform
 
-        try:
-            audio_tokens = outputs[0, self.config.input_length :].cpu().numpy()
-            np.savetxt("audio_ids_out.txt", audio_tokens.view(8, -1), delimiter=",", fmt="%d")
-            waveform = self.process_audio(audio_tokens)
-            print(f"Successfully generated audio: {len(waveform)} samples")
-            return waveform
-        except Exception as e:
-            print(f"Error in audio processing: {e}")
-            # Fallback: Generate a short silence or error waveform
-            return torch.zeros(16000 * 1)  # 1s silence at 16kHz
-
-    def process_audio(self, generated: np.ndarray):
+    def process_audio(self, generated):
         """Process generated audio tokens with EOS fixup and decode to waveform."""
-        if generated.size == 0:
+        if generated.shape[0] == 0:
             raise RuntimeError("No audio tokens were generated by the model.")
 
         # Trim to complete frames (multiple of num_codebooks)
-        remainder = generated.size % self.num_codebooks
+        remainder = generated.shape[0] % self.num_codebooks
         if remainder != 0:
             generated = generated[:-remainder]
-        if generated.size == 0:
+        if generated.shape[0] == 0:
             raise RuntimeError("Generated tokens did not contain any complete audio frames.")
 
         # Reshape to frames: (num_frames, num_codebooks)
-        frames = generated.reshape(-1, self.num_codebooks).astype(np.int64)
+        frames = generated.view(-1, self.num_codebooks)
         print(f"Initial frames shape: {frames.shape}")
 
+        np.savetxt(
+            "3.txt",
+            frames.cpu(),
+            delimiter=",",
+            fmt="%d",
+        )
+
         # Log initial token stats
-        content_tokens = np.sum((frames >= 0) & (frames < self.audio_codebook_size))
-        eos_tokens = np.sum(frames == self.stream_eos_id)
+        content_tokens = torch.sum((frames >= 0) & (frames < self.audio_codebook_size))
+        eos_tokens = torch.sum(frames == self.stream_eos_id)
         print(
             f"Initial stats - Content (0-{self.audio_codebook_size - 1}): {content_tokens}, "
             f"EOS ({self.stream_eos_id}): {eos_tokens}"
         )
 
         # BOS and EOS rows for reference
-        bos_row = np.full((self.num_codebooks,), self.stream_bos_id, dtype=np.int64)
-        eos_row = np.full((self.num_codebooks,), self.stream_eos_id, dtype=np.int64)
+        bos_row = torch.full((self.num_codebooks,), self.stream_bos_id, device=frames.device)
+        eos_row = torch.full((self.num_codebooks,), self.stream_eos_id, device=frames.device)
 
         # Trim leading BOS rows (from initial frame)
-        while frames.size > 0 and np.all(frames[0] == bos_row):
+        while frames.shape[0] > 0 and torch.all(frames[0] == bos_row):
             frames = frames[1:]
+
+        np.savetxt(
+            "4.txt",
+            frames.cpu().view(-1, self.num_codebooks),
+            delimiter=",",
+            fmt="%d",
+        )
 
         # Post-generation EOS fixup: Ensure staggered EOS propagation in the last frame(s)
         max_frames_to_fix = 2  # Tune: Check/fix last N frames
-        if frames.size > 0:
+        if frames.shape[0] > 0:
             last_frames_start = max(0, len(frames) - max_frames_to_fix)
             last_frames = frames[last_frames_start:]
 
@@ -1296,7 +1213,7 @@ class HiggsAudioTRTRunner:
             earliest_eos_cb = self.num_codebooks  # Default: No EOS, force full EOS frame
             for frame_idx in range(len(last_frames) - 1, -1, -1):  # Scan backward
                 frame = last_frames[frame_idx]
-                eos_cbs = np.where(frame == self.stream_eos_id)[0]
+                eos_cbs = torch.where(frame == self.stream_eos_id)[0]
                 if len(eos_cbs) > 0:
                     earliest_eos_cb = min(eos_cbs)
                     eos_detected_in_last = True
@@ -1318,23 +1235,23 @@ class HiggsAudioTRTRunner:
             else:
                 # No EOS detected: Append a full EOS frame to terminate
                 print("No EOS detected; appending full EOS frame for safe termination")
-                frames = np.vstack([frames, eos_row])
+                frames = torch.vstack([frames, eos_row])
 
-            # Trim trailing full EOS rows (post-fixup)
-            while frames.size > 0 and np.all(frames[-1] == eos_row):
-                frames = frames[:-1]
+                # Trim trailing full EOS rows (post-fixup)
+                while frames.shape[0] > 0 and torch.all(frames[-1] == eos_row):
+                    frames = frames[:-1]
 
         # Update stats after fixup
-        content_tokens_after = np.sum((frames >= 0) & (frames < self.audio_codebook_size))
-        eos_tokens_after = np.sum(frames == self.stream_eos_id)
+        content_tokens_after = torch.sum((frames >= 0) & (frames < self.audio_codebook_size))
+        eos_tokens_after = torch.sum(frames == self.stream_eos_id)
         print(f"Post-fixup stats - Content: {content_tokens_after}, EOS: {eos_tokens_after}")
 
-        if frames.size == 0:
+        if frames.shape[0] == 0:
             raise RuntimeError("No valid frames after EOS fixup.")
 
         # Group frames by EOS separators (as before)
-        groups: list[np.ndarray] = []
-        eos_rows = np.where(np.all(frames == eos_row, axis=1))[0]
+        groups: list[torch.Tensor] = []
+        eos_rows = torch.where(torch.all(frames == eos_row, axis=1))[0]
         start = 0
         for idx in eos_rows:
             if idx > start:
@@ -1343,13 +1260,12 @@ class HiggsAudioTRTRunner:
         if start < len(frames):
             groups.append(frames[start:])
 
-        print(f"Final groups lengths: {[g.shape[0] for g in groups if g.size > 0]}")
+        print(f"Final groups lengths: {[g.shape[0] for g in groups if g.shape[0] > 0]}")
 
         # Decode each group
         waveforms: list[np.ndarray] = []
-        sr = self.audio_tokenizer.sampling_rate
         for group_idx, audio_data in enumerate(groups):
-            if audio_data.size == 0:
+            if audio_data.shape[0] == 0:
                 continue
 
             print(f"Processing group {group_idx} of length {audio_data.shape[0]}")
@@ -1363,7 +1279,7 @@ class HiggsAudioTRTRunner:
 
             # Clamp to valid range (treat BOS/EOS as 0 for decoding)
             valid_limit = self.audio_codebook_size - 2  # Exclude BOS/EOS
-            codes = np.where(codes >= valid_limit, 0, codes)
+            codes = torch.where(codes >= valid_limit, 0, codes)
 
             print(f"Decoded codes shape for group {group_idx}: {codes.shape}")
             try:
