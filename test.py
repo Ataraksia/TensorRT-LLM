@@ -684,6 +684,18 @@ class HiggsAudioInfer:
             )
 
         audio_tokens = outputs[0, 0, self.config.audio_out_start :]
+        # Map flattened audio token ids to local [0..codebook_size-1] space
+        # Flattened range: [0 .. num_codebooks*codebook_size-1] (e.g., 0..8207)
+        if isinstance(audio_tokens, torch.Tensor):
+            flat_max = self.num_codebooks * self.codebook_size
+            is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
+            # Convert flattened token id to local id per codebook via modulo
+            mapped = audio_tokens.clone()
+            mapped[is_flattened_audio] = mapped[is_flattened_audio] % self.codebook_size
+            # Drop any non-audio tokens outside flattened range
+            audio_tokens = mapped[is_flattened_audio]
+        if audio_tokens.numel() == 0:
+            raise RuntimeError("No audio tokens found after mapping. Generation likely ended early.")
         np.savetxt(
             "2.txt",
             audio_tokens.cpu(),
