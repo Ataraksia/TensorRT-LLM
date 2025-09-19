@@ -42,7 +42,9 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
         # Enable LogitsProcessor so audio-mode logits are constrained during generation
         kwargs["logits_processor_names"] = ["delay_pattern"]
 
-        self.debug_log.append("Using LogitsProcessor-based + post-processing delay pattern implementation")
+        self.debug_log.append(
+            "Using LogitsProcessor-based + post-processing delay pattern implementation"
+        )
 
         result = super().generate(batch_input_ids, **kwargs)
 

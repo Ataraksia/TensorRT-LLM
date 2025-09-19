@@ -695,7 +695,9 @@ class HiggsAudioInfer:
             # Drop any non-audio tokens outside flattened range
             audio_tokens = mapped[is_flattened_audio]
         if audio_tokens.numel() == 0:
-            raise RuntimeError("No audio tokens found after mapping. Generation likely ended early.")
+            raise RuntimeError(
+                "No audio tokens found after mapping. Generation likely ended early."
+            )
         np.savetxt(
             "2.txt",
             audio_tokens.cpu(),
