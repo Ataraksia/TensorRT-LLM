@@ -50,21 +50,21 @@ class HiggsAudioConfig(PretrainedConfig):
         text_vocab_size: int = 128256,
         audio_vocab_size: int = 8208,
         # Audio codebook configuration
-        audio_num_codebooks: int = 8,
-        audio_codebook_size: int = 1024 + 2,  # +2 for special tokens
+        num_codebooks: int = 8,
+        codebook_size: int = 1024 + 2,  # +2 for special tokens
         audio_stream_bos_id: int = 1024,
         audio_stream_eos_id: int = 1025,
         # Special tokens
         audio_bos_token: str = "<|audio_bos|>",
-        audio_bos_token_id: int = 128011,
+        audio_bos_id: int = 128011,
         audio_eos_token: str = "<|audio_eos|>",
-        audio_eos_token_id: int = 128012,
+        audio_eos_id: int = 128012,
         audio_out_bos_token: str = "<|audio_out_bos|>",
-        audio_out_bos_token_id: int = 128013,
+        audio_out_bos_id: int = 128013,
         audio_in_token: str = "<|AUDIO|>",
         audio_out_token: str = "<|AUDIO_OUT|>",
-        audio_in_token_idx: int = 128015,
-        audio_out_token_idx: int = 128016,
+        audio_in_idx: int = 128015,
+        audio_out_idx: int = 128016,
         pad_token_id: int = 128001,
         max_num_tokens=2048,
         **kwargs,
@@ -82,22 +82,22 @@ class HiggsAudioConfig(PretrainedConfig):
         self.audio_ffn_intermediate_size = audio_ffn_intermediate_size
 
         # Audio codebook parameters
-        self.audio_num_codebooks = audio_num_codebooks
-        self.audio_codebook_size = audio_codebook_size
+        self.num_codebooks = num_codebooks
+        self.codebook_size = codebook_size
         self.audio_stream_bos_id = audio_stream_bos_id
         self.audio_stream_eos_id = audio_stream_eos_id
 
         # Special tokens
         self.audio_bos_token = audio_bos_token
-        self.audio_bos_token_id = audio_bos_token_id
+        self.audio_bos_id = audio_bos_id
         self.audio_eos_token = audio_eos_token
-        self.audio_eos_token_id = audio_eos_token_id
+        self.audio_eos_id = audio_eos_id
         self.audio_out_bos_token = audio_out_bos_token
-        self.audio_out_bos_token_id = audio_out_bos_token_id
+        self.audio_out_bos_id = audio_out_bos_id
         self.audio_in_token = audio_in_token
         self.audio_out_token = audio_out_token
-        self.audio_in_token_idx = audio_in_token_idx
-        self.audio_out_token_idx = audio_out_token_idx
+        self.audio_in_idx = audio_in_idx
+        self.audio_out_idx = audio_out_idx
         self.pad_token_id = pad_token_id
 
         self.max_num_tokens = max_num_tokens
@@ -112,20 +112,20 @@ class HiggsAudioConfig(PretrainedConfig):
             "audio_dual_ffn_layers",
             "audio_ffn_hidden_size",
             "audio_ffn_intermediate_size",
-            "audio_num_codebooks",
-            "audio_codebook_size",
+            "num_codebooks",
+            "codebook_size",
             "audio_stream_bos_id",
             "audio_stream_eos_id",
             "audio_bos_token",
-            "audio_bos_token_id",
+            "audio_bos_id",
             "audio_eos_token",
-            "audio_eos_token_id",
+            "audio_eos_id",
             "audio_out_bos_token",
-            "audio_out_bos_token_id",
+            "audio_out_bos_id",
             "audio_in_token",
             "audio_out_token",
-            "audio_in_token_idx",
-            "audio_out_token_idx",
+            "audio_in_idx",
+            "audio_out_idx",
             "pad_token_id",
         ]
         for attr in custom_attrs:

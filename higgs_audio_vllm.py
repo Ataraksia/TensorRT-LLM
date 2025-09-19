@@ -253,7 +253,7 @@ class HiggsAudioDecoderProjector(nn.Module):
                    `(batch_size, seq_len, vocab_size)`):
                 Logits for text tokens
             audio_logits (`torch.Tensor` of shape
-                `(num_audio_out_tokens, audio_num_codebooks * audio_codebook_size)`):
+                `(num_audio_out_tokens, num_codebooks * codebook_size)`):
                 Logits for audio tokens. We ensure
                 `num_text_tokens + num_audio_tokens == batch_size * seq_len`.
                 If we the model only outputs text logits,
@@ -1062,8 +1062,8 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         self.audio_encoder_proj = HiggsAudioFeatureProjector(vllm_config)
         # We add 1 for the audio_stream_bos token and 1
         # for theaudio_stream_eos token
-        self.audio_codebook_size = config.audio_codebook_size + 2
-        self.audio_num_codebooks = config.audio_num_codebooks
+        self.codebook_size = config.codebook_size + 2
+        self.num_codebooks = config.num_codebooks
 
         # HACK: This is a hack to tell if it is a audio generation model
         # FIXME: This should be fixed. We should simply reply on the token
@@ -1082,7 +1082,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             )
 
         self.audio_codebook_embeddings = nn.Embedding(
-            config.audio_num_codebooks * self.audio_codebook_size,
+            config.num_codebooks * self.codebook_size,
             config.text_config.hidden_size,
         )
 
@@ -1094,7 +1094,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         )
 
         self.audio_lm_head = ParallelLMHead(
-            config.audio_num_codebooks * self.audio_codebook_size,
+            config.num_codebooks * self.codebook_size,
             config.text_config.hidden_size,
             quant_config=quant_config,
             bias=False,
@@ -1156,8 +1156,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             audio_embed: torch.LongTensor of shape (audio_in_total_length, hidden_size)
         """
         codebook_shift = (
-            torch.arange(self.audio_num_codebooks, device=audio_ids.device)
-            * self.audio_codebook_size
+            torch.arange(self.num_codebooks, device=audio_ids.device) * self.codebook_size
         )
         codebook_shift = codebook_shift.unsqueeze(-1)
         audio_embed = self.audio_codebook_embeddings(audio_ids + codebook_shift)
@@ -1199,8 +1198,8 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                 inputs_embeds,
                 multimodal_embeddings,
                 [
-                    self.config.audio_in_token_idx,
-                    self.config.audio_out_token_idx,
+                    self.config.audio_in_idx,
+                    self.config.audio_out_idx,
                 ],
             )
 
@@ -1219,8 +1218,8 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
             input_ids,
             torch.tensor(
                 [
-                    self.config.audio_in_token_idx,
-                    self.config.audio_out_token_idx,
+                    self.config.audio_in_idx,
+                    self.config.audio_out_idx,
                 ],
                 device=input_ids.device,
             ),
@@ -1281,9 +1280,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         text_logits = self.logits_processor(self.text_lm_head, hidden_states, sampling_metadata)
         if self.generate_audio_out_token:
             audio_logits = self.audio_logits_processor(self.audio_lm_head, hidden_states, None)
-            audio_logits = audio_logits.view(
-                -1, self.audio_num_codebooks, self.audio_codebook_size
-            ).float()
+            audio_logits = audio_logits.view(-1, self.num_codebooks, self.codebook_size).float()
         else:
             audio_logits = None
         return text_logits, audio_logits
@@ -1318,27 +1315,26 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                 output_token_ids = sampling_metadata.output_token_ids[i]
                 if (
                     len(output_token_ids) > 0
-                    and output_token_ids[-1] == self.config.audio_out_bos_token_id
+                    and output_token_ids[-1] == self.config.audio_out_bos_id
                 ) or (
                     len(output_token_ids) == 0
-                    and last_prompt_token_id == self.config.audio_out_bos_token_id
+                    and last_prompt_token_id == self.config.audio_out_bos_id
                 ):
                     # check if the previous token is audio_out_bos. If so, we should always generate <|AUDIO_OUT|>
                     # Start the audio generation mode
                     audio_generation_mode[i] = 1
                 elif (
-                    len(output_token_ids) > 0
-                    and output_token_ids[-1] == self.config.audio_out_token_idx
+                    len(output_token_ids) > 0 and output_token_ids[-1] == self.config.audio_out_idx
                 ):
                     # Still in the audio generation mode
                     audio_generation_mode[i] = 2
 
             assert audio_logits is not None
-            audio_logits = audio_logits.reshape(-1, self.audio_codebook_size)
+            audio_logits = audio_logits.reshape(-1, self.codebook_size)
             mm_sampling_metadata = self.prepare_mm_sampling_metadata(sampling_metadata)
             next_mm_tokens = self.sampler(audio_logits, mm_sampling_metadata)
             next_mm_tokens.sampled_token_ids = next_mm_tokens.sampled_token_ids.reshape(
-                -1, self.audio_num_codebooks
+                -1, self.num_codebooks
             )
 
             # Check if we are generating the audio tokens
@@ -1352,13 +1348,13 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                     num_audio_eos = multimodal_metadata.num_audio_eos[i]
 
                     # Generate the delayed for the first few tokens
-                    if num_audio_delay < self.audio_num_codebooks:
+                    if num_audio_delay < self.num_codebooks:
                         next_mm_tokens.sampled_token_ids[i][num_audio_delay:] = (
                             self.config.audio_stream_bos_id
                         )
 
                     # Generate the eos token for the last few tokens
-                    if num_audio_eos < self.audio_num_codebooks:
+                    if num_audio_eos < self.num_codebooks:
                         all_eos_indices = torch.where(
                             next_mm_tokens.sampled_token_ids[i] == self.config.audio_stream_eos_id
                         )[0]
@@ -1367,7 +1363,7 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
                             next_mm_tokens.sampled_token_ids[i][:last_eos_index] = (
                                 self.config.audio_stream_eos_id
                             )
-                    elif num_audio_eos >= self.audio_num_codebooks:
+                    elif num_audio_eos >= self.num_codebooks:
                         # We already generated the last audio token,
                         # so we should just generate the eos token for the text
                         next_mm_tokens.sampled_token_ids[i] = -1
@@ -1381,15 +1377,15 @@ class HiggsAudioForConditionalGeneration(nn.Module, SupportsMultiModal):
         mm_sampling_metadata = copy.copy(sampling_metadata)
         if sampling_metadata.top_k is not None:
             mm_sampling_metadata.top_k = sampling_metadata.top_k.clip(
-                max=self.audio_codebook_size
-            ).repeat_interleave(self.audio_num_codebooks)
+                max=self.codebook_size
+            ).repeat_interleave(self.num_codebooks)
         if sampling_metadata.top_p is not None:
             mm_sampling_metadata.top_p = sampling_metadata.top_p.repeat_interleave(
-                self.audio_num_codebooks
+                self.num_codebooks
             )
         if sampling_metadata.temperature is not None:
             mm_sampling_metadata.temperature = sampling_metadata.temperature.repeat_interleave(
-                self.audio_num_codebooks
+                self.num_codebooks
             )
         return mm_sampling_metadata
 

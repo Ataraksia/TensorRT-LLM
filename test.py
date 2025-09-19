@@ -541,18 +541,18 @@ class HiggsAudioTRTRunner:
         self.hf_model_dir = "bosonai/higgs-audio-v2-generation-3B-base"
         self.audio_tokenizer_dir = "bosonai/higgs-audio-v2-tokenizer"
         self.reference_audio = None  # Disable reference audio loading for faster testing
-        # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
+        self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
         self.temperature = 1.0
         self.top_k = 50
         self.top_p = 0.95
         self.num_beams = 1
         self.max_num_tokens = self.config.max_num_tokens
-        self.num_codebooks = self.config.audio_num_codebooks
+        self.num_codebooks = self.config.num_codebooks
         self.stream_bos_id = self.config.audio_stream_bos_id
         self.stream_eos_id = self.config.audio_stream_eos_id
-        self.audio_eos_id = self.config.audio_eos_token_id
-        self.codebook_size = self.config.audio_codebook_size
+        self.audio_eos_id = self.config.audio_eos_id
+        self.codebook_size = self.config.codebook_size
 
         # Set up device
         self.device = torch.device("cuda", 0)
@@ -572,7 +572,6 @@ class HiggsAudioTRTRunner:
             # use_gpu_direct_storage=True,
             # cuda_graph_mode=True,
         )
-
         # Preload the part of the input that doesn't change
         if self.reference_audio and self.audio_tokenizer:
             # Load and transcribe reference audio for voice cloning
@@ -625,9 +624,6 @@ class HiggsAudioTRTRunner:
                 .to(self.device)
                 .flatten()
             )
-
-            self.runner.audio_in_start = pre_audio_input_ids.shape[0]
-            self.runner.audio_in_end = pre_audio_input_ids.shape[0] + audio_ids.shape[0] - 1
             input_ids = torch.cat([pre_audio_input_ids, audio_ids, post_audio_input_ids])
             np.savetxt("audio_ids_in.txt", audio_ids.cpu().view(8, -1), delimiter=",", fmt="%d")
         else:
@@ -667,7 +663,7 @@ class HiggsAudioTRTRunner:
             f"<|audio_out_bos|>"
         )
         next_audio_token = torch.full(
-            (self.config.audio_num_codebooks,),
+            (self.config.num_codebooks,),
             self.stream_bos_id,
             dtype=torch.long,
             device=self.device,
@@ -675,7 +671,7 @@ class HiggsAudioTRTRunner:
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
         input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
-        self.runner.audio_out_start = input_ids.shape[0]
+        self.audio_out_start = input_ids.shape[0]
         max_new_tokens = self.max_num_tokens - input_ids.shape[0]
 
         with torch.no_grad():
@@ -688,7 +684,7 @@ class HiggsAudioTRTRunner:
                 end_id=0,
             )
 
-        audio_tokens = outputs[0, 0, self.runner.audio_out_start :]
+        audio_tokens = outputs[0, 0, self.audio_out_start :]
         np.savetxt(
             "2.txt",
             audio_tokens.cpu(),

@@ -17,17 +17,9 @@ import torch
 from starlette.datastructures import State
 from huggingface_hub import snapshot_download
 from torch import nn
-from transformers import (
-    AutoModel,
-    AutoModelForSpeechSeq2Seq,
-    AutoProcessor,
-    AutoTokenizer,
-    pipeline,
-)
 import torchaudio
 import torch.nn.functional as F
 
-from tensorrt_llm import default_net
 from tensorrt_llm.bindings import INT32, ModelConfig
 from tensorrt_llm.mapping import Mapping
 
@@ -223,6 +215,8 @@ class HiggsAudioTransformer(Module):
             dtype=self.config.dtype,
         )
 
+        self.first_pass = True
+
     def _embed_audio_ids(self, audio_ids: Tensor):
         """Embed the audio ids"""
         # Simply repeat the audio_ids for each codebook
@@ -230,8 +224,7 @@ class HiggsAudioTransformer(Module):
 
         # Create codebook shifts
         codebook_shift = (
-            arange(0, self.config.audio_num_codebooks, dtype="int32")
-            * self.config.audio_codebook_size
+            arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
         ).unsqueeze(-1)  # Shape: (num_codebooks, 1)
 
         # Broadcast addition will handle the expansion automatically
@@ -240,6 +233,21 @@ class HiggsAudioTransformer(Module):
         # Get embeddings and sum
         audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0)
         return audio_embed  # Shape: (seq_len, embedding_dim)
+
+    def _calculate_audio_mask(self, input_ids, position_ids: Tensor):
+        """Calculate the audio token mask based on position ids."""
+        audio_in_start = nonzero(input_ids == self.config.audio_bos_id).flatten()
+        audio_in_end = nonzero(input_ids == self.config.audio_eos_id).flatten()
+        audio_out_start = nonzero(input_ids == self.config.audio_out_bos_id).flatten()
+        audio_mask = op_or(
+            op_and(
+                position_ids >= audio_in_start,
+                position_ids <= audio_in_end,
+            ),
+            position_ids >= audio_out_start,
+        )
+        self.first_pass = False
+        return audio_mask  # Shape: (seq_len,)
 
     def forward(
         self,
@@ -250,18 +258,13 @@ class HiggsAudioTransformer(Module):
         kv_cache_params: Optional[KeyValueCacheParams] = None,
         attention_params: Optional[AttentionParams] = None,
         position_ids: Optional[Tensor] = None,
-        audio_in_start: int = 0,
-        audio_in_end: int = 0,
-        audio_out_start: int = 0,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-        audio_mask = op_or(
-            op_and(
-                position_ids >= audio_in_start,
-                position_ids <= audio_in_end,
-            ),
-            position_ids >= audio_out_start,
+
+        audio_mask = (
+            self._calculate_audio_mask(input_ids, position_ids) if self.first_pass else True
         )
+
         audio_ids = where(audio_mask, input_ids, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
         text_ids = where(audio_mask, 0, input_ids)
@@ -284,6 +287,7 @@ class HiggsAudioTransformer(Module):
 
         if use_cache:
             return (hidden_states, tuple(presents))
+
         return hidden_states
 
 
@@ -302,91 +306,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         )
 
         super().__init__(config, transformer, lm_head)
-
-    def forward(
-        self,
-        audio_in_start: int = 0,
-        audio_in_end: int = 0,
-        audio_out_start: int = 0,
-        **kwargs,
-    ):
-        # fill attention params.
-        attention_params = Attention.fill_attention_params(
-            self, kwargs.get("attention_params", None)
-        )
-
-        # split the sequence for context parallelism
-        if self.config.mapping.cp_size > 1:
-            if len(input_ids.shape) == 1:
-                # input shape is [-1]
-                input_ids, cp_join_index = cp_split_plugin(
-                    input_ids,
-                    attention_params.host_request_types,
-                    attention_params.host_context_lengths,
-                    self.config.mapping.cp_size,
-                    self.config.mapping.cp_rank,
-                )
-            else:
-                assert False, "Context parallelism with non-remove-padding is not supported yet."
-
-        kwargs = {
-            "input_ids": kwargs.get("input_ids", None),
-            "position_ids": kwargs.get("position_ids", None),
-            "use_cache": kwargs.get("use_cache", False),
-            "attention_mask": kwargs.get("attention_mask", None),
-            "kv_cache_params": kwargs.get("kv_cache_params", None),
-            "attention_params": attention_params,
-        }
-
-        hidden_states = self.transformer.forward(
-            audio_in_start=audio_in_start,
-            audio_in_end=audio_in_end,
-            audio_out_start=audio_out_start,
-            **kwargs,
-        )
-
-        if kwargs.get("use_cache", False):
-            hidden_states, presents = hidden_states
-
-        # All gather and rebuild sequence after transformer layer for context parallelism
-        if self.config.mapping.cp_size > 1:
-            if len(hidden_states.shape) == 2:
-                hidden_states = allgather(hidden_states, self.config.mapping.cp_group, gather_dim=0)
-                hidden_states = view(hidden_states, [-1, hidden_states.shape[-1]])
-                hidden_states = index_select(hidden_states, 0, cp_join_index)
-            else:
-                assert False, "Context parallelism with non-remove-padding is not supported yet."
-
-        if self.config.mapping.is_last_pp_rank():
-            all_hidden_states = hidden_states
-            hidden_states = gather_last_token_logits(
-                hidden_states,
-                kwargs.get("last_token_ids", None),
-                default_net().plugin_config.remove_input_padding,
-            )
-
-            # [batch_size, hidden_size] -> [batch_size, vocab_size]
-            lm_logits = self.lm_head(hidden_states)
-            if hasattr(self.config, "output_multiplier_scale"):
-                lm_logits *= getattr(self.config, "output_multiplier_scale", 1)
-            if self.mup_width_multiplier is not None:
-                lm_logits = lm_logits / self.mup_width_multiplier
-            lm_logits.mark_output("logits", self.config.logits_dtype)
-        else:
-            hidden_states.mark_output("hidden_states_output", self.config.dtype)
-
-        if kwargs.get("use_cache", False) and not default_net().plugin_config.paged_kv_cache:
-            for i, present in zip(
-                self.config.mapping.pp_layers(self.config.num_hidden_layers), presents
-            ):
-                present.mark_output(f"present_key_value_{i}", self.config.kv_dtype)
-            if self.config.mapping.is_last_pp_rank():
-                return (lm_logits, presents, hidden_states)
-            return (hidden_states, presents)
-        else:
-            if self.config.mapping.is_last_pp_rank():
-                return lm_logits, hidden_states, all_hidden_states
-            return hidden_states
 
     @classmethod
     def from_hugging_face(

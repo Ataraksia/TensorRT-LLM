@@ -65,7 +65,7 @@ def main():
     )
 
     config = HiggsAudioConfig()
-    end_id = config.audio_eos_token_id  # audio eos
+    end_id = config.audio_eos_id  # audio eos
     pad_id = config.pad_token_id
 
     # Use the same prompt style as in the model's runner (no audio reference for simplicity)

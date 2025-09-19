@@ -250,9 +250,9 @@ def token2wav(
     token: np.ndarray,
     audio_chunk_size: int,
     audio_tokenizer: AudioTokenizer,
-    audio_codebook_size: int,
+    codebook_size: int,
     samples_per_token: int,
-    audio_num_codebooks: int,
+    num_codebooks: int,
     audio_stream_bos_id: int,
     audio_stream_eos_id: int,
     fade_out_audio: Optional[np.ndarray] = None,
@@ -271,7 +271,7 @@ def token2wav(
             audio_chunk_size -= 1
 
         audio_data = audio_data.transpose(1, 0)
-        audio_codes = revert_delay_pattern(audio_data).clip(0, audio_codebook_size - 1)
+        audio_codes = revert_delay_pattern(audio_data).clip(0, codebook_size - 1)
         audio_codes_list.append(audio_codes)
 
     audio_codes = np.concatenate(audio_codes_list, axis=1)
@@ -298,9 +298,9 @@ def create_audio_chunk(
     audio_chunk_size: int,
     fade_out_audio: Optional[np.ndarray],
     audio_tokenizer: AudioTokenizer,
-    audio_codebook_size: int,
+    codebook_size: int,
     samples_per_token: int,
-    audio_num_codebooks: int,
+    num_codebooks: int,
     audio_stream_bos_id: int,
     audio_stream_eos_id: int,
     finalize: bool = False,
@@ -312,9 +312,9 @@ def create_audio_chunk(
         fade_out_audio=fade_out_audio,
         finalize=finalize,
         audio_tokenizer=audio_tokenizer,
-        audio_codebook_size=audio_codebook_size,
+        codebook_size=codebook_size,
         samples_per_token=samples_per_token,
-        audio_num_codebooks=audio_num_codebooks,
+        num_codebooks=num_codebooks,
         audio_stream_bos_id=audio_stream_bos_id,
         audio_stream_eos_id=audio_stream_eos_id,
     )
@@ -452,8 +452,8 @@ class HiggsAudioServingAudio:
             "bosonai/higgs-audio-v2-generation-3B-base"
         )
         self.audio_tokenizer = AudioTokenizer(self.audio_tokenizer_dir, device=str(self.gpu_device))
-        self.audio_num_codebooks = self.audio_tokenizer.num_codebooks
-        self.audio_codebook_size = self.audio_tokenizer.codebook_size
+        self.num_codebooks = self.audio_tokenizer.num_codebooks
+        self.codebook_size = self.audio_tokenizer.codebook_size
         self.audio_tokenizer_tps = self.audio_tokenizer.tps
         self.samples_per_token = int(self.audio_tokenizer.sampling_rate // self.audio_tokenizer_tps)
         self.audio_stream_bos_id = self.config.audio_stream_bos_id
@@ -578,7 +578,7 @@ class HiggsAudioServingAudio:
         audio_chunk_size = request.audio_chunk_size or self.audio_tokenizer_tps
         audio_chunk_overlap_size = request.audio_chunk_overlap_size or self.audio_tokenizer_tps
 
-        audio_tokens_cache = np.ndarray((0, self.audio_num_codebooks), dtype=np.int64)
+        audio_tokens_cache = np.ndarray((0, self.num_codebooks), dtype=np.int64)
         is_first_audio_chunk = True
         fade_out_audio = None
         finish_reason_sent = False
@@ -605,15 +605,15 @@ class HiggsAudioServingAudio:
                             fade_out_audio,
                             finalize=True,
                             audio_tokenizer=self.audio_tokenizer,
-                            audio_codebook_size=self.audio_codebook_size,
+                            codebook_size=self.codebook_size,
                             samples_per_token=self.samples_per_token,
-                            audio_num_codebooks=self.audio_num_codebooks,
+                            num_codebooks=self.num_codebooks,
                             audio_stream_bos_id=self.audio_stream_bos_id,
                             audio_stream_eos_id=self.audio_stream_eos_id,
                             return_as_numpy_audio=True,
                         )
                         audio_tokens_cache = np.ndarray(
-                            (0, self.audio_num_codebooks), dtype=np.int64
+                            (0, self.num_codebooks), dtype=np.int64
                         )
                         fade_out_audio = None
                         # Reset the flag for the next audio sequences
@@ -631,18 +631,18 @@ class HiggsAudioServingAudio:
                     # The first audio chunk is generated with with less tokens than other chunks
                     # to reduce the first audio latency
                     if is_first_audio_chunk and curr_audio_chunk_size >= (
-                        10 + self.audio_num_codebooks - 1
+                        10 + self.num_codebooks - 1
                     ):
-                        first_audio_chunk_size = int(10 - self.audio_num_codebooks + 1)
+                        first_audio_chunk_size = int(10 - self.num_codebooks + 1)
                         audio_chunk, fade_out_audio = create_audio_chunk(
                             audio_tokens_cache,
                             first_audio_chunk_size,
                             fade_out_audio,
                             finalize=False,
                             audio_tokenizer=self.audio_tokenizer,
-                            audio_codebook_size=self.audio_codebook_size,
+                            codebook_size=self.codebook_size,
                             samples_per_token=self.samples_per_token,
-                            audio_num_codebooks=self.audio_num_codebooks,
+                            num_codebooks=self.num_codebooks,
                             audio_stream_bos_id=self.audio_stream_bos_id,
                             audio_stream_eos_id=self.audio_stream_eos_id,
                             return_as_numpy_audio=True,
@@ -658,9 +658,9 @@ class HiggsAudioServingAudio:
                             fade_out_audio,
                             finalize=False,
                             audio_tokenizer=self.audio_tokenizer,
-                            audio_codebook_size=self.audio_codebook_size,
+                            codebook_size=self.codebook_size,
                             samples_per_token=self.samples_per_token,
-                            audio_num_codebooks=self.audio_num_codebooks,
+                            num_codebooks=self.num_codebooks,
                             audio_stream_bos_id=self.audio_stream_bos_id,
                             audio_stream_eos_id=self.audio_stream_eos_id,
                             return_as_numpy_audio=True,
@@ -695,9 +695,9 @@ class HiggsAudioServingAudio:
                 audio_chunk_size,
                 fade_out_audio,
                 audio_tokenizer=self.audio_tokenizer,
-                audio_codebook_size=self.audio_codebook_size,
+                codebook_size=self.codebook_size,
                 samples_per_token=self.samples_per_token,
-                audio_num_codebooks=self.audio_num_codebooks,
+                num_codebooks=self.num_codebooks,
                 audio_stream_bos_id=self.audio_stream_bos_id,
                 audio_stream_eos_id=self.audio_stream_eos_id,
                 finalize=True,

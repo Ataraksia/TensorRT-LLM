@@ -131,8 +131,8 @@ def merge_input_ids_with_audio_features(
     audio_in_ids_start,
     audio_out_embed,
     audio_out_ids_start,
-    audio_in_token_idx,
-    audio_out_token_idx,
+    audio_in_idx,
+    audio_out_idx,
     inputs_embeds,
     input_ids,
     attention_mask,
@@ -158,9 +158,9 @@ def merge_input_ids_with_audio_features(
             The embeddings of audio-out tokens
         audio_out_ids_start (`torch.LongTensor` of shape `(num_audios,)`):
             The start index of the audio-out tokens for each audio
-        audio_in_token_idx
+        audio_in_idx
             The index of the audio-in token in the vocabulary
-        audio_out_token_idx
+        audio_out_idx
             The index of the audio-out token in the vocabulary
         inputs_embeds (`torch.Tensor` of shape `(batch_size, sequence_length, embed_dim)`):
             Token embeddings before merging with audio embeddings
@@ -257,9 +257,9 @@ def merge_input_ids_with_audio_features(
     if left_padding is None:
         left_padding = torch.any(attention_mask[:, 0] == 0)
 
-    audio_in_token_mask = input_ids == audio_in_token_idx
-    audio_out_token_mask = input_ids == audio_out_token_idx
-    text_token_mask = (input_ids != audio_in_token_idx) & (input_ids != audio_out_token_idx)
+    audio_in_token_mask = input_ids == audio_in_idx
+    audio_out_token_mask = input_ids == audio_out_idx
+    text_token_mask = (input_ids != audio_in_idx) & (input_ids != audio_out_idx)
 
     # 1. Calculate the number of tokens for each placeholder (like [<|AUDIO|>, <|AUDIO_OUT|>]).
     token_placeholder_num = torch.ones_like(input_ids)
@@ -369,7 +369,7 @@ def merge_input_ids_with_audio_features(
         )
         batch_indices = audio_in_batch_id[batch_indices]
         final_embedding[batch_indices, col_indices] = audio_in_embed
-        final_input_ids[batch_indices, col_indices] = audio_in_token_idx
+        final_input_ids[batch_indices, col_indices] = audio_in_idx
         if not skip_labels:
             final_labels[batch_indices, col_indices] = ignore_index
         final_audio_in_mask[batch_indices, col_indices] = True
@@ -390,7 +390,7 @@ def merge_input_ids_with_audio_features(
         )
         batch_indices = audio_in_batch_id[batch_indices]
         final_embedding[batch_indices, col_indices] = masked_audio_in_features
-        final_input_ids[batch_indices, col_indices] = audio_in_token_idx
+        final_input_ids[batch_indices, col_indices] = audio_in_idx
         if not skip_labels:
             final_labels[batch_indices, col_indices] = ignore_index
         final_audio_in_mask[batch_indices, col_indices] = True
@@ -409,7 +409,7 @@ def merge_input_ids_with_audio_features(
         )
         batch_indices = audio_out_batch_id[batch_indices]
         final_embedding[batch_indices, col_indices] = audio_out_embed
-        final_input_ids[batch_indices, col_indices] = audio_out_token_idx
+        final_input_ids[batch_indices, col_indices] = audio_out_idx
         if not skip_labels:
             final_labels[batch_indices, col_indices] = ignore_index
         final_audio_out_mask[batch_indices, col_indices] = True
@@ -899,9 +899,9 @@ class HiggsAudioConfig(PretrainedConfig):
             Whether to use an embedding projector to map audio out embeddings.
         use_audio_out_self_attention (`bool`, *optional*, defaults to False):
             Whether to use self-attention to aggregate information from audio-tokens before sending to the text attention layer.
-        audio_num_codebooks (`int`, *optional*, defaults to 12):
+        num_codebooks (`int`, *optional*, defaults to 12):
             The number of codebooks in RVQGAN.
-        audio_codebook_size (`int`, *optional*, defaults to 1024):
+        codebook_size (`int`, *optional*, defaults to 1024):
             The size of each codebook in RVQGAN.
         audio_stream_bos_id
             The id of the bos in the audio stream
@@ -952,8 +952,8 @@ class HiggsAudioConfig(PretrainedConfig):
         rq_transformer_num_attention_heads=None,
         rq_transformer_num_key_value_heads=None,
         rq_transformer_num_hidden_layers=3,
-        audio_num_codebooks=12,
-        audio_codebook_size=1024,
+        num_codebooks=12,
+        codebook_size=1024,
         audio_stream_bos_id=1024,
         audio_stream_eos_id=1025,
         audio_bos_token="<|audio_bos|>",
@@ -961,11 +961,11 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_out_bos_token="<|audio_out_bos|>",
         audio_in_token="<|AUDIO|>",
         audio_out_token="<|AUDIO_OUT|>",
-        audio_in_token_idx=128015,
-        audio_out_token_idx=128016,
+        audio_in_idx=128015,
+        audio_out_idx=128016,
         pad_token_id=128001,
-        audio_out_bos_token_id=128013,
-        audio_eos_token_id=128012,
+        audio_out_bos_id=128013,
+        audio_eos_id=128012,
         **kwargs,
     ):
         if isinstance(audio_encoder_config, dict):
@@ -1041,19 +1041,19 @@ class HiggsAudioConfig(PretrainedConfig):
             assert self.rq_transformer_hidden_size % self.rq_transformer_num_attention_heads == 0
             assert self.rq_transformer_hidden_size % self.rq_transformer_num_key_value_heads == 0
 
-        self.audio_num_codebooks = audio_num_codebooks
-        self.audio_codebook_size = audio_codebook_size
+        self.num_codebooks = num_codebooks
+        self.codebook_size = codebook_size
         self.audio_bos_token = audio_bos_token
         self.audio_eos_token = audio_eos_token
         self.audio_out_bos_token = audio_out_bos_token
         self.audio_in_token = audio_in_token
         self.audio_out_token = audio_out_token
-        self.audio_in_token_idx = audio_in_token_idx
-        self.audio_out_token_idx = audio_out_token_idx
+        self.audio_in_idx = audio_in_idx
+        self.audio_out_idx = audio_out_idx
         self.audio_stream_bos_id = audio_stream_bos_id
         self.audio_stream_eos_id = audio_stream_eos_id
-        self.audio_out_bos_token_id = audio_out_bos_token_id
-        self.audio_eos_token_id = audio_eos_token_id
+        self.audio_out_bos_id = audio_out_bos_id
+        self.audio_eos_id = audio_eos_id
 
         super().__init__(**kwargs)
         self.pad_token_id = pad_token_id
@@ -1082,7 +1082,7 @@ class HiggsAudioDecoderProjector(HiggsAudioPreTrainedModel):
         )
         self.audio_lm_head = nn.Linear(
             config.text_config.hidden_size,
-            config.audio_num_codebooks * (config.audio_codebook_size + 2),
+            config.num_codebooks * (config.codebook_size + 2),
             bias=False,
         )
 
@@ -1119,7 +1119,7 @@ class HiggsAudioDecoderProjector(HiggsAudioPreTrainedModel):
         Returns:
             logits (`torch.Tensor` of shape `(batch_size, seq_len, vocab_size)`):
                 Logits for text tokens
-            audio_logits (`torch.Tensor` of shape `(num_audio_out_tokens, audio_num_codebooks * audio_codebook_size)`):
+            audio_logits (`torch.Tensor` of shape `(num_audio_out_tokens, num_codebooks * codebook_size)`):
                 Logits for audio tokens. We ensure `num_text_tokens + num_audio_tokens == batch_size * seq_len`
         """
         logits = self.text_lm_head(hidden_states)
@@ -2072,13 +2072,13 @@ class HiggsAudioGenerationOutput(ModelOutput):
             at each generation step. Tuple of `torch.FloatTensor` with up to `max_new_tokens` elements (one element for
             each generated token).
             If the generated token is a text token, the tensor will have shape `(batch_size, config.vocab_size)`.
-            If the generated token is an audio token, the tensor will have shape `(config.audio_num_codebooks, self.audio_codebook_size)`
+            If the generated token is an audio token, the tensor will have shape `(config.num_codebooks, self.codebook_size)`
         logits (`tuple(torch.FloatTensor)` *optional*, returned when `output_logits=True`):
             Unprocessed prediction scores of the language modeling head or the audio head (scores for each vocabulary token before SoftMax)
             at each generation step. Tuple of `torch.FloatTensor` with up to `max_new_tokens` elements (one element for
             each generated token).
             If the generated token is a text token, the tensor will have shape `(batch_size, config.vocab_size)`.
-            If the generated token is an audio token, the tensor will have shape `(config.audio_num_codebooks, self.audio_codebook_size)`
+            If the generated token is an audio token, the tensor will have shape `(config.num_codebooks, self.codebook_size)`
         attentions (`tuple(tuple(torch.FloatTensor))`, *optional*, returned when `output_attentions=True`):
             Tuple (one element for each generated token) of tuples (one element for each layer of the decoder) of
             `torch.FloatTensor` of shape `(batch_size, num_heads, generated_length, sequence_length)`.
@@ -2123,16 +2123,12 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
     def __init__(self, config: HiggsAudioConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
-        self.audio_in_token_idx = config.audio_in_token_idx
-        self.audio_out_token_idx = config.audio_out_token_idx
-        self.audio_out_bos_token_id = (
-            config.audio_out_bos_token_id if "audio_out_bos_token_id" in config else None
-        )
-        self.audio_eos_token_id = (
-            config.audio_eos_token_id if "audio_eos_token_id" in config else None
-        )
+        self.audio_in_idx = config.audio_in_idx
+        self.audio_out_idx = config.audio_out_idx
+        self.audio_out_bos_id = config.audio_out_bos_id if "audio_out_bos_id" in config else None
+        self.audio_eos_id = config.audio_eos_id if "audio_eos_id" in config else None
         self.vocab_size = config.text_config.vocab_size
-        self.audio_num_codebooks = config.audio_num_codebooks
+        self.num_codebooks = config.num_codebooks
         self.use_delay_pattern = config.use_delay_pattern
         self.use_audio_out_embed_projector = config.use_audio_out_embed_projector
         self.use_audio_out_self_attention = config.use_audio_out_self_attention
@@ -2206,8 +2202,8 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             self.audio_tower = None
             self.audio_encoder_proj = None
         self.audio_decoder_proj = HiggsAudioDecoderProjector(config, layer_idx=layer_idx)
-        self.audio_codebook_size = (
-            config.audio_codebook_size + 2
+        self.codebook_size = (
+            config.codebook_size + 2
         )  # We add 1 for the audio_stream_bos token and 1 for the audio_stream_eos token
 
         if config.use_audio_out_embed_projector:
@@ -2216,11 +2212,11 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             )
 
         self.audio_codebook_embeddings = nn.Embedding(
-            config.audio_num_codebooks * self.audio_codebook_size, config.text_config.hidden_size
+            config.num_codebooks * self.codebook_size, config.text_config.hidden_size
         )
 
         self.audio_codebook_weights = (
-            torch.ones(config.audio_num_codebooks) / config.audio_num_codebooks
+            torch.ones(config.num_codebooks) / config.num_codebooks
         )  # default to equal weights
         self.post_init()
 
@@ -2232,8 +2228,8 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         self.use_delay_pattern = True
 
     def set_audio_special_tokens(self, tokenizer: AutoTokenizer):
-        self.audio_out_bos_token_id = tokenizer.convert_tokens_to_ids("<|audio_out_bos|>")
-        self.audio_eos_token_id = tokenizer.convert_tokens_to_ids("<|audio_eos|>")
+        self.audio_out_bos_id = tokenizer.convert_tokens_to_ids("<|audio_out_bos|>")
+        self.audio_eos_id = tokenizer.convert_tokens_to_ids("<|audio_eos|>")
 
     def _embed_audio_ids(self, audio_ids):
         """Embed the audio ids
@@ -2245,8 +2241,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             audio_embed: torch.LongTensor of shape (audio_in_total_length, hidden_size)
         """
         codebook_shift = (
-            torch.arange(self.config.audio_num_codebooks, device=audio_ids.device)
-            * self.audio_codebook_size
+            torch.arange(self.config.num_codebooks, device=audio_ids.device) * self.codebook_size
         )
         audio_embed = self.audio_codebook_embeddings(audio_ids + codebook_shift.unsqueeze(-1))
         if self.config.audio_embed_avg:
@@ -2570,7 +2565,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
                 audio_in_ids = audio_in_ids.to(target_device)
             else:
                 audio_in_ids = torch.zeros(
-                    (self.audio_num_codebooks, 0), device=target_device, dtype=torch.long
+                    (self.num_codebooks, 0), device=target_device, dtype=torch.long
                 )
             audio_in_embed = self._embed_audio_ids(audio_in_ids)
         else:
@@ -2580,7 +2575,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             audio_out_ids = audio_out_ids.to(target_device)
         else:
             audio_out_ids = torch.zeros(
-                (self.audio_num_codebooks, 0), device=target_device, dtype=torch.long
+                (self.num_codebooks, 0), device=target_device, dtype=torch.long
             )
         audio_out_embed = self._embed_audio_ids(audio_out_ids)
 
@@ -2605,8 +2600,8 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             audio_in_ids_start,
             audio_out_embed,
             audio_out_ids_start,
-            self.audio_in_token_idx,
-            self.audio_out_token_idx,
+            self.audio_in_idx,
+            self.audio_out_idx,
             inputs_embeds,
             input_ids,
             attention_mask,
@@ -2738,7 +2733,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
 
         if audio_logits is not None:
             audio_logits = audio_logits.view(
-                audio_logits.shape[0], self.audio_num_codebooks, self.audio_codebook_size
+                audio_logits.shape[0], self.num_codebooks, self.codebook_size
             ).float()
 
         if output_hidden_states:
@@ -2871,7 +2866,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         ras_win_max_num_repeat = generation_config.generation_kwargs.get(
             "ras_win_max_num_repeat", 2
         )
-        audio_eos_token_id = generation_config.generation_kwargs.get("audio_eos_token_id", None)
+        audio_eos_id = generation_config.generation_kwargs.get("audio_eos_id", None)
         # In the audio generation mode, we sample from audio_logits and keep updating audio_out_ids.
         next_audio_token_logits = audio_logits.clone()[-1, :, :].float().to(device)
         # TopP, TopK logits processor supports empty input_ids
@@ -2906,7 +2901,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         # Force the next text tokens to be <|AUDIO_OUT|> in audio generation mode
         next_tokens = torch.full(
             (audio_logits.shape[0],),
-            self.config.audio_out_token_idx,
+            self.config.audio_out_idx,
             dtype=torch.long,
             device=device,
         )
@@ -2917,7 +2912,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
                 next_audio_tokens[(num_delay + 1) :] = self.config.audio_stream_bos_id
                 num_delay += 1
             if num_remaining_delays is not None:
-                next_audio_tokens[: (self.audio_num_codebooks - num_remaining_delays)] = (
+                next_audio_tokens[: (self.num_codebooks - num_remaining_delays)] = (
                     self.config.audio_stream_eos_id
                 )
                 num_remaining_delays -= 1
@@ -2927,9 +2922,9 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
                     all_eos_indices = all_eos_indices[0]
                     last_eos_idx = all_eos_indices[-1]
                     next_audio_tokens[:last_eos_idx] = self.config.audio_stream_eos_id
-                    num_remaining_delays = self.audio_num_codebooks - last_eos_idx - 1
+                    num_remaining_delays = self.num_codebooks - last_eos_idx - 1
             if num_remaining_delays is not None and num_remaining_delays <= 0:
-                next_tokens[...] = audio_eos_token_id
+                next_tokens[...] = audio_eos_id
                 num_delay = 0
                 num_remaining_delays = None
 
@@ -2965,12 +2960,12 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             # See the audio bos token, we should start generating audio tokens
             next_tokens = torch.full(
                 (input_ids.shape[0],),
-                self.audio_out_token_idx,
+                self.audio_out_idx,
                 dtype=torch.long,
                 device=device,
             )
             next_audio_tokens = torch.full(
-                (self.config.audio_num_codebooks,),
+                (self.config.num_codebooks,),
                 self.config.audio_stream_bos_id,
                 dtype=torch.long,
                 device=device,
@@ -3043,9 +3038,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
             `model.config.is_encoder_decoder=True`.
         """
         assert input_ids.shape[0] == 1, "Only support batch_size=1 in _sample()"
-        audio_out_bos_token_id = generation_config.generation_kwargs.get(
-            "audio_out_bos_token_id", None
-        )
+        audio_out_bos_id = generation_config.generation_kwargs.get("audio_out_bos_id", None)
 
         # torch generator for sampling
         seed = generation_config.generation_kwargs.get("seed", None)
@@ -3091,13 +3084,13 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         input_ids_full = input_ids.clone()
 
         # Initialize the audio variables based on the input prompt.
-        if input_ids[0][-1] == self.config.audio_out_token_idx:
+        if input_ids[0][-1] == self.config.audio_out_idx:
             audio_sequences = [
                 model_kwargs["audio_out_ids"][:, model_kwargs["audio_out_ids_start"][-1] :]
             ]
             if self.use_delay_pattern:
                 num_delay = (
-                    self.audio_num_codebooks
+                    self.num_codebooks
                     - (
                         model_kwargs["audio_out_ids"][:, -1] == self.config.audio_stream_bos_id
                     ).sum()
@@ -3108,7 +3101,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
                 if torch.numel(all_eos_indices) > 0:
                     all_eos_indices = all_eos_indices[0]
                     last_eos_idx = all_eos_indices[-1]
-                    num_remaining_delays = self.audio_num_codebooks - last_eos_idx - 1
+                    num_remaining_delays = self.num_codebooks - last_eos_idx - 1
 
         while self._has_unfinished_sequences(
             this_peer_finished,
@@ -3119,9 +3112,9 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         ):
             # Check which multimodal stage we are in
             # FIXME: Assume single input generation
-            if input_ids[0][-1] == audio_out_bos_token_id:
+            if input_ids[0][-1] == audio_out_bos_id:
                 generation_mode = GenerationMode.AUDIO_INIT
-            elif input_ids[0][-1] == self.audio_out_token_idx:
+            elif input_ids[0][-1] == self.audio_out_idx:
                 generation_mode = GenerationMode.AUDIO_IN_PROGRESS
             else:
                 generation_mode = GenerationMode.TEXT
@@ -3309,7 +3302,7 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
                     )
 
             # update generated ids, model inputs, and length for next step
-            if not is_audio_generation_mode or next_tokens[0] != self.audio_out_token_idx:
+            if not is_audio_generation_mode or next_tokens[0] != self.audio_out_idx:
                 # We only add one <|AUDIO_OUT|> token to the input_ids for simplicity.
                 input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
             input_ids_full = torch.cat([input_ids_full, next_tokens[:, None]], dim=-1)
@@ -3348,8 +3341,8 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         audio_out_ids: Optional[torch.LongTensor] = None,
         audio_out_ids_start: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
-        audio_out_bos_token_id: int = None,
-        audio_eos_token_id: int = None,
+        audio_out_bos_id: int = None,
+        audio_eos_id: int = None,
         past_key_values_buckets: Optional[OrderedDict[int, Cache]] = None,
         seed: Optional[int] = None,
         **kwargs,
@@ -3368,23 +3361,21 @@ class HiggsAudioModel(HiggsAudioPreTrainedModel, GenerationMixin):
         generation_config, kwargs = self._prepare_generation_config(
             kwargs.pop("generation_config", None), **kwargs
         )
-        if audio_out_bos_token_id is not None:
-            generation_config.generation_kwargs["audio_out_bos_token_id"] = audio_out_bos_token_id
+        if audio_out_bos_id is not None:
+            generation_config.generation_kwargs["audio_out_bos_id"] = audio_out_bos_id
         else:
             try:
-                generation_config.generation_kwargs["audio_out_bos_token_id"] = (
-                    self.audio_out_bos_token_id
-                )
+                generation_config.generation_kwargs["audio_out_bos_id"] = self.audio_out_bos_id
             except:
-                generation_config.generation_kwargs["audio_out_bos_token_id"] = None
+                generation_config.generation_kwargs["audio_out_bos_id"] = None
 
-        if audio_eos_token_id is not None:
-            generation_config.generation_kwargs["audio_eos_token_id"] = audio_eos_token_id
+        if audio_eos_id is not None:
+            generation_config.generation_kwargs["audio_eos_id"] = audio_eos_id
         else:
             try:
-                generation_config.generation_kwargs["audio_eos_token_id"] = self.audio_eos_token_id
+                generation_config.generation_kwargs["audio_eos_id"] = self.audio_eos_id
             except:
-                generation_config.generation_kwargs["audio_eos_token_id"] = None
+                generation_config.generation_kwargs["audio_eos_id"] = None
 
         has_default_max_length = (
             kwargs.get("max_length") is None and generation_config.max_length is not None
