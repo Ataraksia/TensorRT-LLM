@@ -82,13 +82,13 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
 
             current_codebook_idx = tokens_since_audio_start % self.config.num_codebooks
             current_frame_idx = tokens_since_audio_start // self.config.num_codebooks
-            
+
             # Number of codebooks that should be generating content tokens in this frame
             active_codebooks_this_frame = min(current_frame_idx + 1, self.config.num_codebooks)
 
             # 3. Mask logits to the current codebook's vocabulary window
             flat_audio_vocab_size = self.config.codebook_size * self.config.num_codebooks
-            
+
             # Mask out text tokens if the vocab includes them
             if vocab_size > flat_audio_vocab_size:
                 logits[:, :, flat_audio_vocab_size:] = -math.inf
@@ -108,17 +108,19 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
 
             # 4. Check for EOS propagation
             # Look at the tokens generated in the current frame
-            start_of_current_frame = self.audio_start_pos + current_frame_idx * self.config.num_codebooks
+            start_of_current_frame = (
+                self.audio_start_pos + current_frame_idx * self.config.num_codebooks
+            )
             tokens_in_current_frame = input_ids[start_of_current_frame:]
-            
+
             # If any token in the current frame is an EOS token, we must generate EOS for all subsequent codebooks in this frame.
             if not self.seen_eos_in_frame:
-                 for token in tokens_in_current_frame:
+                for token in tokens_in_current_frame:
                     # Check if the token is an EOS token for any codebook
                     if (token % self.config.codebook_size) == self.config.audio_stream_eos_id:
                         self.seen_eos_in_frame = True
                         break
-            
+
             if self.seen_eos_in_frame:
                 logits[:, :, :] = -math.inf
                 logits[:, :, eos_token_id_in_window] = 0.0
@@ -139,19 +141,23 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
                 # 6. Anti-repetition for content tokens
                 # Look at the previously generated token for this *same codebook*
                 if tokens_since_audio_start >= self.config.num_codebooks:
-                    prev_token_for_this_codebook_pos = tokens_since_audio_start - self.config.num_codebooks
-                    prev_token_id = input_ids[self.audio_start_pos + prev_token_for_this_codebook_pos]
-                    
+                    prev_token_for_this_codebook_pos = (
+                        tokens_since_audio_start - self.config.num_codebooks
+                    )
+                    prev_token_id = input_ids[
+                        self.audio_start_pos + prev_token_for_this_codebook_pos
+                    ]
+
                     # Check if the previous token was a content token from the same codebook
                     if window_start <= prev_token_id < window_end:
                         local_prev_token = prev_token_id % self.config.codebook_size
-                        if local_prev_token < self.config.audio_stream_bos_id: # is a content token
-                             logits[:, :, prev_token_id] = -math.inf
-
+                        if local_prev_token < self.config.audio_stream_bos_id:  # is a content token
+                            logits[:, :, prev_token_id] = -math.inf
 
         except Exception as e:
             print(f"[ERROR] DelayPatternLogitsProcessor failed: {e}")
             import traceback
+
             traceback.print_exc()
             # Allow generation to continue without this processor if it fails
             pass
