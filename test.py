@@ -543,9 +543,9 @@ class HiggsAudioInfer:
         self.reference_audio = None  # Disable reference audio loading for faster testing
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
-        self.temperature = 1.0
-        self.top_k = 50
-        self.top_p = 0.95
+        self.temperature = 0.8  # Reduced to be more conservative
+        self.top_k = 50  # Reduced to limit to top audio tokens
+        self.top_p = 0.95  # Increased for better coverage
         self.num_beams = 1
         self.max_num_tokens = self.config.max_num_tokens
         self.num_codebooks = self.config.num_codebooks
@@ -808,8 +808,18 @@ class HiggsAudioInfer:
             else:
                 codes = revert_delay_pattern(group.T)  # torch version
 
-            # Clamp BOS/EOS to 0 for decode
-            codes = torch.where(codes >= self.codebook_size - 2, torch.zeros_like(codes), codes)
+            # The delay pattern should already be reverted, so BOS/EOS tokens should be gone
+            # Only clamp actual out-of-range tokens, not valid BOS/EOS that are part of content
+            # Valid tokens are 0-1023 (content) + 1024 (BOS) + 1025 (EOS)
+            # After delay pattern reversion, remaining BOS/EOS should be converted to pad token (0)
+            codes = torch.where(
+                (codes == self.stream_bos_id) | (codes == self.stream_eos_id),
+                torch.zeros_like(codes),
+                codes,
+            )
+
+            # Ensure all tokens are in valid range [0, codebook_size-1] for content
+            codes = torch.clamp(codes, 0, self.codebook_size - 3)  # 0-1023 for content tokens
 
             # Validate first frame has content
             if g_idx == 0 and codes.size(1) > 0:
