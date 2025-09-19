@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
+import torch
+from typing import Optional
 
-from tensorrt_llm.functional import nonzero
+
 from tensorrt_llm.runtime import ModelRunnerCpp
 
 load_dotenv()
@@ -10,12 +12,14 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
     def __init__(self, *args, config=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.config = config
+        self.audio_in_start: int = 0
+        self.audio_in_end: int = 0
+        self.audio_out_start: int = 0
         self._reset_higgs_state()
 
     def _reset_higgs_state(self) -> None:
-        self.init_model_input = True
-        self.num_delay = 0
-        self.num_remaining_delays = None
+        self.num_bos: int = 0
+        self.num_eos: Optional[int] = None
 
     @classmethod
     def from_dir(cls, config, **kwargs):
@@ -27,23 +31,25 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
     def _fill_output(self, **kwargs):
         outputs = super()._fill_output(**kwargs)
         # Additional processing for Higgs Audio outputs
-        next_audio_tokens = outputs.view(-1)
-        if self.num_delay + 1 < next_audio_tokens.shape[0]:
-            next_audio_tokens[(self.num_delay + 1) :] = self.config.audio_stream_bos_id
-            self.num_delay += 1
-        if self.num_remaining_delays is not None:
-            next_audio_tokens[: (self.config.audio_num_codebooks - self.num_remaining_delays)] = (
+
+        outputs = outputs.view(self.audio_num_codebooks, -1)
+        if self.num_bos < self.config.audio_num_codebooks:
+            outputs[self.num_bos :] = self.config.audio_stream_bos_id
+            self.num_bos += 1
+        if self.num_eos is not None:
+            outputs[: self.config.audio_num_codebooks - self.num_eos] = (
                 self.config.audio_stream_eos_id
             )
-            self.num_remaining_delays -= 1
+            self.num_eos -= 1
         else:
-            all_eos_indices = nonzero(next_audio_tokens == self.config.audio_stream_eos_id).view(-1)
-            if all_eos_indices.shape[0] > 0:
+            all_eos_indices = (outputs == self.config.audio_stream_eos_id).nonzero()
+            if torch.numel(all_eos_indices) > 0:
+                all_eos_indices = all_eos_indices[0]
                 last_eos_idx = all_eos_indices[-1]
-                next_audio_tokens[:last_eos_idx] = self.config.audio_stream_eos_id
-                self.num_remaining_delays = self.config.audio_num_codebooks - last_eos_idx - 1
-        if self.num_remaining_delays is not None and self.num_remaining_delays <= 0:
-            self.num_delay = 0
-            self.num_remaining_delays = None
+                outputs[:last_eos_idx] = self.config.audio_stream_eos_id
+                self.num_eos = self.config.audio_num_codebooks - last_eos_idx - 1
+        if self.num_eos is not None and self.num_eos <= 0:
+            self._reset_higgs_state()
+            outputs[...] = 0
 
-        return outputs
+        return outputs.view(1, 1, -1)

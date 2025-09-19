@@ -543,8 +543,6 @@ class HiggsAudioTRTRunner:
         self.reference_audio = None  # Disable reference audio loading for faster testing
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
-        # self.config.audio_in_start = 0
-        # self.config.audio_in_end = 0
         self.temperature = 1.0
         self.top_k = 50
         self.top_p = 0.95
@@ -627,8 +625,9 @@ class HiggsAudioTRTRunner:
                 .to(self.device)
                 .flatten()
             )
-            # self.config.audio_in_start = pre_audio_input_ids.shape[0]
-            # self.config.audio_in_end = pre_audio_input_ids.shape[0] + audio_ids.shape[0] - 1
+
+            self.runner.audio_in_start = pre_audio_input_ids.shape[0]
+            self.runner.audio_in_end = pre_audio_input_ids.shape[0] + audio_ids.shape[0] - 1
             input_ids = torch.cat([pre_audio_input_ids, audio_ids, post_audio_input_ids])
             np.savetxt("audio_ids_in.txt", audio_ids.cpu().view(8, -1), delimiter=",", fmt="%d")
         else:
@@ -676,23 +675,20 @@ class HiggsAudioTRTRunner:
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
         input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
-        self.config.input_length = input_ids.shape[0]
-        self.config.audio_in_start = -1
-        self.config.audio_in_end = -1
-        max_new_tokens = self.max_num_tokens - self.config.input_length
+        self.runner.audio_out_start = input_ids.shape[0]
+        max_new_tokens = self.max_num_tokens - input_ids.shape[0]
 
         with torch.no_grad():
-            self.config.input_length = input_ids.shape[0]
-
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
                 temperature=self.temperature,
                 top_k=self.top_k,
                 top_p=self.top_p,
+                end_id=0,
             )
 
-        audio_tokens = outputs[0, 0, self.config.input_length :]
+        audio_tokens = outputs[0, 0, self.runner.audio_out_start :]
         np.savetxt(
             "2.txt",
             audio_tokens.cpu(),
