@@ -67,6 +67,7 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_out_idx: int = 128016,
         pad_token_id: int = 128001,
         max_num_tokens=2048,
+        audio_out_start: int = 0,
         **kwargs,
     ):
         self.text_vocab_size = text_vocab_size
@@ -101,6 +102,7 @@ class HiggsAudioConfig(PretrainedConfig):
         self.pad_token_id = pad_token_id
 
         self.max_num_tokens = max_num_tokens
+        self.audio_out_start = audio_out_start
 
     def to_dict(self) -> Dict:
         output = super().to_dict()

@@ -541,7 +541,7 @@ class HiggsAudioTRTRunner:
         self.hf_model_dir = "bosonai/higgs-audio-v2-generation-3B-base"
         self.audio_tokenizer_dir = "bosonai/higgs-audio-v2-tokenizer"
         self.reference_audio = None  # Disable reference audio loading for faster testing
-        self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
+        # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
         self.temperature = 1.0
         self.top_k = 50
@@ -671,7 +671,7 @@ class HiggsAudioTRTRunner:
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
         input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
-        self.audio_out_start = input_ids.shape[0]
+        self.config.audio_out_start = input_ids.shape[0]
         max_new_tokens = self.max_num_tokens - input_ids.shape[0]
 
         with torch.no_grad():
@@ -684,7 +684,7 @@ class HiggsAudioTRTRunner:
                 end_id=0,
             )
 
-        audio_tokens = outputs[0, 0, self.audio_out_start :]
+        audio_tokens = outputs[0, 0, self.config.audio_out_start :]
         np.savetxt(
             "2.txt",
             audio_tokens.cpu(),

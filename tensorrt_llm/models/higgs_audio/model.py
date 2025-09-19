@@ -234,20 +234,21 @@ class HiggsAudioTransformer(Module):
         audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0)
         return audio_embed  # Shape: (seq_len, embedding_dim)
 
-    def _calculate_audio_mask(self, input_ids, position_ids: Tensor):
-        """Calculate the audio token mask based on position ids."""
-        audio_in_start = nonzero(input_ids == self.config.audio_bos_id).flatten()
-        audio_in_end = nonzero(input_ids == self.config.audio_eos_id).flatten()
-        audio_out_start = nonzero(input_ids == self.config.audio_out_bos_id).flatten()
-        audio_mask = op_or(
-            op_and(
-                position_ids >= audio_in_start,
-                position_ids <= audio_in_end,
-            ),
-            position_ids >= audio_out_start,
-        )
-        self.first_pass = False
-        return audio_mask  # Shape: (seq_len,)
+    # def _calculate_audio_mask(self, input_ids, position_ids: Tensor):
+    #     """Calculate the audio token mask based on position ids."""
+    #     # audio_in_start = nonzero(input_ids == self.config.audio_bos_id).flatten()
+    #     # audio_in_end = nonzero(input_ids == self.config.audio_eos_id).flatten()
+    #     # audio_out_start = nonzero(input_ids == self.config.audio_out_bos_id).flatten()
+    #     # audio_mask = op_or(
+    #     #     op_and(
+    #     #         position_ids >= audio_in_start,
+    #     #         position_ids <= audio_in_end,
+    #     #     ),
+    #     #     position_ids >= audio_out_start,
+    #     # )
+    #     audio_mask = self.config.audio_out_start >= position_ids
+    #     # self.first_pass = False
+    #     return audio_mask  # Shape: (seq_len,)
 
     def forward(
         self,
@@ -261,9 +262,7 @@ class HiggsAudioTransformer(Module):
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
 
-        audio_mask = (
-            self._calculate_audio_mask(input_ids, position_ids) if self.first_pass else True
-        )
+        audio_mask = self.config.audio_out_start >= position_ids
 
         audio_ids = where(audio_mask, input_ids, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
