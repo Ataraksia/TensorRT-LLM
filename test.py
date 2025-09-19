@@ -543,9 +543,9 @@ class HiggsAudioInfer:
         self.reference_audio = None  # Disable reference audio loading for faster testing
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
-        self.temperature = 0.8  # Reduced to be more conservative
-        self.top_k = 50  # Reduced to limit to top audio tokens
-        self.top_p = 0.95  # Increased for better coverage
+        self.temperature = 0.95
+        self.top_k = 256
+        self.top_p = 0.95
         self.num_beams = 1
         self.max_num_tokens = self.config.max_num_tokens
         self.num_codebooks = self.config.num_codebooks
@@ -741,6 +741,13 @@ class HiggsAudioInfer:
 
         bos_row = torch.full((self.num_codebooks,), self.stream_bos_id, device=generated.device)
         eos_row = torch.full((self.num_codebooks,), self.stream_eos_id, device=generated.device)
+
+        # Hard truncate at first full-EOS frame to avoid trailing noise
+        full_eos_rows = torch.where((frames == self.stream_eos_id).all(dim=1))[0]
+        if full_eos_rows.numel() > 0:
+            trunc_idx = int(full_eos_rows[0].item())
+            frames = frames[: trunc_idx]
+            print(f"Truncated at EOS frame {trunc_idx}")
 
         # Trim leading BOS
         while frames.size(0) > 0 and torch.all(frames[0] == bos_row):

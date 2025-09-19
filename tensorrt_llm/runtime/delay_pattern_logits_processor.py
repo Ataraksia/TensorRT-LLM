@@ -70,7 +70,7 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
             if not self.audio_generation_active:
                 return
 
-            # We're in audio generation mode - apply vLLM-style delay pattern constraints
+            # We're in audio generation mode - apply delay pattern & masking constraints
             if self.config.audio_out_bos_id in input_ids:
                 # Find position of audio_out_bos_id
                 audio_positions = [
@@ -82,15 +82,62 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
 
                     # Calculate which codebook we're generating for based on position
                     current_codebook = tokens_since_audio_start % self.config.num_codebooks
+                    current_frame = tokens_since_audio_start // self.config.num_codebooks
+                    active_codebooks = min(current_frame + 1, self.config.num_codebooks)
 
-                    # Apply delay pattern logic based on vLLM implementation
-                    # Generate the delayed BOS tokens for the first few tokens
-                    if self.num_audio_delays < self.config.num_codebooks:
-                        if current_codebook >= self.num_audio_delays:
-                            # Force BOS token for delayed codebooks
-                            logits[:, :, :] = float("-inf")
-                            logits[:, :, self.config.audio_stream_bos_id] = 0.0
-                            return
+                    # Flattened audio vocab size
+                    flat_max = self.config.num_codebooks * self.config.codebook_size
+                    # If logits has a larger vocab (text + audio), block non-audio region
+                    if vocab_size > flat_max:
+                        logits[:, :, flat_max:] = float("-inf")
+
+                    # Compute codebook window indices within flattened audio vocab
+                    window_start = current_codebook * self.config.codebook_size
+                    window_end = window_start + self.config.codebook_size
+
+                    # Mask outside current codebook window
+                    if window_start > 0:
+                        logits[:, :, :window_start] = float("-inf")
+                    if window_end < min(vocab_size, flat_max):
+                        logits[:, :, window_end:min(vocab_size, flat_max)] = float("-inf")
+
+                    # Local ids within window
+                    local_bos = self.config.audio_stream_bos_id
+                    local_eos = self.config.audio_stream_eos_id
+                    bos_idx = window_start + local_bos
+                    eos_idx = window_start + local_eos
+
+                    # Apply delay pattern:
+                    # - If current_codebook is not yet active in this frame, force BOS
+                    if current_codebook >= active_codebooks:
+                        logits[:, :, window_start:window_end] = float("-inf")
+                        logits[:, :, bos_idx] = 0.0
+                        return
+                    else:
+                        # Active codebook: disallow BOS; allow content and EOS
+                        logits[:, :, bos_idx] = float("-inf")
+
+                        # No-immediate-repeat within this codebook: mask last picked content id
+                        # Find last token for this codebook window
+                        if tokens_since_audio_start >= self.config.num_codebooks:
+                            # Walk back in steps of num_codebooks to last same-codebook token
+                            prev_positions = [
+                                audio_start_pos + tokens_since_audio_start - self.config.num_codebooks
+                            ]
+                        else:
+                            prev_positions = []
+
+                        prev_local = None
+                        for pos in reversed(prev_positions):
+                            if 0 <= pos < len(input_ids):
+                                prev_id = input_ids[pos]
+                                if 0 <= prev_id < flat_max and window_start <= prev_id < window_end:
+                                    prev_local = prev_id - window_start
+                                    break
+                        if prev_local is not None and 0 <= prev_local < self.config.codebook_size:
+                            # Only mask content tokens, not BOS/EOS
+                            if prev_local < local_bos or (local_bos < prev_local < local_eos):
+                                logits[:, :, window_start + prev_local] = float("-inf")
 
                     # Check if we should increment delay counter
                     if (
@@ -121,13 +168,14 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
                             remaining_codebooks = self.config.num_codebooks - self.num_audio_eos
                             if current_codebook < remaining_codebooks:
                                 # Force EOS token
-                                logits[:, :, :] = float("-inf")
-                                logits[:, :, self.config.audio_stream_eos_id] = 0.0
+                                logits[:, :, window_start:window_end] = float("-inf")
+                                logits[:, :, eos_idx] = 0.0
                                 return
                     elif self.num_audio_eos >= self.config.num_codebooks:
                         # All codebooks should generate EOS, stop generation
-                        logits[:, :, :] = float("-inf")
-                        logits[:, :, self.config.audio_stream_eos_id] = 0.0
+                        # Restrict to current window and force EOS
+                        logits[:, :, window_start:window_end] = float("-inf")
+                        logits[:, :, eos_idx] = 0.0
                         return
 
             self.audio_generation_step += 1
