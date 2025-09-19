@@ -99,7 +99,7 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
                     if window_start > 0:
                         logits[:, :, :window_start] = float("-inf")
                     if window_end < min(vocab_size, flat_max):
-                        logits[:, :, window_end:min(vocab_size, flat_max)] = float("-inf")
+                        logits[:, :, window_end : min(vocab_size, flat_max)] = float("-inf")
 
                     # Local ids within window
                     local_bos = self.config.audio_stream_bos_id
@@ -122,7 +122,9 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
                         if tokens_since_audio_start >= self.config.num_codebooks:
                             # Walk back in steps of num_codebooks to last same-codebook token
                             prev_positions = [
-                                audio_start_pos + tokens_since_audio_start - self.config.num_codebooks
+                                audio_start_pos
+                                + tokens_since_audio_start
+                                - self.config.num_codebooks
                             ]
                         else:
                             prev_positions = []

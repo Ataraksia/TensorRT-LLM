@@ -746,7 +746,7 @@ class HiggsAudioInfer:
         full_eos_rows = torch.where((frames == self.stream_eos_id).all(dim=1))[0]
         if full_eos_rows.numel() > 0:
             trunc_idx = int(full_eos_rows[0].item())
-            frames = frames[: trunc_idx]
+            frames = frames[:trunc_idx]
             print(f"Truncated at EOS frame {trunc_idx}")
 
         # Trim leading BOS
