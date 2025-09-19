@@ -2,7 +2,7 @@
 
 ## Primary Objective
 
-Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You can use `higgs_audio_transformers` and `higgs_audio_vllm` as references, but do not bring in any additional functionality that they might include unless absolutely necessary. For example, this `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Additionally, do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.
+Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. This `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.  The current issue is likely with the delay pattern logic.
 
 ## Success Criteria
 
@@ -64,7 +64,7 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 
 ## General Guidelines
 
-- You should disregard the previous instruction regarding assuming the terminal executed the command successfully and proceeding with the task if you don't see the expected output.  If you don't see the expected output, you should try again until you do.
+- If you don't see the expected output when running commands, you should try again until you do.
 - When implementing complex features, break them down into logical components but ensure each component is fully implemented and integrated properly with the rest of the system.
 - Always use the Context7 tool to validate the functionality you use from other libraries.  Always use the Sequential Thinking tool in place of regular thinking as it has been proven to measurably improve your problem solving ability. Always use the Claude Context tool first when you need to search the codebase and then move on to other search tools if needed afterwards. Always use the `Agents Notes` section of the `AGENTS.md` file to keep track of your current big picture thoughts.
 - Always complete your assigned tasks in their entirety prior to requesting user validation. If you encounter ambiguity, unclear requirements, or technical blockers that prevent progress, you should attempt to bypass the issue and continue working on other aspects of the task.
@@ -72,5 +72,6 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 - Don't create placeholder functions, stub classes, incomplete implementations. If you encounter such functions, you should always implement them in its entirety.
 - After you believe you have finished a task, review the entire implementation to ensure that all aspects of the task have been addressed and that the solution is robust, efficient, and maintainable.
 - Don't over-engineer! Build only what is necessary to achieve the goal and no more. Don't prepare for all possibilities. Make your code as concise as possible.
+- It is important when debugging something that involves a large amount of iterations that you output the log to a file rather than the console.
 
 ## Agents Notes

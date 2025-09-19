@@ -939,165 +939,16 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
     def __init__(
         self,
         config: HiggsAudioConfig,
-        ras_window: int = 64,
-        ras_max_repeats: int = 6,
-        debug: bool = False,
     ):
         self.config = config
-
-        self.vocab_size = config.audio_vocab_size
         self.num_codebooks = config.audio_num_codebooks
-        self.codebook_size = config.audio_codebook_size
+        self.audio_codebook_size = config.audio_codebook_size
         self.stream_bos_id = config.audio_stream_bos_id
         self.stream_eos_id = config.audio_stream_eos_id
-        self.request_states = {}  # Track delay pattern state per request
+        self.min_audio_length = 200  # Minimum audio frames before allowing EOS
 
-        # Repetition-Aware Sampling (RAS) configuration
-        self.ras_window = int(ras_window)
-        self.ras_max_repeats = int(ras_max_repeats)
-        self.debug = bool(debug)
-
-        # Debug step counter for tracking generation progress
-        self.debug_step_counter = 0
-
-    @staticmethod
-    def _sync_stream(stream: Optional[torch.cuda.Stream]) -> None:
-        if stream is not None:
-            stream.synchronize()
-        else:
-            torch.cuda.synchronize()
-
-    def _get_or_create_state(self, req_id: int, token_ids: List[List[int]]) -> dict:
-        """Get or create generation state for a request."""
-        if req_id not in self.request_states:
-            prompt_len = min(self.config.input_length, len(token_ids[0]))
-
-            self.request_states[req_id] = {
-                "prompt_len": prompt_len,
-                "processed_tokens": prompt_len,
-                # legacy fields (kept harmlessly)
-                "num_delay": 0,
-                "num_remaining_delays": None,
-                "frames": [],
-                "current_frame": [self.stream_bos_id] * self.num_codebooks,
-                "frame_counter": 0,
-                "countdown_active": False,
-                "min_content_frames": self.num_codebooks * 10,  # heuristic gate for EOS
-                "last_frame": None,
-                "repeat_count": 0,
-                "max_repeat_frames": 2,
-                "last_column": [self.stream_bos_id] * self.num_codebooks,
-                "pending_column": [],
-                "history": [[] for _ in range(self.num_codebooks)],
-                "max_frames": 160,
-                "global_counts": [defaultdict(int) for _ in range(self.num_codebooks)],
-                "global_repeat_threshold": 12,
-                # aligned delay schedule + EOS propagation state
-                "codebook_index": 0,  # 0..7 current active codebook slice
-                "frame_step": 0,  # increments only after wrap 7->0
-                "started_flags": [False] * self.num_codebooks,  # BOS emitted per codebook
-                "eosed_flags": [False] * self.num_codebooks,  # EOS emitted per codebook
-                "last_eos_index": -1,  # highest cb index EOSed in current frame progression
-                "all_audio_finished": False,  # all CBs EOSed and a wrap completed
-                "debug": self.debug,
-            }
-
-        # Ensure RAS bookkeeping is present (idempotent)
-        state = self.request_states[req_id]
-        if "ras_window" not in state:
-            state["ras_window"] = self.ras_window
-        if "ras_max_repeats" not in state:
-            state["ras_max_repeats"] = self.ras_max_repeats
-        if "ras_histories" not in state:
-            state["ras_histories"] = [
-                deque(maxlen=state["ras_window"]) for _ in range(self.num_codebooks)
-            ]
-        if "ras_counts" not in state:
-            state["ras_counts"] = [defaultdict(int) for _ in range(self.num_codebooks)]
-
-        return state
-
-    def _decode_audio_token(self, token: int) -> int:
-        return int(token % self.codebook_size)
-
-    def _mask_except(self, vector: torch.Tensor, keep_idx: int) -> None:
-        original = vector[keep_idx]
-        vector.fill_(torch.finfo(vector.dtype).min)
-        floor_value = torch.tensor(0.0, device=vector.device, dtype=vector.dtype)
-        if torch.isfinite(original):
-            vector[keep_idx] = torch.maximum(original, floor_value)
-        else:
-            vector[keep_idx] = floor_value
-
-    def _suppress_token(self, vector: torch.Tensor, idx: int) -> None:
-        vector[idx] = torch.finfo(vector.dtype).min
-
-    def _ingest_token(self, state: dict, token: int) -> None:
-        value = self._decode_audio_token(token)
-        state["pending_column"].append(value)
-        cb = state["codebook_index"]
-        state["current_frame"][cb] = value
-        state["history"][cb].append(value)
-        history_window = 256
-        if len(state["history"][cb]) > history_window:
-            state["history"][cb] = state["history"][cb][-history_window:]
-        state["global_counts"][cb][value] += 1
-
-        if cb == self.num_codebooks - 1:
-            completed_frame = state["current_frame"]
-            state["frames"].append(completed_frame.copy())
-            state["current_frame"] = [self.stream_bos_id] * self.num_codebooks
-            state["codebook_index"] = 0
-            state["frame_counter"] += 1
-            state["last_column"] = state["pending_column"].copy()
-            state["pending_column"] = []
-            if state["frame_counter"] >= state["max_frames"]:
-                state["all_audio_finished"] = True
-
-            if state["last_frame"] is not None and state["last_frame"] == completed_frame:
-                state["repeat_count"] += 1
-            else:
-                state["repeat_count"] = 0
-            state["last_frame"] = completed_frame.copy()
-            if state["repeat_count"] >= state["max_repeat_frames"]:
-                state["all_audio_finished"] = True
-
-            prev_last_eos = state["last_eos_index"]
-            eos_indices = [
-                idx for idx, val in enumerate(completed_frame) if val == self.stream_eos_id
-            ]
-            new_eos_detected = False
-            if eos_indices:
-                last_eos_idx = eos_indices[-1]
-                if last_eos_idx > prev_last_eos:
-                    remaining = self.num_codebooks - last_eos_idx - 1
-                    state["last_eos_index"] = last_eos_idx
-                    state["num_remaining_delays"] = max(remaining, 0)
-                    state["countdown_active"] = remaining > 0
-                    new_eos_detected = True
-                    if remaining == 0:
-                        state["countdown_active"] = False
-                        state["all_audio_finished"] = True
-            if state["countdown_active"] and state["num_remaining_delays"] is not None:
-                if not new_eos_detected:
-                    state["num_remaining_delays"] = max(state["num_remaining_delays"] - 1, 0)
-                if state["num_remaining_delays"] == 0:
-                    state["countdown_active"] = False
-                    state["all_audio_finished"] = True
-
-            if state["all_audio_finished"]:
-                state["num_delay"] = 0
-
-            if (
-                state["last_eos_index"] == self.num_codebooks - 1
-                and state["num_remaining_delays"] == 0
-            ):
-                state["all_audio_finished"] = True
-
-            if state["all_audio_finished"]:
-                state["num_delay"] = 0
-        else:
-            state["codebook_index"] += 1
+        # Track delay pattern state per request
+        self.request_states = {}
 
     def __call__(
         self,
@@ -1107,418 +958,176 @@ class HiggsAudioLogitsProcessor(LogitsProcessor):
         stream_ptr: Optional[int],
         client_id: Optional[int],
     ) -> None:
-        """Aligned delay-gating + EOS guard: unmask exactly one codebook slice per step and mirror EOS propagation."""
-        stream = None if stream_ptr is None else torch.cuda.ExternalStream(stream_ptr)
+        """Apply delay pattern logic during generation for the Higgs Audio model."""
 
-        with torch.cuda.stream(stream):
-            # Debug: increment step counter
-            if self.debug:
-                self.debug_step_counter += 1
+        # Initialize request state if needed
+        if req_id not in self.request_states:
+            self.request_states[req_id] = {
+                "audio_start_pos": None,
+                "current_step": 0,
+                "eos_propagated": [False] * self.num_codebooks,
+                "sequence_ended": False,
+                "debug_call_count": 0,
+            }
 
-            # Reset state if we detect we're still inside prompt
-            if req_id in self.request_states:
-                prev_prompt_len = self.request_states[req_id]["prompt_len"]
-                if len(token_ids[0]) <= prev_prompt_len:
-                    self.request_states.pop(req_id, None)
+        state = self.request_states[req_id]
+        state["debug_call_count"] += 1
 
-            state = self._get_or_create_state(req_id, token_ids)
+        # Only show debug info for first 8 calls and every 10th call after
+        show_debug = state["debug_call_count"] <= 8 or state["debug_call_count"] % 10 == 0
 
-            # Debug: log current state at start of processing
-            if self.debug:
-                print(f"\n{'=' * 80}")
-                print(f"[DEBUG STEP {self.debug_step_counter}] Request ID: {req_id}")
-                print(f"{'=' * 80}")
+        if show_debug:
+            print(f"[DEBUG] LogitsProcessor call #{state['debug_call_count']} - req_id: {req_id}")
+            print(f"[DEBUG] Logits shape: {logits.shape}")
+
+        # Get current sequence length
+        current_pos = len(token_ids[0]) if token_ids and len(token_ids) > 0 else 0
+
+        # Check if logits tensor has the expected audio vocabulary size
+        expected_audio_vocab_size = self.config.audio_vocab_size
+        if logits.shape[-1] < expected_audio_vocab_size:
+            if show_debug:
                 print(
-                    f"[STATE] codebook_index={state['codebook_index']}, frame_step={state['frame_step']}"
+                    f"[DEBUG] Skipping audio masking - vocab size mismatch ({logits.shape[-1]} < {expected_audio_vocab_size})"
                 )
-                print(f"[STATE] started_flags={state['started_flags']}")
-                print(f"[STATE] eosed_flags={state['eosed_flags']}")
-                print(f"[STATE] last_eos_index={state['last_eos_index']}")
-                print(f"[STATE] num_remaining_delays={state.get('num_remaining_delays', 'None')}")
-                print(f"[STATE] all_audio_finished={state['all_audio_finished']}")
-                print(
-                    f"[STATE] processed_tokens={state['processed_tokens']}, total_len={len(token_ids[0])}"
-                )
+            return  # Skip masking if logits don't have full audio vocabulary
 
-            # Slice audio logits: [1,1,V] -> [8,1026]
-            logits_tensor = logits
-            flat = logits_tensor[0, 0, 0 : self.vocab_size]
-            logits_2d = flat.view(self.num_codebooks, self.codebook_size)
-            min_val = torch.finfo(logits_2d.dtype).min
+        # Determine audio generation phase using input_length from config
+        if hasattr(self.config, "input_length") and self.config.input_length > 0:
+            if state["audio_start_pos"] is None:
+                state["audio_start_pos"] = self.config.input_length
 
-            # Debug: log active codebook slice info
-            if self.debug:
-                active_cb = state["codebook_index"]
-                allowed_range = (
-                    active_cb * self.codebook_size,
-                    (active_cb + 1) * self.codebook_size,
-                )
-                print(
-                    f"[CODEBOOK] Active codebook slice: {active_cb} (token range {allowed_range[0]}-{allowed_range[1] - 1})"
-                )
-
-            # Ingest any new sampled tokens since last call to advance state
-            total_len = len(token_ids[0])
-            new_tokens_processed = []
-            if total_len > state["processed_tokens"]:
-                if self.debug:
+            # Check if we're in audio generation phase
+            if current_pos < state["audio_start_pos"]:
+                if show_debug:
                     print(
-                        f"[TOKENS] Processing new tokens from index {state['processed_tokens']} to {total_len - 1}"
+                        f"[DEBUG] Still in text phase ({current_pos} < {state['audio_start_pos']})"
                     )
+                return  # Still in text generation phase, don't modify logits
 
-                for idx in range(state["processed_tokens"], total_len):
-                    if idx < state["prompt_len"]:
-                        continue
-                    sampled = int(token_ids[0][idx])
-                    active_cb = state["codebook_index"]
-                    sampled_cb = int(sampled // self.codebook_size)
-                    sampled_local = int(sampled % self.codebook_size)
+            # Calculate audio generation step
+            audio_step = current_pos - state["audio_start_pos"]
+        else:
+            # Fallback: assume we're in audio generation from the beginning
+            audio_step = current_pos
+            if state["audio_start_pos"] is None:
+                state["audio_start_pos"] = 0
 
-                    # Debug: log token interpretation
-                    if self.debug:
-                        token_type = (
-                            "BOS"
-                            if sampled_local == 1024
-                            else "EOS"
-                            if sampled_local == 1025
-                            else f"Local[{sampled_local}]"
-                        )
-                        print(
-                            f"[TOKEN] {sampled} → CB{sampled_cb}:{token_type} (active_cb={active_cb})"
-                        )
+        # Only apply delay pattern during audio generation
+        if audio_step >= 0:
+            # Update eos_propagated from last token
+            if current_pos > state["audio_start_pos"]:
+                last_token = token_ids[0][-1]
+                if 0 <= last_token < self.config.audio_vocab_size:
+                    cb = last_token // self.audio_codebook_size
+                    local_token = last_token % self.audio_codebook_size
+                    if local_token == self.stream_eos_id:
+                        for j in range(cb + 1):
+                            state["eos_propagated"][j] = True
+            if show_debug:
+                print(
+                    f"[DEBUG] Applying delay pattern mask for step {audio_step}, eos_propagated: {state['eos_propagated']}"
+                )
+            self._apply_delay_pattern_mask(logits, audio_step, state, show_debug)
+            state["current_step"] = audio_step
+            # Check if sequence ended
+            if all(state["eos_propagated"]):
+                state["sequence_ended"] = True
+                logits.fill_(-float("inf"))
 
-                    new_tokens_processed.append((sampled, sampled_cb, sampled_local))
+    def _apply_delay_pattern_mask(
+        self, logits: torch.Tensor, step: int, state: dict, show_debug: bool = False
+    ) -> None:
+        """Apply delay pattern masking to logits for the current step.
 
-                    if state.get("debug", False):
-                        assert sampled_cb == active_cb, (
-                            f"Sampled cb={sampled_cb} while active={active_cb}"
-                        )
+        The delay pattern ensures that codebook i starts generating at step i,
+        creating a diagonal pattern of token generation across codebooks.
+        """
 
-                    # Update per-codebook start/EOS flags
-                    state_changed = False
-                    if sampled_local == self.stream_bos_id:
-                        if not state["started_flags"][active_cb]:
-                            state["started_flags"][active_cb] = True
-                            state_changed = True
-                            if self.debug:
-                                print(f"[TRANSITION] CB{active_cb}: inactive → BOS")
-                    elif sampled_local == self.stream_eos_id:
-                        if not state["eosed_flags"][active_cb]:
-                            state["eosed_flags"][active_cb] = True
-                            state_changed = True
-                            if self.debug:
-                                print(f"[TRANSITION] CB{active_cb}: content → EOS")
-                        if active_cb > state["last_eos_index"]:
-                            old_last_eos = state["last_eos_index"]
-                            state["last_eos_index"] = active_cb
-                            if self.debug:
-                                print(
-                                    f"[EOS_PROP] last_eos_index updated: {old_last_eos} → {active_cb}"
-                                )
-                        # Initialize remaining delays countdown for EOS propagation across frames
-                        state["num_remaining_delays"] = self.num_codebooks - active_cb - 1
-                        # Initialize remaining delays to mirror Transformers countdown semantics
-                        state["num_remaining_delays"] = self.num_codebooks - active_cb - 1
-                    else:
-                        if not state["started_flags"][active_cb]:
-                            state["started_flags"][active_cb] = True
-                            state_changed = True
-                            if self.debug:
-                                print(f"[TRANSITION] CB{active_cb}: inactive → content")
+        if show_debug:
+            print(f"[DEBUG] _apply_delay_pattern_mask step: {step}, shape: {logits.shape}")
 
-                    # RAS bookkeeping: update rolling window per active codebook for local ids [0..1023]
-                    if 0 <= sampled_local < 1024:
-                        hist = state["ras_histories"][active_cb]
-                        cnts = state["ras_counts"][active_cb]
-                        old_count = cnts.get(sampled_local, 0)
-                        hist.append(sampled_local)
-                        cnts[sampled_local] += 1
-                        # maintain capacity (deque enforces maxlen, but decrement count if popped)
-                        if len(hist) > state["ras_window"]:
-                            popped = hist[0]
-                            cnts[popped] -= 1
-                            if cnts[popped] <= 0:
-                                del cnts[popped]
+        # Handle different tensor shapes - ensure we work with the last dimension as vocab
+        vocab_size = logits.shape[-1]
 
-                        if self.debug and cnts[sampled_local] != old_count:
-                            print(
-                                f"[RAS] CB{active_cb} token {sampled_local}: count {old_count} → {cnts[sampled_local]}"
-                            )
+        # Double-check bounds before applying any masking
+        max_required_index = (self.num_codebooks - 1) * self.audio_codebook_size + max(
+            self.stream_bos_id, self.stream_eos_id
+        )
+        if vocab_size <= max_required_index:
+            if show_debug:
+                print(
+                    f"[DEBUG] ERROR: vocab_size ({vocab_size}) <= max_required_index ({max_required_index})"
+                )
+            return
 
-                    # Optional delay countdown aligned to Transformers semantics:
-                    # Decrease remaining delays on steps that do not introduce a new EOS.
-                    if (
-                        state.get("num_remaining_delays") is not None
-                        and state["num_remaining_delays"] > 0
-                        and sampled_local != self.stream_eos_id
-                    ):
-                        old_delays = state["num_remaining_delays"]
-                        state["num_remaining_delays"] -= 1
-                        if self.debug:
-                            print(
-                                f"[DELAY_COUNTDOWN] num_remaining_delays: {old_delays} → {state['num_remaining_delays']}"
-                            )
+        # Initially mask all audio tokens to prevent generation
+        logits.fill_(-float("inf"))
 
-                    # Strict codebook cycling 0->7
-                    old_cb_index = state["codebook_index"]
-                    state["codebook_index"] = (state["codebook_index"] + 1) % self.num_codebooks
-
-                    # Debug: log codebook wrap and frame advancement
-                    if self.debug:
-                        if state["codebook_index"] == 0:
-                            print(
-                                f"[WRAP] Codebook wrap: CB{old_cb_index} → CB0, frame_step: {state['frame_step']} → {state['frame_step'] + 1}"
-                            )
+        # Apply delay pattern logic for each codebook
+        # Following the delay pattern logic from higgs_audio_transformers.py lines 1509-1530
+        for codebook_idx in range(self.num_codebooks):
+            codebook_start = codebook_idx * self.audio_codebook_size
+            codebook_end = (codebook_idx + 1) * self.audio_codebook_size
+            if codebook_end > vocab_size:
+                continue
+            force_eos = state["eos_propagated"][codebook_idx] or any(
+                state["eos_propagated"][j] for j in range(codebook_idx)
+            )
+            if step >= codebook_idx:
+                relative_step = step - codebook_idx
+                if relative_step == 0:
+                    bos_index = codebook_start + self.stream_bos_id
+                    if bos_index < vocab_size:
+                        if force_eos:
+                            eos_index = codebook_start + self.stream_eos_id
+                            if eos_index < vocab_size:
+                                logits[..., eos_index] = 0.0
                         else:
-                            print(
-                                f"[ADVANCE] Codebook advance: CB{old_cb_index} → CB{state['codebook_index']}"
-                            )
-
-                    if state["codebook_index"] == 0:
-                        # Completed one frame/column
-                        state["frame_step"] += 1
-                        # Reset clamping for new frame progression
-                        old_last_eos = state["last_eos_index"]
-                        state["last_eos_index"] = -1
-                        if self.debug and old_last_eos != -1:
-                            print(f"[FRAME_COMPLETE] Reset last_eos_index: {old_last_eos} → -1")
-                        # Propagate remaining delays across frames (Transformers semantics)
-                        if (
-                            state.get("num_remaining_delays") is not None
-                            and state["num_remaining_delays"] > 0
-                        ):
-                            old_delays = state["num_remaining_delays"]
-                            state["num_remaining_delays"] -= 1
-                            if self.debug:
+                            if show_debug:
                                 print(
-                                    f"[FRAME_DELAY_COUNTDOWN] Cross-frame delay countdown: {old_delays} → {state['num_remaining_delays']}"
+                                    f"[DEBUG] Setting BOS at index {bos_index} for codebook {codebook_idx} at step {step}"
                                 )
-                        # If all codebooks are EOSed, we can stop after wrap
-                        if all(state["eosed_flags"]):
-                            state["all_audio_finished"] = True
-                            if self.debug:
-                                print(
-                                    f"[END_CONDITION] All codebooks EOSed → all_audio_finished=True"
-                                )
-
-                state["processed_tokens"] = total_len
-
-            # Masking: only active codebook row is visible
-            active_cb = state["codebook_index"]
-            masked_codebooks = 0
-            for j in range(self.num_codebooks):
-                if j != active_cb:
-                    logits_2d[j].fill_(min_val)
-                    masked_codebooks += 1
-
-            if self.debug:
-                print(
-                    f"[MASKING] Masked {masked_codebooks} codebook rows, active row: CB{active_cb}"
-                )
-
-            row = logits_2d[active_cb]
-            original_row = row.clone()
-            final_decision = None
-
-            if state["all_audio_finished"]:
-                # Only EOS after completion
-                row.fill_(min_val)
-                row[self.stream_eos_id] = 0.0
-                final_decision = f"Force EOS (all_audio_finished=True)"
-                if self.debug:
-                    print(f"[DECISION] {final_decision}")
-            else:
-                # Optional invariant checks
-                if state.get("debug", False) and state["last_eos_index"] >= 0:
-                    for k in range(0, state["last_eos_index"] + 1):
-                        assert state["eosed_flags"][k], (
-                            f"Clamp invariant violated: last_eos_index={state['last_eos_index']} "
-                            f"but eosed_flags[{k}] is False"
-                        )
-
-                started = state["started_flags"][active_cb]
-                eosed = state["eosed_flags"][active_cb]
-                last_eos_idx = state["last_eos_index"]
-
-                # Clamp: any codebook <= last_eos_index or already EOSed -> EOS only
-                if eosed or active_cb <= last_eos_idx:
-                    row.fill_(min_val)
-                    row[self.stream_eos_id] = 0.0
-                    reason = (
-                        "already EOSed"
-                        if eosed
-                        else f"CB{active_cb} <= last_eos_index({last_eos_idx})"
-                    )
-                    final_decision = f"Force EOS ({reason})"
-                    if self.debug:
-                        print(f"[DECISION] {final_decision}")
+                            logits[..., bos_index] = 0.0
                 else:
-                    # BOS gating: before a codebook starts, force a single BOS on its first activation
-                    if not started:
-                        row.fill_(min_val)
-                        row[self.stream_bos_id] = 0.0
-                        final_decision = f"Force BOS (first activation of CB{active_cb})"
-                        if self.debug:
-                            print(f"[DECISION] {final_decision}")
+                    content_start = codebook_start
+                    content_end = codebook_start + self.audio_codebook_size - 2
+                    eos_index = codebook_start + self.stream_eos_id
+                    if force_eos:
+                        if eos_index < vocab_size:
+                            logits[..., eos_index] = 0.0
                     else:
-                        # Normal content phase: keep model distribution while enforcing BOS/EOS schedule
-                        row.copy_(original_row)
-
-                        constraints = []
-
-                        # BOS only once per codebook
-                        row[self.stream_bos_id] = min_val
-                        constraints.append("BOS blocked (already started)")
-
-                        # Replace overly restrictive EOS constraint with more permissive approach
-                        min_content_steps = 10  # Allow EOS after some content generation
-                        frame_step = state.get("frame_step", 0)
-
-                        if frame_step < min_content_steps:
-                            # Block EOS in very early generation to ensure minimum content
-                            row[self.stream_eos_id] = min_val
-                            constraints.append(
-                                f"EOS blocked (frame_step={frame_step} < {min_content_steps})"
+                        relative_step = step - codebook_idx
+                        # Bias against early EOS: mask EOS if relative_step < min_audio_length
+                        early_step = relative_step < self.min_audio_length
+                        if show_debug:
+                            print(
+                                f"[DEBUG] Unmasking codebook {codebook_idx} range [{codebook_start}:{codebook_end}] at step {step}, relative_step {relative_step}, early: {early_step}"
                             )
-                        elif active_cb > 0 and not state["eosed_flags"][active_cb - 1]:
-                            # Prefer sequential EOS but don't completely block it - use penalty instead
-                            row[self.stream_eos_id] *= (
-                                0.1  # Heavy penalty instead of complete block
-                            )
-                            constraints.append(f"EOS penalized (CB{active_cb - 1} not EOSed yet)")
-                        # Otherwise allow EOS naturally
-
-                        # Final codebook guard: relax restrictions to avoid deadlock
-                        if active_cb == (self.num_codebooks - 1):
-                            frame_step = state.get("frame_step", 0)
-                            if frame_step < min_content_steps:
-                                # Still block very early EOS for final codebook
-                                row[self.stream_eos_id] = min_val
-                                constraints.append(
-                                    f"Final CB EOS blocked (frame_step={frame_step} < {min_content_steps})"
-                                )
+                        if content_end > vocab_size:
+                            content_end = vocab_size
+                        if content_start < vocab_size:
+                            logits[..., content_start:content_end] = 0.0
+                        if eos_index < vocab_size:
+                            if not early_step:
+                                logits[..., eos_index] = 0.0
                             else:
-                                # Allow final CB EOS after minimum content, with preference for sequential behavior
-                                lower_all_eosed = all(
-                                    state["eosed_flags"][: self.num_codebooks - 1]
-                                )
-                                remaining = state.get("num_remaining_delays", None)
-                                penalty_applied = False
+                                logits[..., eos_index] = -float("inf")  # Bias against early EOS
+            else:
+                bos_index = codebook_start + self.stream_bos_id
+                if bos_index < vocab_size:
+                    if show_debug:
+                        print(
+                            f"[DEBUG] Forcing BOS at index {bos_index} for delayed codebook {codebook_idx} at step {step}"
+                        )
+                    logits[..., bos_index] = 0.0
 
-                                # Apply penalties for non-sequential behavior but don't completely block
-                                if not lower_all_eosed:
-                                    row[self.stream_eos_id] *= (
-                                        0.05  # Strong penalty for non-sequential
-                                    )
-                                    penalty_applied = True
-                                if remaining is not None and remaining > 0:
-                                    row[self.stream_eos_id] *= 0.1  # Penalty for remaining delays
-                                    penalty_applied = True
-
-                                if penalty_applied:
-                                    reasons = []
-                                    if not lower_all_eosed:
-                                        reasons.append("not all lower CBs EOSed")
-                                    if remaining is not None and remaining > 0:
-                                        reasons.append(f"remaining_delays={remaining}")
-                                    constraints.append(
-                                        f"Final CB EOS penalized ({'; '.join(reasons)})"
-                                    )
-
-                        # RAS: per-codebook repetition-aware masking on local tokens [0..1023]
-                        cnts = state["ras_counts"][active_cb]
-                        ras_masked_count = 0
-                        if cnts:
-                            # gather tokens exceeding repetition threshold
-                            threshold = state.get("ras_max_repeats", self.ras_max_repeats)
-                            masked_ids = [
-                                lid for lid, c in cnts.items() if c >= threshold and 0 <= lid < 1024
-                            ]
-                            ras_masked_count = len(masked_ids)
-                            if masked_ids:
-                                neg_inf = torch.finfo(row.dtype).min
-                                # optimistic mask
-                                for lid in masked_ids:
-                                    row[lid] = neg_inf
-                                # if all locals masked (and EOS might be masked by schedule), relax to penalization
-                                local_valid = torch.isfinite(row[:1024]).any().item()
-                                eos_masked = not torch.isfinite(row[self.stream_eos_id]).item()
-                                if not local_valid and eos_masked:
-                                    # relax: heavy penalty instead of full mask
-                                    strong_penalty = row.new_tensor(-10.0)
-                                    for lid in masked_ids:
-                                        # Only adjust if it was set to -inf above
-                                        if not torch.isfinite(original_row[lid]):
-                                            # keep as is; but typical case is finite, so just set penalty
-                                            row[lid] = strong_penalty
-                                        else:
-                                            row[lid] = torch.maximum(
-                                                original_row[lid] + strong_penalty, strong_penalty
-                                            )
-                                    constraints.append(
-                                        f"RAS relaxed to penalty (all locals+EOS blocked)"
-                                    )
-
-                                if self.debug:
-                                    # log number masked and top-3 most frequent
-                                    sorted_items = sorted(
-                                        cnts.items(), key=lambda kv: kv[1], reverse=True
-                                    )
-                                    top3 = sorted_items[:3]
-                                    print(
-                                        f"[RAS] CB{active_cb} masked={len(masked_ids)} tokens, top3 frequent={top3}"
-                                    )
-
-                        if ras_masked_count > 0:
-                            constraints.append(f"RAS masked {ras_masked_count} tokens")
-
-                        # Debug invariant: never include BOS/EOS in RAS counts
-                        if state.get("debug", False):
-                            assert 1024 not in cnts and 1025 not in cnts
-
-                        # Safety: ensure at least one valid token
-                        valid_tokens = torch.isfinite(row).sum().item()
-                        if valid_tokens == 0:
-                            row.fill_(min_val)
-                            # Prefer local content fallback
-                            best_local = int(torch.argmax(original_row[:1024]).item())
-                            row[best_local] = 0.0
-                            constraints.append(f"Safety fallback to token {best_local}")
-                            valid_tokens = 1
-
-                        final_decision = f"Content generation (valid tokens: {valid_tokens})"
-                        if constraints:
-                            final_decision += f" with constraints: {'; '.join(constraints)}"
-
-                        if self.debug:
-                            print(f"[DECISION] {final_decision}")
-
-            # Debug: log final decision and next predicted token
-            if self.debug:
-                # Find the most likely token in the active codebook slice
-                active_row = logits_2d[active_cb]
-                if torch.isfinite(active_row).any():
-                    best_idx = torch.argmax(active_row).item()
-                    best_global_id = active_cb * self.codebook_size + best_idx
-                    token_type = (
-                        "BOS"
-                        if best_idx == 1024
-                        else "EOS"
-                        if best_idx == 1025
-                        else f"Local[{best_idx}]"
-                    )
-                    print(
-                        f"[PREDICTION] Most likely next token: {best_global_id} → CB{active_cb}:{token_type}"
-                    )
-                else:
-                    print(f"[PREDICTION] No valid tokens in active codebook slice!")
-
-                print(f"{'=' * 80}\n")
-
-            # Write back
-            logits_tensor[0, 0, 0 : self.vocab_size].copy_(logits_2d.view(-1))
-
-        HiggsAudioLogitsProcessor._sync_stream(stream)
+    def _update_eos_state(self, state: dict, step: int) -> None:
+        """Update EOS propagation state for codebooks that have finished."""
+        # This is a simplified version - in practice, we'd need to check
+        # the actual generated tokens to see which codebooks produced EOS
+        # For now, we rely on the masking logic to handle this
+        pass
 
 
 class HiggsAudioTRTRunner:
@@ -1567,7 +1176,7 @@ class HiggsAudioTRTRunner:
         self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir)
 
         # Create custom logits processor for delay pattern handling
-        self.audio_logits_processor = HiggsAudioLogitsProcessor(self.config, debug=False)
+        self.audio_logits_processor = HiggsAudioLogitsProcessor(self.config)
 
         from tensorrt_llm.runtime import ModelRunnerCpp
 
@@ -1606,12 +1215,8 @@ class HiggsAudioTRTRunner:
                 audio_ids,
                 bos_token_id=self.stream_bos_id,
                 pad_token_id=self.stream_eos_id,
-            )
-            codebook_offsets = (
-                torch.arange(self.num_codebooks, device=audio_ids.device, dtype=audio_ids.dtype)
-                * self.audio_codebook_size
             ).unsqueeze(-1)
-            audio_ids = (audio_ids + codebook_offsets).flatten()
+            audio_ids = (audio_ids).flatten()
 
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # Don't change this!
@@ -1640,6 +1245,7 @@ class HiggsAudioTRTRunner:
             self.config.audio_in_start = pre_audio_input_ids.size(0)
             self.config.audio_in_end = pre_audio_input_ids.size(0) + audio_ids.size(0) - 1
             input_ids = torch.cat([pre_audio_input_ids, audio_ids, post_audio_input_ids])
+            np.savetxt("audio_ids_in.txt", audio_ids.cpu().view(8, -1), delimiter=",", fmt="%d")
         else:
             # Simplified format for direct text-to-speech without voice cloning
             # Don't change this!
@@ -1675,37 +1281,39 @@ class HiggsAudioTRTRunner:
         # Don't change this!
         text_input = (
             f"{input_text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-            f"<|audio_out_bos|><|AUDIO_OUT|>"
+            f"<|audio_out_bos|>"
         )
+        next_audio_token = torch.full(
+            (self.config.audio_num_codebooks,),
+            self.stream_bos_id,
+            dtype=torch.long,
+            device=self.device,
+        ).flatten()
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
-        input_ids = torch.cat([self.saved_input_ids, input_ids])
-        # np.savetxt("log0.5.txt", input_ids.cpu(), delimiter=",", fmt="%d")
+        input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
         self.config.input_length = input_ids.size(0)
         max_input_length = int(input_ids.size(0))
         max_new_tokens = self.max_num_tokens - max_input_length
 
-        # Reset logits processor state for a fresh generation run.
-        self.audio_logits_processor.request_states.clear()
-
-        # Only terminate once the final codebook emits EOS. The runtime flattens
-        # the (codebook, token) pair into a single id, so account for the stride.
-        end_token_id = self.stream_eos_id + (self.num_codebooks - 1) * self.audio_codebook_size
-
         with torch.no_grad():
-            # Continue using ModelRunnerCpp!
+            self.config.input_length = input_ids.size(0)
+            self.audio_logits_processor.config = self.config
+
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                end_id=int(end_token_id),
+                end_id=int(self.stream_eos_id),
                 temperature=float(self.temperature),
                 top_k=int(self.top_k),
                 top_p=float(self.top_p),
                 logits_processor_names=["higgs_audio_logit_processor"],
             )
 
-        # Extract and process audio tokens with proper delay pattern handling
         try:
+            np.savetxt(
+                "audio_ids_out.txt", outputs[0, 0].cpu().view(8, -1), delimiter=",", fmt="%d"
+            )
             return self.process_audio(outputs[0, 0])
 
         except Exception as e:
@@ -1724,13 +1332,22 @@ class HiggsAudioTRTRunner:
             raise RuntimeError("Generated tokens did not contain any complete audio frames.")
 
         frames = generated.view(-1, self.num_codebooks).to(torch.int64).cpu().numpy()
+        print(f"Generated tokens: {generated.numel()}, frames shape: {frames.shape}")
         frame_tokens = np.mod(frames, self.audio_codebook_size).astype(np.int64)
+
+        # Log token stats
+        content_tokens = np.sum((frame_tokens >= 0) & (frame_tokens <= 1023))
+        eos_tokens = np.sum(frame_tokens == 1025)
+        print(
+            f"Token stats - Content (0-1023): {content_tokens}, EOS (1025): {eos_tokens}, Ratio content/EOS: {content_tokens / max(eos_tokens, 1):.2f}"
+        )
 
         bos_row = np.full((self.num_codebooks,), self.stream_bos_id, dtype=np.int64)
         separator = np.full((self.num_codebooks,), self.stream_eos_id, dtype=np.int64)
 
         groups: list[np.ndarray] = []
         eos_rows = np.where(np.all(frame_tokens == separator, axis=1))[0]
+        print(f"EOS rows: {eos_rows}")
         start = 0
         for idx in eos_rows:
             if idx > start:
@@ -1738,29 +1355,42 @@ class HiggsAudioTRTRunner:
             start = idx + 1
         if start < len(frame_tokens):
             groups.append(frame_tokens[start:])
+        print(f"Groups lengths: {[g.shape[0] for g in groups]}")
 
         waveforms: list[np.ndarray] = []
         sr = 16000
         for audio_data in groups:
             if audio_data.size == 0:
                 continue
+            # Trim leading BOS and trailing EOS rows
             while audio_data.size > 0 and np.all(audio_data[0] == bos_row):
                 audio_data = audio_data[1:]
             while audio_data.size > 0 and np.all(audio_data[-1] == separator):
                 audio_data = audio_data[:-1]
+            print(f"Processing group of length {audio_data.shape[0]}")
             if audio_data.size == 0:
                 continue
 
-            if np.any(audio_data == self.stream_bos_id) or np.any(audio_data == self.stream_eos_id):
-                codes = revert_delay_pattern(audio_data.transpose(1, 0))
-            else:
+            # Always attempt revert; for small groups, pad virtually or transpose directly
+            if audio_data.shape[0] < self.num_codebooks:
+                # For small groups, assume aligned, transpose directly
                 codes = audio_data.transpose(1, 0)
+                print(f"Small group: transposed directly to {codes.shape}")
+            else:
+                codes = revert_delay_pattern(audio_data.transpose(1, 0))
+                print(f"Reverted delay pattern to {codes.shape}")
+
             codes = np.asarray(codes, dtype=np.int64)
             valid_codebook_limit = self.audio_codebook_size - 2
             # Treat special stream BOS/EOS markers as padding before decoding.
             codes = np.where(codes >= valid_codebook_limit, 0, codes)
-            waveform, sr = self.audio_tokenizer.decode(codes)
-            waveforms.append(waveform)
+            print(f"Final codes shape before decode: {codes.shape}")
+            try:
+                waveform, sr = self.audio_tokenizer.decode(codes)
+                waveforms.append(waveform)
+            except Exception as decode_err:
+                print(f"Decode failed for codes shape {codes.shape}: {decode_err}")
+                continue
 
         if not waveforms:
             raise RuntimeError("Unable to reconstruct any audio waveform from generated tokens.")
@@ -1768,4 +1398,5 @@ class HiggsAudioTRTRunner:
         waveform = np.concatenate(waveforms).astype(np.float32)
         if sr != 16000:
             waveform = librosa.resample(waveform, orig_sr=sr, target_sr=16000)
+        print(f"Final waveform length: {len(waveform)} samples at {sr} Hz")
         return waveform

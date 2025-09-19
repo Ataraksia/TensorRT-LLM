@@ -111,3 +111,4 @@ token_hist.txt
 *.wav
 .roo/mcp.json
 .kilocode/mcp.json
+audio_ids_out.txt
