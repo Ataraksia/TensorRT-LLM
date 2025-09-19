@@ -76,3 +76,30 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 - It is important when debugging something that involves a large amount of iterations that you output the log to a file rather than the console.
 
 ## Agents Notes
+
+vLLM Delay Pattern Implementation:
+
+# Update the next mm tokens based on the delay pattern
+num_audio_delay = multimodal_metadata.num_audio_delays[i]
+num_audio_eos = multimodal_metadata.num_audio_eos[i]
+
+# Generate the delayed for the first few tokens
+if num_audio_delay < self.num_codebooks:
+    next_mm_tokens.sampled_token_ids[i][num_audio_delay:] = (
+        self.config.audio_stream_bos_id
+    )
+
+# Generate the eos token for the last few tokens
+if num_audio_eos < self.num_codebooks:
+    all_eos_indices = torch.where(
+        next_mm_tokens.sampled_token_ids[i] == self.config.audio_stream_eos_id
+    )[0]
+    if all_eos_indices.shape[0] > 0:
+        last_eos_index = all_eos_indices[-1]
+        next_mm_tokens.sampled_token_ids[i][:last_eos_index] = (
+            self.config.audio_stream_eos_id
+        )
+elif num_audio_eos >= self.num_codebooks:
+    # We already generated the last audio token,
+    # so we should just generate the eos token for the text
+    next_mm_tokens.sampled_token_ids[i] = -1

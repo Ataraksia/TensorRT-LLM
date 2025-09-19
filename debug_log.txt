@@ -1,0 +1,17 @@
+_fill_output called
+Processing 1 responses
+Original response has 2048 tokens
+Analyzing sequence of 2048 tokens
+Found audio_out_bos_id at position 72
+Audio section: 1975 tokens from 73 to 2048
+Truncating 1975 audio tokens to 1968 complete frames
+Reshaping to 246 frames x 8 codebooks
+Expected 28 modifications, made 21
+Frame 0 (active_cbs=1): BOS=8, content=8, tokens=[1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024]
+Frame 1 (active_cbs=2): BOS=6, content=7, tokens=[996, 2980, 1024, 1024, 1024, 1024, 1024, 1024]
+Frame 2 (active_cbs=3): BOS=5, content=7, tokens=[5867, 996, 996, 1024, 1024, 1024, 1024, 1024]
+Frame 7 (active_cbs=8): BOS=0, content=4, tokens=[490, 263, 887, 1631, 2711, 2799, 1115, 645]
+Frame 50 (active_cbs=8): BOS=0, content=3, tokens=[490, 2799, 2428, 68, 1871, 490, 5715, 2799]
+Frame 100 (active_cbs=8): BOS=0, content=1, tokens=[1044, 2817, 2428, 2178, 2363, 1760, 709, 2428]
+✅ DELAY PATTERN VERIFICATION: PASSED
+Applied delay pattern, modified sequence
