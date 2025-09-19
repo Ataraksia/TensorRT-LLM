@@ -34,7 +34,14 @@ from xcodec.quantization.vq import ResidualVectorQuantizer
 from run_chat_completion import AutoModelForSpeechSeq2Seq
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
+import logging
+
+from tensorrt_llm.runtime.model_runner_cpp import ModelRunnerCpp
+
 load_dotenv()
+
+# Set up logging at the top level
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def _build_delay_pattern_mask(input_ids: torch.LongTensor, bos_token_id: int, pad_token_id: int):
@@ -528,11 +535,15 @@ class HiggsAudioInfer:
         repo_root: str = ".",
     ) -> None:
         """Initialize the TensorRT-LLM runner for HiggsAudio."""
+        logging.info("--- Starting HiggsAudioInfer initialization ---")
         repo_root = Path(repo_root)
         default_engine_dir = repo_root / "higgs_audio_engine"
         engine_dir_env = os.environ.get("HIGGS_AUDIO_ENGINE_DIR")
         engine_path = Path(engine_dir_env) if engine_dir_env else default_engine_dir
+        logging.info(f"Engine path set to: {engine_path}")
+
         if not engine_path.exists():
+            logging.error("Engine path does not exist!")
             raise FileNotFoundError(
                 "Higgs Audio TensorRT engine not found. Build the engine with "
                 "build_engine.py or set HIGGS_AUDIO_ENGINE_DIR to the engine directory."
@@ -543,6 +554,7 @@ class HiggsAudioInfer:
         self.reference_audio = None  # Disable reference audio loading for faster testing
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
+        logging.info("HiggsAudioConfig loaded.")
         self.temperature = 0.95
         self.top_k = 256
         self.top_p = 0.95
@@ -557,20 +569,28 @@ class HiggsAudioInfer:
         # Set up device
         self.device = torch.device("cuda", 0)
         torch.cuda.set_device(self.device)
+        logging.info(f"CUDA device set to: {self.device}")
 
         # Load components
+        logging.info(f"Loading text tokenizer from: {self.hf_model_dir}")
         self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_dir, trust_remote_code=True)
+        logging.info("Text tokenizer loaded.")
+
+        logging.info(f"Loading audio tokenizer from: {self.audio_tokenizer_dir}")
         self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir)
+        logging.info("Audio tokenizer loaded.")
 
-        from tensorrt_llm.runtime.higgs_audio_model_runner import HiggsAudioModelRunner
+        logging.info("Imported HiggsAudioModelRunner.")
 
-        self.runner = HiggsAudioModelRunner.from_dir(
-            config=self.config,
+        logging.info("Calling HiggsAudioModelRunner.from_dir()...")
+        self.runner = ModelRunnerCpp.from_dir(
             engine_dir=self.engine_dir,
             kv_cache_free_gpu_memory_fraction=0.5,
             # use_gpu_direct_storage=True,
             # cuda_graph_mode=True,
         )
+        logging.info("HiggsAudioModelRunner.from_dir() returned successfully.")
+
         # Preload the part of the input that doesn't change
         if self.reference_audio and self.audio_tokenizer:
             # Load and transcribe reference audio for voice cloning
@@ -641,6 +661,7 @@ class HiggsAudioInfer:
             )
 
         self.saved_input_ids = input_ids
+        logging.info("--- HiggsAudioInfer initialization complete ---")
 
     def generate(
         self,
@@ -708,167 +729,59 @@ class HiggsAudioInfer:
         print(f"Successfully generated audio: {len(waveform)} samples")
         return waveform
 
-    def process_audio(self, generated):
-        """Process generated audio tokens with EOS fixup and decode to waveform."""
-        if generated.numel() == 0:
+    def process_audio(self, generated_ids: torch.Tensor):
+        """
+        Process generated audio tokens and decode to waveform.
+        This simplified version relies on the LogitsProcessor to have generated a clean stream.
+        """
+        if generated_ids.numel() == 0:
             raise RuntimeError("No tokens generated.")
 
-        # Trim to complete frames
-        remainder = generated.numel() % self.num_codebooks
+        # The LogitsProcessor should prevent non-audio tokens, but as a safeguard:
+        flat_audio_vocab_size = self.num_codebooks * self.codebook_size
+        audio_tokens = generated_ids[(generated_ids >= 0) & (generated_ids < flat_audio_vocab_size)]
+
+        if audio_tokens.numel() == 0:
+            raise RuntimeError("No valid audio tokens found after filtering.")
+
+        # Trim to ensure it's a multiple of num_codebooks
+        remainder = audio_tokens.numel() % self.num_codebooks
         if remainder != 0:
-            generated = generated[:-remainder]
-        if generated.numel() == 0:
-            raise RuntimeError("No complete frames.")
+            audio_tokens = audio_tokens[:-remainder]
 
-        frames = generated.view(-1, self.num_codebooks)  # (num_frames, num_codebooks)
-        print(f"Initial frames: {frames.shape}")
+        if audio_tokens.numel() == 0:
+            raise RuntimeError("No complete frames to decode.")
 
-        np.savetxt(
-            "3.txt",
-            frames.cpu(),
-            delimiter=",",
-            fmt="%d",
-        )
+        # Reshape into frames
+        frames = audio_tokens.view(-1, self.num_codebooks)
+        print(f"Shaped into {frames.shape[0]} frames.")
 
-        # Log initial token stats
-        content_mask = (frames >= 0) & (frames < self.codebook_size)
-        eos_mask = frames == self.stream_eos_id
-        content_tokens = content_mask.sum().item()
-        eos_tokens = eos_mask.sum().item()
-        print(
-            f"Initial: Content={content_tokens}, EOS={eos_tokens} (ratio EOS/total={eos_tokens / (frames.numel()):.2%})"
-        )
+        # The output from the model is in a "flattened" format, where the token ID
+        # represents both the codebook and the value. The decoder expects local IDs
+        # within each codebook. We can get this with the modulo operator.
+        # The LogitsProcessor should have already handled the delay pattern, so we
+        # just need to map the IDs.
+        local_codes = frames % self.codebook_size
 
-        bos_row = torch.full((self.num_codebooks,), self.stream_bos_id, device=generated.device)
-        eos_row = torch.full((self.num_codebooks,), self.stream_eos_id, device=generated.device)
+        # The decoder expects shape (num_codebooks, seq_len)
+        local_codes_transposed = local_codes.T
 
-        # Hard truncate at first full-EOS frame to avoid trailing noise
-        full_eos_rows = torch.where((frames == self.stream_eos_id).all(dim=1))[0]
-        if full_eos_rows.numel() > 0:
-            trunc_idx = int(full_eos_rows[0].item())
-            frames = frames[:trunc_idx]
-            print(f"Truncated at EOS frame {trunc_idx}")
+        # Decode the codes to a waveform
+        try:
+            waveform, sr = self.audio_tokenizer.decode(local_codes_transposed.cpu().numpy())
+        except Exception as e:
+            print(f"Error during decoding: {e}")
+            raise RuntimeError("Failed to decode audio codes.")
 
-        # Trim leading BOS
-        while frames.size(0) > 0 and torch.all(frames[0] == bos_row):
-            frames = frames[1:]
+        if waveform.size == 0:
+            raise RuntimeError("Decoding produced an empty waveform.")
 
-        # EOS fixup (increased to 3 frames)
-        max_frames_to_fix = 3
-        if frames.size(0) > 0:
-            last_start = max(0, frames.size(0) - max_frames_to_fix)
-            last_frames = frames[last_start:]
-
-            eos_detected = False
-            earliest_eos_cb = self.num_codebooks
-            for f_idx in range(last_frames.size(0) - 1, -1, -1):
-                frame = last_frames[f_idx]
-                eos_cbs = (frame == self.stream_eos_id).nonzero(as_tuple=True)[0]
-                if eos_cbs.numel() > 0:
-                    earliest_eos_cb = eos_cbs.min().item()
-                    eos_detected = True
-                    print(f"EOS detected in frame {last_start + f_idx} at CB {earliest_eos_cb}")
-                    break
-
-            if eos_detected:
-                remaining = self.num_codebooks - 1 - earliest_eos_cb
-                for fix_idx in range(last_frames.size(0)):
-                    target = last_frames[fix_idx]
-                    force_up_to = max(0, remaining - fix_idx)
-                    for cb in range(force_up_to):
-                        if target[cb] != self.stream_eos_id:
-                            target[cb] = self.stream_eos_id
-                            print(f"Fixed EOS: frame {last_start + fix_idx}, CB {cb}")
-            else:
-                # No EOS: Append 1 full EOS frame
-                print("No EOS; appending full EOS frame")
-                frames = torch.cat([frames, eos_row.unsqueeze(0)])
-
-            # Trim trailing full EOS
-            while frames.size(0) > 0 and torch.all(frames[-1] == eos_row):
-                frames = frames[:-1]
-
-        # Post-fixup stats
-        content_after = ((frames >= 0) & (frames < self.codebook_size)).sum().item()
-        eos_after = (frames == self.stream_eos_id).sum().item()
-        print(f"Post-fixup: Content={content_after}, EOS={eos_after}")
-
-        # Validation: Ensure reasonable EOS (e.g., >5% in last 10 frames)
-        if frames.size(0) >= 10:
-            last_10_eos = (frames[-10:] == self.stream_eos_id).sum().item()
-            if last_10_eos / (10 * self.num_codebooks) < 0.05:
-                print("Warning: Low EOS density; appending extra EOS frame")
-                frames = torch.cat([frames, eos_row.unsqueeze(0)])
-
-        if frames.size(0) == 0:
-            raise RuntimeError("No frames after fixup.")
-
-        # Group by full EOS rows
-        groups = []
-        eos_row_indices = torch.where(torch.all(frames == eos_row, dim=1))[0]
-        start = 0
-        for idx in eos_row_indices:
-            if idx > start:
-                groups.append(frames[start:idx])
-            start = idx + 1
-        if start < frames.size(0):
-            groups.append(frames[start:])
-
-        print(f"Groups: {[g.size(0) for g in groups if g.size(0) > 0]}")
-
-        # Decode groups
-        waveforms = []
-        for g_idx, group in enumerate(groups):
-            if group.size(0) == 0:
-                continue
-            print(f"Group {g_idx}: {group.size(0)} frames")
-
-            # Revert delay
-            if group.size(0) < self.num_codebooks:
-                codes = group.T  # (num_cb, seq_len)
-            else:
-                codes = revert_delay_pattern(group.T)  # torch version
-
-            # The delay pattern should already be reverted, so BOS/EOS tokens should be gone
-            # Only clamp actual out-of-range tokens, not valid BOS/EOS that are part of content
-            # Valid tokens are 0-1023 (content) + 1024 (BOS) + 1025 (EOS)
-            # After delay pattern reversion, remaining BOS/EOS should be converted to pad token (0)
-            codes = torch.where(
-                (codes == self.stream_bos_id) | (codes == self.stream_eos_id),
-                torch.zeros_like(codes),
-                codes,
-            )
-
-            # Ensure all tokens are in valid range [0, codebook_size-1] for content
-            codes = torch.clamp(codes, 0, self.codebook_size - 3)  # 0-1023 for content tokens
-
-            # Validate first frame has content
-            if g_idx == 0 and codes.size(1) > 0:
-                first_frame_content = (codes[:, 0] < self.codebook_size).float().mean().item()
-                if first_frame_content < 0.5:
-                    print(
-                        f"Warning: Low content in first frame ({first_frame_content:.2%}); skipping group"
-                    )
-                    continue
-
-            try:
-                # Decode expects np (num_cb, seq_len)
-                waveform, sr = self.audio_tokenizer.decode(codes.cpu().numpy())
-                waveforms.append(waveform)
-            except Exception as e:
-                print(f"Decode error group {g_idx}: {e}")
-                continue
-
-        if not waveforms:
-            raise RuntimeError("No valid waveforms decoded.")
-
-        # Concat and resample
-        waveform = np.concatenate(waveforms).astype(np.float32)
+        # Resample to the target sample rate for Whisper
         target_sr = 16000
         if sr != target_sr:
             waveform = librosa.resample(waveform, orig_sr=sr, target_sr=target_sr)
 
-        return waveform
+        return waveform.astype(np.float32)
 
 
 if __name__ == "__main__":
@@ -876,14 +789,18 @@ if __name__ == "__main__":
     gpu_device = torch.device("cuda", 0)
     torch.cuda.set_device(gpu_device)
 
+    logging.info("Creating HiggsAudioInfer instance...")
     runner = HiggsAudioInfer("/home/me/TTS/TensorRT-LLM/")
+    logging.info("HiggsAudioInfer instance created.")
 
     input_text = "Chat, stop backseating! I totally know what I'm doing... I think"
 
     # Generate text/audio
+    logging.info("Calling generate...")
     audio_output = runner.generate(
         input_text,
     )
+    logging.info("Generate call finished.")
     sf.write("output.wav", audio_output, 16000)
 
     model_id = "openai/whisper-large-v3-turbo"
