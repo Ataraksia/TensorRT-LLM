@@ -5,7 +5,6 @@
 import librosa
 import numpy as np
 import torch
-from boson_multimodal import HiggsAudioTokenizer
 from openai.types.chat import ChatCompletionAudio
 from huggingface_hub import snapshot_download
 from omegaconf import OmegaConf

@@ -16,17 +16,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
 
+# Need this to avoid the stupid circular import issues
+def remove_and_store_strings():
+    filename = "/home/me/TTS/TensorRT-LLM/tensorrt_llm/models/__init__.py"
+    with open(filename, "r", encoding="utf-8") as f:
+        lines = [line.rstrip("\n") for line in f]
+    for i, line in enumerate(lines):
+        if line.__contains__("Higgs"):
+            if line.lstrip().startswith("#"):
+                lines[i] = lines[i].lstrip("#")
+            else:
+                lines[i] = "#" + lines[i]
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+remove_and_store_strings()
+
+import torch
 from tensorrt_llm.builder import BuildConfig, build
 from tensorrt_llm.logger import logger
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 from tensorrt_llm.models.higgs_audio.model import HiggsAudioForCausalLM
 
+remove_and_store_strings()
+
 
 def main():
     logger.set_level("info")
-
     gpu_device = torch.device("cuda", 0)
     torch.cuda.set_device(gpu_device)
     trtllm_config = HiggsAudioConfig.from_hugging_face("bosonai/higgs-audio-v2-generation-3B-base")
