@@ -21,7 +21,7 @@ import torch
 from dotenv import load_dotenv
 
 from tensorrt_llm.runtime.generation import SamplingConfig
-from tensorrt_llm.runtime import ModelRunnerCpp
+from tensorrt_llm.runtime.model_runner_cpp import ModelRunnerCpp
 from tensorrt_llm.runtime.session import Session, TensorInfo
 
 from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
@@ -44,8 +44,8 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
         max_beam_width: int,
         max_num_tokens: int,
         use_lora_plugin: bool,
-        lora_manager=None,
-        medusa_choices: torch.Tensor | None = None,
+        lora_manager: Optional[object] = None,
+        medusa_choices: torch.Tensor = None,
     ):
         """
         Initializes the HiggsAudioModelRunner.
@@ -64,7 +64,35 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
         """
         logging.info("Initializing HiggsAudioModelRunner...")
         self.config = config
-        self.delay_processor = DelayPatternLogitsProcessor(config)
+        super().__init__(
+            session,
+            max_batch_size,
+            max_input_len,
+            max_seq_len,
+            max_beam_width,
+            max_num_tokens,
+            use_lora_plugin,
+            lora_manager,
+            medusa_choices,
+        )
+        logging.info("HiggsAudioModelRunner initialized successfully.")
+        """
+        Initializes the HiggsAudioModelRunner.
+
+        Args:
+            config: The HiggsAudioConfig object.
+            session: The TensorRT-LLM session.
+            max_batch_size: The maximum batch size.
+            max_input_len: The maximum input length.
+            max_seq_len: The maximum sequence length.
+            max_beam_width: The maximum beam width.
+            max_num_tokens: The maximum number of tokens.
+            use_lora_plugin: Whether to use the LoRA plugin.
+            lora_manager: The LoRA manager.
+            medusa_choices: The Medusa choices.
+        """
+        logging.info("Initializing HiggsAudioModelRunner...")
+        self.config = config
         super().__init__(
             session,
             max_batch_size,
@@ -96,11 +124,8 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
             A tensor of shape [batch_size, beam_width, max_seq_len] with the generated token ids.
         """
         logging.info("Starting generation...")
-        if self.delay_processor:
-            self.delay_processor.reset()
-            kwargs["logits_processor"] = self.delay_processor
-
-        outputs = super().generate(batch_input_ids, sampling_config, **kwargs)
+        print(f"[DEBUG] Calling super().generate with kwargs: {list(kwargs.keys())}")
+        outputs = super().generate(batch_input_ids, sampling_config=sampling_config, **kwargs)
         logging.info("Generation finished.")
         return outputs
 
@@ -133,7 +158,8 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
             A HiggsAudioModelRunner instance.
         """
         logging.info(f"Creating HiggsAudioModelRunner from directory: {engine_dir}")
-        runner = ModelRunnerCpp().from_dir(
+
+        runner = ModelRunnerCpp.from_dir(
             engine_dir=engine_dir,
             lora_dir=lora_dir,
             rank=rank,
@@ -144,10 +170,9 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
         )
         logging.info("ModelRunner.from_dir() completed.")
 
-        # We need to overwrite the generate method to add the delay pattern logits processor
         runner.__class__ = HiggsAudioModelRunner
         runner.config = config
-        runner.delay_processor = DelayPatternLogitsProcessor(config)
+
         logging.info("HiggsAudioModelRunner created and configured.")
         return runner
 

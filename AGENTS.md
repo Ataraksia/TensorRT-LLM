@@ -2,7 +2,7 @@
 
 ## Primary Objective
 
-Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. This `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.
+Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. This `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing. We're making good progress.  Current the output sounds like voices on a radio station changing channels rapidly.
 
 ## Success Criteria
 
@@ -56,10 +56,11 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 ## Key Files & Components
 
 - `model.py` - Core model
-- `higgs_audio_model_runner.py` - Custom model runner for Higgs Audio
 - `config.py` - Model configuration
 - `test.py` - Inference and End-to-end validation using speech-to-text and WER
 - `build_engine.py` - rebuild the engine
+- `delay_pattern_logits_processor.py` - Custom logits processor implementing delay pattern for codebooks
+- `higgs_audio_model_runner.py` - Custom model runner for Higgs Audio - not currently used
 - `higgs_audio_transformers.py` - condensed Higgs Audio Transformers implementation
 - `higgs_audio_vllm.py` - condensed Higgs Audio vLLM implementation
 

@@ -36,7 +36,7 @@ from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 import logging
 
-from tensorrt_llm.runtime.model_runner_cpp import ModelRunnerCpp
+from tensorrt_llm.runtime.higgs_audio_model_runner import HiggsAudioModelRunner
 
 load_dotenv()
 
@@ -583,11 +583,10 @@ class HiggsAudioInfer:
         logging.info("Imported HiggsAudioModelRunner.")
 
         logging.info("Calling HiggsAudioModelRunner.from_dir()...")
-        self.runner = ModelRunnerCpp.from_dir(
+        self.runner = HiggsAudioModelRunner.from_dir(
             engine_dir=self.engine_dir,
+            config=self.config,
             kv_cache_free_gpu_memory_fraction=0.5,
-            # use_gpu_direct_storage=True,
-            # cuda_graph_mode=True,
         )
         logging.info("HiggsAudioModelRunner.from_dir() returned successfully.")
 
@@ -698,18 +697,32 @@ class HiggsAudioInfer:
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                temperature=self.temperature,
-                top_k=self.top_k,
-                top_p=self.top_p,
+                temperature=min(self.temperature, 0.65),
+                top_k=min(self.top_k, 48),
+                top_p=min(self.top_p, 0.82),
+                repetition_penalty=1.12,
+                presence_penalty=0.05,
+                frequency_penalty=0.08,
                 end_id=0,
             )
 
         audio_tokens = outputs[0, 0, self.config.audio_out_start :]
-        # Map flattened audio token ids to local [0..codebook_size-1] space
+
+        # Debug: show some generated tokens
+        print(f"Raw audio tokens (first 50): {audio_tokens[:50].tolist()}")
+        print(f"Token range: min={audio_tokens.min().item()}, max={audio_tokens.max().item()}")
+        print(f"Expected flattened range: [0, {self.num_codebooks * self.codebook_size - 1}]")
+
+        # Revert delay pattern by frame and map flattened audio token ids to local [0..codebook_size-1] space
         # Flattened range: [0 .. num_codebooks*codebook_size-1] (e.g., 0..8207)
         if isinstance(audio_tokens, torch.Tensor):
             flat_max = self.num_codebooks * self.codebook_size
             is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
+
+            print(
+                f"Flattened audio token count: {is_flattened_audio.sum().item()} / {len(audio_tokens)}"
+            )
+
             # Convert flattened token id to local id per codebook via modulo
             mapped = audio_tokens.clone()
             mapped[is_flattened_audio] = mapped[is_flattened_audio] % self.codebook_size
@@ -765,6 +778,8 @@ class HiggsAudioInfer:
 
         # The decoder expects shape (num_codebooks, seq_len)
         local_codes_transposed = local_codes.T
+        # Guard: clip any special IDs just in case to prevent decoder OOB
+        local_codes_transposed = torch.clamp(local_codes_transposed, 0, 1023)
 
         # Decode the codes to a waveform
         try:

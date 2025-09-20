@@ -51,6 +51,7 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
         """
         Apply delay pattern constraints to logits during generation.
         """
+        print(f"[DELAY DEBUG] DelayPatternLogitsProcessor.__call__ invoked!")
         try:
             if not token_ids or not token_ids[0]:
                 self.reset()
@@ -67,6 +68,7 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
                 if audio_out_bos_positions:
                     self.audio_generation_active = True
                     self.audio_start_pos = audio_out_bos_positions[-1] + 1
+                    print(f"[DELAY] Audio generation activated at position {self.audio_start_pos}")
                 else:
                     # Not in audio mode, do nothing
                     return
@@ -85,6 +87,10 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
 
             # Number of codebooks that should be generating content tokens in this frame
             active_codebooks_this_frame = min(current_frame_idx + 1, self.config.num_codebooks)
+
+            print(
+                f"[DELAY] Token {tokens_since_audio_start}: frame={current_frame_idx}, codebook={current_codebook_idx}, active={active_codebooks_this_frame}"
+            )
 
             # 3. Mask logits to the current codebook's vocabulary window
             flat_audio_vocab_size = self.config.codebook_size * self.config.num_codebooks
@@ -132,10 +138,12 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
             # 5. Apply delay pattern (force BOS for inactive codebooks)
             if current_codebook_idx >= active_codebooks_this_frame:
                 # This codebook is not yet active in this frame, force BOS
+                print(f"[DELAY] Forcing BOS for inactive codebook {current_codebook_idx}")
                 logits[:, :, :] = -math.inf
                 logits[:, :, bos_token_id_in_window] = 0.0
             else:
                 # This codebook is active, so disallow BOS
+                print(f"[DELAY] Allowing content for active codebook {current_codebook_idx}")
                 logits[:, :, bos_token_id_in_window] = -math.inf
 
                 # 6. Anti-repetition for content tokens
