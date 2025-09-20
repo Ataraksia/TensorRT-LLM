@@ -556,8 +556,8 @@ class HiggsAudioInfer:
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
         self.config = HiggsAudioConfig.from_hugging_face()
         logging.info("HiggsAudioConfig loaded.")
-        self.temperature = 0.95
-        self.top_k = 256
+        self.temperature = 1.0
+        self.top_k = 50
         self.top_p = 0.95
         self.num_beams = 1
         self.max_num_tokens = self.config.max_num_tokens
@@ -707,13 +707,13 @@ class HiggsAudioInfer:
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                temperature=0.8,  # Slightly higher temperature to add more variety
-                top_k=64,  # Increase choices to avoid repetition
-                top_p=0.85,  # More flexible sampling
-                repetition_penalty=1.15,  # Stronger repetition penalty
-                presence_penalty=0.1,  # Stronger presence penalty
-                frequency_penalty=0.15,  # Stronger frequency penalty
-                end_id=flattened_eos_id,  # Use flattened audio stream EOS token
+                temperature=0.7,
+                top_k=0,  # disable top-k, rely on top-p
+                top_p=0.9,
+                repetition_penalty=1.0,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                end_id=-1,  # ignore global EOS; rely on per-codebook EOS handling
                 logits_processor_names=["delay_pattern_logit_processor"],
             )
 
@@ -740,29 +740,19 @@ class HiggsAudioInfer:
         print(f"  Content tokens: {content_tokens.sum().item()}")
         print(f"  BOS tokens: {bos_tokens.sum().item()}")
         print(f"  EOS tokens: {eos_tokens.sum().item()}")
-        # Revert delay pattern and map flattened audio token ids to local [0..codebook_size-1] space
+        # Map flattened audio token ids to local [0..codebook_size-1] space (do not drop BOS/EOS yet)
         if isinstance(audio_tokens, torch.Tensor):
             flat_max = self.num_codebooks * self.codebook_size
             is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
-
-            # Filter to only valid audio tokens
             audio_tokens = audio_tokens[is_flattened_audio]
-
             if audio_tokens.numel() == 0:
                 raise RuntimeError("No valid audio tokens found after filtering.")
+            local_ids = audio_tokens % self.codebook_size
+        else:
+            raise RuntimeError("Unexpected type for audio tokens.")
 
-            # Convert flattened token id to local id per codebook via modulo
-            audio_tokens = audio_tokens % self.codebook_size
-
-            # Remove EOS tokens for cleaner decoding
-            valid_content = audio_tokens < self.stream_bos_id  # Only content tokens (0-1023)
-            audio_tokens = audio_tokens[valid_content]
-
-        if audio_tokens.numel() == 0:
-            raise RuntimeError("No content tokens found after filtering EOS/BOS tokens.")
-
-        print(f"Content tokens after filtering: {len(audio_tokens)}")
-        waveform = self.process_audio(audio_tokens)
+        print(f"Tokens after modulo (keeping BOS/EOS): {len(local_ids)}")
+        waveform = self.process_audio(local_ids)
         print(f"Successfully generated audio: {len(waveform)} samples")
         np.savetxt("debug_audio_tokens.txt", audio_tokens.cpu(), delimiter=",", fmt="%d")
         return waveform
@@ -777,57 +767,52 @@ class HiggsAudioInfer:
 
         print(f"Processing {len(generated_ids)} generated tokens")
 
-        # Filter to valid flattened audio tokens
-        flat_audio_vocab_size = self.num_codebooks * self.codebook_size
-        valid_audio_mask = (generated_ids >= 0) & (generated_ids < flat_audio_vocab_size)
-        audio_tokens = generated_ids[valid_audio_mask]
-
-        if audio_tokens.numel() == 0:
-            raise RuntimeError("No valid audio tokens found.")
-
-        print(f"Valid audio tokens: {len(audio_tokens)}")
-
-        # Convert flattened IDs to local codebook IDs
-        local_ids = audio_tokens % self.codebook_size
-
-        # Separate content tokens, BOS tokens, and EOS tokens
-        content_mask = local_ids < self.stream_bos_id
-        bos_mask = local_ids == self.stream_bos_id
-        eos_mask = local_ids == self.stream_eos_id
-
-        print(
-            f"Token breakdown: {content_mask.sum().item()} content, {bos_mask.sum().item()} BOS, {eos_mask.sum().item()} EOS"
-        )
-
-        if content_mask.sum() == 0:
-            raise RuntimeError("No content tokens found - only BOS/EOS tokens.")
-
-        # For now, let's take a simpler approach: extract content tokens and reshape
-        content_tokens = local_ids[content_mask]
-
-        # Ensure we have a multiple of num_codebooks for proper reshaping
-        remainder = content_tokens.numel() % self.num_codebooks
+        # Expect generated_ids to be local token ids in [0..codebook_size-1] including BOS/EOS
+        local_ids = generated_ids
+        # Ensure we have a multiple of num_codebooks for proper reshaping into frames
+        remainder = local_ids.numel() % self.num_codebooks
         if remainder != 0:
-            content_tokens = content_tokens[:-remainder]
-
-        if content_tokens.numel() == 0:
+            local_ids = local_ids[:-remainder]
+        if local_ids.numel() == 0:
             raise RuntimeError("No complete frames to decode after alignment.")
 
         # Reshape into frames (num_frames, num_codebooks)
-        num_frames = content_tokens.numel() // self.num_codebooks
-        frames = content_tokens.view(num_frames, self.num_codebooks)
+        num_frames = local_ids.numel() // self.num_codebooks
+        frames = local_ids.view(num_frames, self.num_codebooks)
 
-        print(f"Reshaped into {num_frames} frames of {self.num_codebooks} codebooks each")
+        # Per-codebook trimming to revert delay pattern:
+        # - Remove the first c tokens for codebook c (initial BOS delay)
+        # - Stop at first EOS if present
+        codebook_seqs = []
+        min_len = None
+        for c in range(self.num_codebooks):
+            seq = frames[:, c]
+            # Trim leading delay by codebook index
+            seq = seq[c:]
+            # Find EOS index if any (value == stream_eos_id)
+            eos_positions = torch.nonzero(seq == self.stream_eos_id, as_tuple=False)
+            if eos_positions.numel() > 0:
+                end = eos_positions[0].item()
+                seq = seq[:end]
+            # Keep content tokens only for decoder (0..1023)
+            seq = seq[seq < self.stream_bos_id]
+            if min_len is None:
+                min_len = seq.numel()
+            else:
+                min_len = min(min_len, seq.numel())
+            codebook_seqs.append(seq)
 
-        # Transpose for decoder: (num_codebooks, num_frames)
-        codes_for_decoder = frames.T
+        if min_len is None or min_len == 0:
+            raise RuntimeError("No decodable content after delay reversion.")
 
-        # Apply some basic filtering to prevent decoder issues
-        codes_for_decoder = torch.clamp(codes_for_decoder, 0, 1023)
-
+        # Truncate all codebooks to the same length
+        codes_for_decoder = torch.stack([s[:min_len] for s in codebook_seqs], dim=0)
         print(
-            f"Final codes shape: {codes_for_decoder.shape} (should be {self.num_codebooks} x {num_frames})"
+            f"Final codes shape: {codes_for_decoder.shape} (should be {self.num_codebooks} x {min_len})"
         )
+
+        # Clamp to valid content range
+        codes_for_decoder = torch.clamp(codes_for_decoder, 0, self.stream_bos_id - 1)
 
         try:
             # Decode to waveform

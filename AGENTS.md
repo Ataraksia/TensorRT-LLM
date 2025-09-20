@@ -2,7 +2,14 @@
 
 ## Primary Objective
 
-Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. This `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing. We're making good progress.  Current the output sounds like voices on a radio station changing channels rapidly.
+Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. This `TensorRT-LLM` implementation sheds the unnecessary `text_lm_head` that is useful for training but not for implementation and only uses the `audio_lm_head`. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.
+
+Here is a list of things that are definitely not the issue, and you should not waste time investigating them:
+
+Sampling - temperature, top_k, top_p are all taken from the other implementations and are confirmed to work fine.
+Network Training - The model has been trained and validated to work correctly in other implementations, so the architecture and weights are correct.
+Prompt - The prompt is correct and matches what was used in training with only very slight additions that do not impede functionality.
+
 
 ## Success Criteria
 
@@ -11,7 +18,7 @@ Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful
 - Word Error Rate < 0.25
 - Audio is intelligible and follows input text content
 
-**The assignment is 75% complete** - architecture and token handling are likely correct, but the generation logic needs refinement to produce meaningful speech instead of degenerate patterns.
+**The assignment is 75% complete**
 
 ## Technical Architecture
 
@@ -81,7 +88,7 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 
 **Current Status**: Working on fixing the DelayPatternLogitsProcessor. The current issue is that the delay pattern logic is not properly implemented. All codebooks show as "ACTIVE" after frame 7, but the delay pattern should ensure that:
 
-- Frame 0: Only codebook 0 generates content, codebooks 1-7 generate BOS  
+- Frame 0: Only codebook 0 generates content, codebooks 1-7 generate BOS
 - Frame 1: Codebooks 0-1 generate content, codebooks 2-7 generate BOS
 - Frame 2: Codebooks 0-2 generate content, codebooks 3-7 generate BOS
 - And so on...
