@@ -75,6 +75,7 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 - After you believe you have finished a task, review the entire implementation to ensure that all aspects of the task have been addressed and that the solution is robust, efficient, and maintainable.
 - Don't over-engineer! Build only what is necessary to achieve the goal and no more. Don't prepare for all possibilities. Make your code as concise as possible.
 - It is important when debugging something that involves a large amount of iterations that you output the log to a file rather than the console.
+- After you finish making changes, always run git status and git diff (or git diff --stat for a quick view) so you can see exactly what you’ve  altered compared to the previous commit. That lets you double‑check for accidental edits, confirm formatting, and make sure the diff reflects the intended logic before moving on to testing or next steps.
 
 ## Agents Notes
 

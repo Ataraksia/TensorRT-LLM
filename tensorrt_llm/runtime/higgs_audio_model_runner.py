@@ -124,7 +124,10 @@ class HiggsAudioModelRunner(ModelRunnerCpp):
             A tensor of shape [batch_size, beam_width, max_seq_len] with the generated token ids.
         """
         logging.info("Starting generation...")
-        print(f"[DEBUG] Calling super().generate with kwargs: {list(kwargs.keys())}")
+        
+        # For now, let TRT-LLM generate normally. 
+        # The delay pattern will be handled in post-processing
+        print(f"[DEBUG] Calling super().generate with standard parameters")
         outputs = super().generate(batch_input_ids, sampling_config=sampling_config, **kwargs)
         logging.info("Generation finished.")
         return outputs

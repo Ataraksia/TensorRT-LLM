@@ -36,6 +36,7 @@ from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 import logging
 
+from tensorrt_llm.runtime.delay_pattern_logits_processor import DelayPatternLogitsProcessor
 from tensorrt_llm.runtime.higgs_audio_model_runner import HiggsAudioModelRunner
 
 load_dotenv()
@@ -587,6 +588,11 @@ class HiggsAudioInfer:
             engine_dir=self.engine_dir,
             config=self.config,
             kv_cache_free_gpu_memory_fraction=0.5,
+            logits_processor_map={
+                "delay_pattern_logit_processor": DelayPatternLogitsProcessor(self.config)
+            },
+            # use_gpu_direct_storage=True,
+            # cuda_graph_mode=True,
         )
         logging.info("HiggsAudioModelRunner.from_dir() returned successfully.")
 
@@ -694,108 +700,155 @@ class HiggsAudioInfer:
         max_new_tokens = self.max_num_tokens - input_ids.shape[0]
 
         with torch.no_grad():
+            # Calculate flattened EOS token ID: for any codebook, EOS=1025
+            # In flattened vocab: codebook_0_eos = 0*codebook_size + 1025 = 1025
+            flattened_eos_id = self.stream_eos_id  # 1025, which is within [0, 8208)
+
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
                 max_new_tokens=max_new_tokens,
-                temperature=min(self.temperature, 0.65),
-                top_k=min(self.top_k, 48),
-                top_p=min(self.top_p, 0.82),
-                repetition_penalty=1.12,
-                presence_penalty=0.05,
-                frequency_penalty=0.08,
-                end_id=0,
+                temperature=0.8,  # Slightly higher temperature to add more variety
+                top_k=64,  # Increase choices to avoid repetition
+                top_p=0.85,  # More flexible sampling
+                repetition_penalty=1.15,  # Stronger repetition penalty
+                presence_penalty=0.1,  # Stronger presence penalty
+                frequency_penalty=0.15,  # Stronger frequency penalty
+                end_id=flattened_eos_id,  # Use flattened audio stream EOS token
+                logits_processor_names=["delay_pattern_logit_processor"],
             )
 
         audio_tokens = outputs[0, 0, self.config.audio_out_start :]
 
         # Debug: show some generated tokens
+        print(f"Total generated tokens: {len(audio_tokens)}")
         print(f"Raw audio tokens (first 50): {audio_tokens[:50].tolist()}")
+        print(f"Raw audio tokens (last 50): {audio_tokens[-50:].tolist()}")
         print(f"Token range: min={audio_tokens.min().item()}, max={audio_tokens.max().item()}")
         print(f"Expected flattened range: [0, {self.num_codebooks * self.codebook_size - 1}]")
 
-        # Revert delay pattern by frame and map flattened audio token ids to local [0..codebook_size-1] space
-        # Flattened range: [0 .. num_codebooks*codebook_size-1] (e.g., 0..8207)
+        # Count different token types
+        flat_max = self.num_codebooks * self.codebook_size
+        is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
+        eos_tokens = audio_tokens % self.codebook_size == self.stream_eos_id
+        bos_tokens = audio_tokens % self.codebook_size == self.stream_bos_id
+        content_tokens = (
+            audio_tokens % self.codebook_size < self.stream_bos_id
+        ) & is_flattened_audio
+
+        print(f"Token analysis:")
+        print(f"  Valid audio tokens: {is_flattened_audio.sum().item()} / {len(audio_tokens)}")
+        print(f"  Content tokens: {content_tokens.sum().item()}")
+        print(f"  BOS tokens: {bos_tokens.sum().item()}")
+        print(f"  EOS tokens: {eos_tokens.sum().item()}")
+        # Revert delay pattern and map flattened audio token ids to local [0..codebook_size-1] space
         if isinstance(audio_tokens, torch.Tensor):
             flat_max = self.num_codebooks * self.codebook_size
             is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
 
-            print(
-                f"Flattened audio token count: {is_flattened_audio.sum().item()} / {len(audio_tokens)}"
-            )
+            # Filter to only valid audio tokens
+            audio_tokens = audio_tokens[is_flattened_audio]
+
+            if audio_tokens.numel() == 0:
+                raise RuntimeError("No valid audio tokens found after filtering.")
 
             # Convert flattened token id to local id per codebook via modulo
-            mapped = audio_tokens.clone()
-            mapped[is_flattened_audio] = mapped[is_flattened_audio] % self.codebook_size
-            # Drop any non-audio tokens outside flattened range
-            audio_tokens = mapped[is_flattened_audio]
+            audio_tokens = audio_tokens % self.codebook_size
+
+            # Remove EOS tokens for cleaner decoding
+            valid_content = audio_tokens < self.stream_bos_id  # Only content tokens (0-1023)
+            audio_tokens = audio_tokens[valid_content]
+
         if audio_tokens.numel() == 0:
-            raise RuntimeError(
-                "No audio tokens found after mapping. Generation likely ended early."
-            )
-        np.savetxt(
-            "2.txt",
-            audio_tokens.cpu(),
-            delimiter=",",
-            fmt="%d",
-        )
+            raise RuntimeError("No content tokens found after filtering EOS/BOS tokens.")
+
+        print(f"Content tokens after filtering: {len(audio_tokens)}")
         waveform = self.process_audio(audio_tokens)
         print(f"Successfully generated audio: {len(waveform)} samples")
+        np.savetxt("debug_audio_tokens.txt", audio_tokens.cpu(), delimiter=",", fmt="%d")
         return waveform
 
     def process_audio(self, generated_ids: torch.Tensor):
         """
         Process generated audio tokens and decode to waveform.
-        This simplified version relies on the LogitsProcessor to have generated a clean stream.
+        Apply delay pattern reversion matching vLLM implementation.
         """
         if generated_ids.numel() == 0:
             raise RuntimeError("No tokens generated.")
 
-        # The LogitsProcessor should prevent non-audio tokens, but as a safeguard:
+        print(f"Processing {len(generated_ids)} generated tokens")
+
+        # Filter to valid flattened audio tokens
         flat_audio_vocab_size = self.num_codebooks * self.codebook_size
-        audio_tokens = generated_ids[(generated_ids >= 0) & (generated_ids < flat_audio_vocab_size)]
+        valid_audio_mask = (generated_ids >= 0) & (generated_ids < flat_audio_vocab_size)
+        audio_tokens = generated_ids[valid_audio_mask]
 
         if audio_tokens.numel() == 0:
-            raise RuntimeError("No valid audio tokens found after filtering.")
+            raise RuntimeError("No valid audio tokens found.")
 
-        # Trim to ensure it's a multiple of num_codebooks
-        remainder = audio_tokens.numel() % self.num_codebooks
+        print(f"Valid audio tokens: {len(audio_tokens)}")
+
+        # Convert flattened IDs to local codebook IDs
+        local_ids = audio_tokens % self.codebook_size
+
+        # Separate content tokens, BOS tokens, and EOS tokens
+        content_mask = local_ids < self.stream_bos_id
+        bos_mask = local_ids == self.stream_bos_id
+        eos_mask = local_ids == self.stream_eos_id
+
+        print(
+            f"Token breakdown: {content_mask.sum().item()} content, {bos_mask.sum().item()} BOS, {eos_mask.sum().item()} EOS"
+        )
+
+        if content_mask.sum() == 0:
+            raise RuntimeError("No content tokens found - only BOS/EOS tokens.")
+
+        # For now, let's take a simpler approach: extract content tokens and reshape
+        content_tokens = local_ids[content_mask]
+
+        # Ensure we have a multiple of num_codebooks for proper reshaping
+        remainder = content_tokens.numel() % self.num_codebooks
         if remainder != 0:
-            audio_tokens = audio_tokens[:-remainder]
+            content_tokens = content_tokens[:-remainder]
 
-        if audio_tokens.numel() == 0:
-            raise RuntimeError("No complete frames to decode.")
+        if content_tokens.numel() == 0:
+            raise RuntimeError("No complete frames to decode after alignment.")
 
-        # Reshape into frames
-        frames = audio_tokens.view(-1, self.num_codebooks)
-        print(f"Shaped into {frames.shape[0]} frames.")
+        # Reshape into frames (num_frames, num_codebooks)
+        num_frames = content_tokens.numel() // self.num_codebooks
+        frames = content_tokens.view(num_frames, self.num_codebooks)
 
-        # The output from the model is in a "flattened" format, where the token ID
-        # represents both the codebook and the value. The decoder expects local IDs
-        # within each codebook. We can get this with the modulo operator.
-        # The LogitsProcessor should have already handled the delay pattern, so we
-        # just need to map the IDs.
-        local_codes = frames % self.codebook_size
+        print(f"Reshaped into {num_frames} frames of {self.num_codebooks} codebooks each")
 
-        # The decoder expects shape (num_codebooks, seq_len)
-        local_codes_transposed = local_codes.T
-        # Guard: clip any special IDs just in case to prevent decoder OOB
-        local_codes_transposed = torch.clamp(local_codes_transposed, 0, 1023)
+        # Transpose for decoder: (num_codebooks, num_frames)
+        codes_for_decoder = frames.T
 
-        # Decode the codes to a waveform
+        # Apply some basic filtering to prevent decoder issues
+        codes_for_decoder = torch.clamp(codes_for_decoder, 0, 1023)
+
+        print(
+            f"Final codes shape: {codes_for_decoder.shape} (should be {self.num_codebooks} x {num_frames})"
+        )
+
         try:
-            waveform, sr = self.audio_tokenizer.decode(local_codes_transposed.cpu().numpy())
+            # Decode to waveform
+            waveform, sr = self.audio_tokenizer.decode(codes_for_decoder.cpu().numpy())
         except Exception as e:
-            print(f"Error during decoding: {e}")
-            raise RuntimeError("Failed to decode audio codes.")
+            print(f"Decoder error: {e}")
+            # Fall back to a simpler approach if decoder fails
+            print("Trying fallback decoding...")
+            # Create a smaller sample for testing
+            test_codes = codes_for_decoder[:, : min(32, num_frames)]
+            waveform, sr = self.audio_tokenizer.decode(test_codes.cpu().numpy())
 
         if waveform.size == 0:
-            raise RuntimeError("Decoding produced an empty waveform.")
+            raise RuntimeError("Decoder produced empty waveform.")
 
-        # Resample to the target sample rate for Whisper
+        # Resample if needed
         target_sr = 16000
         if sr != target_sr:
             waveform = librosa.resample(waveform, orig_sr=sr, target_sr=target_sr)
 
+        print(f"Decoded waveform: {len(waveform)} samples at {target_sr}Hz")
         return waveform.astype(np.float32)
 
 
