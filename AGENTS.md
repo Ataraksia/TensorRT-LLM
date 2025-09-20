@@ -79,6 +79,17 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 
 ## Agents Notes
 
+**Current Status**: Working on fixing the DelayPatternLogitsProcessor. The current issue is that the delay pattern logic is not properly implemented. All codebooks show as "ACTIVE" after frame 7, but the delay pattern should ensure that:
+
+- Frame 0: Only codebook 0 generates content, codebooks 1-7 generate BOS  
+- Frame 1: Codebooks 0-1 generate content, codebooks 2-7 generate BOS
+- Frame 2: Codebooks 0-2 generate content, codebooks 3-7 generate BOS
+- And so on...
+
+The problem is `min(current_frame_idx + 1, self.config.num_codebooks)` always equals 8 for frames >= 7, making all codebooks active.
+
+**Key Insight**: The vLLM delay pattern tracks `num_audio_delay` which represents how many codebooks are allowed to be active in the current frame, but it must be implemented differently for the auto-regressive token-by-token generation in TensorRT-LLM.
+
 vLLM Delay Pattern Implementation:
 
 # Update the next mm tokens based on the delay pattern

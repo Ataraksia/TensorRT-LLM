@@ -39,6 +39,8 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
         self.audio_generation_active = False
         self.audio_start_pos = -1
         self.seen_eos_in_frame = False
+        # Track the delay state like vLLM
+        self.num_audio_delay = 0  # How many complete frames have been generated
 
     def __call__(
         self,
@@ -50,8 +52,8 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
     ) -> None:
         """
         Apply delay pattern constraints to logits during generation.
+        Implements the exact delay pattern from vLLM reference.
         """
-        print(f"[DELAY DEBUG] DelayPatternLogitsProcessor.__call__ invoked!")
         try:
             if not token_ids or not token_ids[0]:
                 self.reset()
@@ -79,18 +81,10 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
             # 2. Calculate current position in the audio stream
             tokens_since_audio_start = len(input_ids) - self.audio_start_pos
             if tokens_since_audio_start < 0:
-                # Should not happen if logic is correct
                 return
 
             current_codebook_idx = tokens_since_audio_start % self.config.num_codebooks
             current_frame_idx = tokens_since_audio_start // self.config.num_codebooks
-
-            # Number of codebooks that should be generating content tokens in this frame
-            active_codebooks_this_frame = min(current_frame_idx + 1, self.config.num_codebooks)
-
-            print(
-                f"[DELAY] Token {tokens_since_audio_start}: frame={current_frame_idx}, codebook={current_codebook_idx}, active={active_codebooks_this_frame}"
-            )
 
             # 3. Mask logits to the current codebook's vocabulary window
             flat_audio_vocab_size = self.config.codebook_size * self.config.num_codebooks
@@ -112,60 +106,61 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
             bos_token_id_in_window = window_start + self.config.audio_stream_bos_id
             eos_token_id_in_window = window_start + self.config.audio_stream_eos_id
 
-            # 4. Check for EOS propagation
-            # Look at the tokens generated in the current frame
-            start_of_current_frame = (
-                self.audio_start_pos + current_frame_idx * self.config.num_codebooks
-            )
-            tokens_in_current_frame = input_ids[start_of_current_frame:]
-
-            # If any token in the current frame is an EOS token, we must generate EOS for all subsequent codebooks in this frame.
+            # 4. Check for EOS propagation within current frame
+            start_of_current_frame = self.audio_start_pos + current_frame_idx * self.config.num_codebooks
+            end_of_current_frame = min(start_of_current_frame + self.config.num_codebooks, len(input_ids))
+            
+            # Check if EOS was generated in current frame
             if not self.seen_eos_in_frame:
-                for token in tokens_in_current_frame:
-                    # Check if the token is an EOS token for any codebook
+                for token_pos in range(start_of_current_frame, end_of_current_frame):
+                    token = input_ids[token_pos]
                     if (token % self.config.codebook_size) == self.config.audio_stream_eos_id:
                         self.seen_eos_in_frame = True
                         break
 
             if self.seen_eos_in_frame:
+                # Force EOS for the rest of this frame
                 logits[:, :, :] = -math.inf
                 logits[:, :, eos_token_id_in_window] = 0.0
-                # Reset for next frame
+                # Reset EOS flag when starting a new frame
                 if current_codebook_idx == self.config.num_codebooks - 1:
                     self.seen_eos_in_frame = False
                 return
 
-            # 5. Apply delay pattern (force BOS for inactive codebooks)
-            if current_codebook_idx >= active_codebooks_this_frame:
-                # This codebook is not yet active in this frame, force BOS
-                print(f"[DELAY] Forcing BOS for inactive codebook {current_codebook_idx}")
+            # 5. Apply delay pattern matching vLLM implementation  
+            # The key insight: codebook i can only start generating content from frame i
+            # num_audio_delay tracks how many codebooks are currently allowed to generate content
+            
+            # Update num_audio_delay based on current frame
+            # In frame 0: only codebook 0 can generate content (num_audio_delay = 1)  
+            # In frame 1: codebooks 0,1 can generate content (num_audio_delay = 2)
+            # etc.
+            self.num_audio_delay = min(current_frame_idx + 1, self.config.num_codebooks)
+
+            if current_codebook_idx >= self.num_audio_delay:
+                # This codebook is delayed - force BOS token  
+                print(f"[DELAY] Frame {current_frame_idx}, codebook {current_codebook_idx}: DELAYED (num_active={self.num_audio_delay})")
                 logits[:, :, :] = -math.inf
                 logits[:, :, bos_token_id_in_window] = 0.0
             else:
-                # This codebook is active, so disallow BOS
-                print(f"[DELAY] Allowing content for active codebook {current_codebook_idx}")
+                # This codebook is active - allow content, disallow BOS
+                print(f"[DELAY] Frame {current_frame_idx}, codebook {current_codebook_idx}: ACTIVE (num_active={self.num_audio_delay})")
                 logits[:, :, bos_token_id_in_window] = -math.inf
 
-                # 6. Anti-repetition for content tokens
-                # Look at the previously generated token for this *same codebook*
+                # 6. Anti-repetition: penalize repeating the same content token
                 if tokens_since_audio_start >= self.config.num_codebooks:
-                    prev_token_for_this_codebook_pos = (
-                        tokens_since_audio_start - self.config.num_codebooks
-                    )
-                    prev_token_id = input_ids[
-                        self.audio_start_pos + prev_token_for_this_codebook_pos
-                    ]
+                    prev_token_pos = tokens_since_audio_start - self.config.num_codebooks
+                    prev_token_id = input_ids[self.audio_start_pos + prev_token_pos]
 
-                    # Check if the previous token was a content token from the same codebook
+                    # Penalize exact repetition within the current codebook window
                     if window_start <= prev_token_id < window_end:
                         local_prev_token = prev_token_id % self.config.codebook_size
-                        if local_prev_token < self.config.audio_stream_bos_id:  # is a content token
-                            logits[:, :, prev_token_id] = -math.inf
+                        if local_prev_token < self.config.audio_stream_bos_id:  # content token
+                            logits[:, :, prev_token_id] -= 2.0  # Soft penalty instead of hard mask
 
         except Exception as e:
             print(f"[ERROR] DelayPatternLogitsProcessor failed: {e}")
             import traceback
-
             traceback.print_exc()
             # Allow generation to continue without this processor if it fails
             pass
