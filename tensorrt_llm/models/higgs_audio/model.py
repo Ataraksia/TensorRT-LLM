@@ -263,11 +263,11 @@ class HiggsAudioTransformer(Module):
         """Forward pass for Higgs Audio transformer with multimodal support."""
         # Use a simple position-based mask: everything from audio_out_start onward
         # is treated as audio tokens. test.py sets this before generation.
-        audio_mask = __ge__(position_ids, int32_array(self.config.audio_out_start))
+        audio_mask = position_ids >= self.config.audio_out_start
 
-        audio_ids = where(audio_mask, input_ids, int32_array(0))
+        audio_ids = where(audio_mask, input_ids, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
-        text_ids = where(audio_mask, int32_array(0), input_ids)
+        text_ids = where(audio_mask, 0, input_ids)
         text_embed = self.vocab_embedding(text_ids)
         input_embed = where(audio_mask.unsqueeze(-1), audio_embed, text_embed)
 

@@ -10,6 +10,7 @@ Sampling - temperature, top_k, top_p are all taken from the other implementation
 Network Training - The model has been trained and validated to work correctly in other implementations, so the architecture and weights are correct.
 Prompt - The prompt is correct and matches what was used in training with only very slight additions that do not impede functionality.
 
+The issue is most likely in the generation logic, specifically the DelayPatternLogitsProcessor implementation and how it integrates with the auto-regressive token-by-token generation in TensorRT-LLM. Focus on ensuring that the delay pattern is correctly applied during generation to prevent degenerate outputs.
 
 ## Success Criteria
 
