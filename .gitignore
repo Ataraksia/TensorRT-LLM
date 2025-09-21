@@ -118,3 +118,7 @@ audio_ids_out.txt
 3.txt
 import_graph.png
 audio_ids_in.txt
+.kilocode/system-prompt-architect
+.kilocode/system-prompt-code
+.kilocode/system-prompt-debug
+.kilocode/system-prompt-orchestrator

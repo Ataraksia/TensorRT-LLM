@@ -36,8 +36,10 @@ from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 import logging
 
+from tensorrt_llm.runtime import SamplingConfig
 from tensorrt_llm.runtime.delay_pattern_logits_processor import DelayPatternLogitsProcessor
 from tensorrt_llm.runtime.higgs_audio_model_runner import HiggsAudioModelRunner
+from tensorrt_llm.runtime import ModelRunnerCpp, ModelRunner
 
 load_dotenv()
 
@@ -554,47 +556,27 @@ class HiggsAudioInfer:
         self.audio_tokenizer_dir = "bosonai/higgs-audio-v2-tokenizer"
         self.reference_audio = None  # Disable reference audio loading for faster testing
         # self.reference_audio = "/home/me/TTS/TensorRT-LLM/AussieGirl.wav"
+
         self.config = HiggsAudioConfig.from_hugging_face()
-        logging.info("HiggsAudioConfig loaded.")
-        self.temperature = 1.0
-        self.top_k = 50
-        self.top_p = 0.95
-        self.num_beams = 1
-        self.max_num_tokens = self.config.max_num_tokens
-        self.num_codebooks = self.config.num_codebooks
-        self.stream_bos_id = self.config.audio_stream_bos_id
-        self.stream_eos_id = self.config.audio_stream_eos_id
-        self.audio_eos_id = self.config.audio_eos_id
-        self.codebook_size = self.config.codebook_size
 
         # Set up device
         self.device = torch.device("cuda", 0)
         torch.cuda.set_device(self.device)
-        logging.info(f"CUDA device set to: {self.device}")
 
         # Load components
-        logging.info(f"Loading text tokenizer from: {self.hf_model_dir}")
         self.tokenizer = AutoTokenizer.from_pretrained(self.hf_model_dir, trust_remote_code=True)
-        logging.info("Text tokenizer loaded.")
 
-        logging.info(f"Loading audio tokenizer from: {self.audio_tokenizer_dir}")
         self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir)
-        logging.info("Audio tokenizer loaded.")
 
-        logging.info("Imported HiggsAudioModelRunner.")
-
-        logging.info("Calling HiggsAudioModelRunner.from_dir()...")
-        self.runner = HiggsAudioModelRunner.from_dir(
+        self.runner = ModelRunner.from_dir(
             engine_dir=self.engine_dir,
-            config=self.config,
-            kv_cache_free_gpu_memory_fraction=0.5,
-            logits_processor_map={
-                "delay_pattern_logit_processor": DelayPatternLogitsProcessor(self.config)
-            },
-            # use_gpu_direct_storage=True,
-            # cuda_graph_mode=True,
+            # kv_cache_free_gpu_memory_fraction=0.5, # For CPP implementation only
+            # logits_processor_map={
+            #     "delay_pattern_logit_processor": DelayPatternLogitsProcessor(self.config)
+            # }, # For CPP implementation only
+            # use_gpu_direct_storage=True, # For CPP implementation only
+            # cuda_graph_mode=True, # For CPP implementation only
         )
-        logging.info("HiggsAudioModelRunner.from_dir() returned successfully.")
 
         # Preload the part of the input that doesn't change
         if self.reference_audio and self.audio_tokenizer:
@@ -617,15 +599,24 @@ class HiggsAudioInfer:
                 raise FileNotFoundError(f"Reference audio file not found: {self.reference_audio}")
 
             audio_ids = self.audio_tokenizer.encode(self.reference_audio)
-
+            np.savetxt(
+                "2.txt",
+                audio_ids.view(8, -1).cpu(),
+                delimiter=",",
+                fmt="%d",
+            )
             # Apply delay pattern
             audio_ids = _build_delay_pattern_mask(
                 audio_ids,
-                bos_token_id=self.stream_bos_id,
-                pad_token_id=self.stream_eos_id,
+                bos_token_id=self.config.audio_stream_bos_id,
+                pad_token_id=self.config.audio_stream_eos_id,
             ).unsqueeze(-1)
-            audio_ids = (audio_ids).flatten()
-
+            np.savetxt(
+                "3.txt",
+                audio_ids.view(8, -1).cpu(),
+                delimiter=",",
+                fmt="%d",
+            )
             # Format with reference audio (voice cloning) following Higgs Audio expected format
             # Don't change this!
             pre_audio_input = (
@@ -689,50 +680,49 @@ class HiggsAudioInfer:
         )
         next_audio_token = torch.full(
             (self.config.num_codebooks,),
-            self.stream_bos_id,
+            self.config.audio_stream_bos_id,
             dtype=torch.long,
             device=self.device,
         ).flatten()
 
         input_ids = self.tokenizer.encode(text_input, return_tensors="pt").to(self.device).flatten()
         input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
+        max_new_tokens = self.config.max_num_tokens - input_ids.shape[0]
         self.config.audio_out_start = input_ids.shape[0]
-        max_new_tokens = self.max_num_tokens - input_ids.shape[0]
 
         with torch.no_grad():
-            # Calculate flattened EOS token ID: for any codebook, EOS=1025
-            # In flattened vocab: codebook_0_eos = 0*codebook_size + 1025 = 1025
-            flattened_eos_id = self.stream_eos_id  # 1025, which is within [0, 8208)
-
             outputs = self.runner.generate(
                 batch_input_ids=[input_ids],
+                # logits_processor_names=["delay_pattern_logit_processor"], # This is the CPP implementation
+                logits_processor=DelayPatternLogitsProcessor(
+                    self.config
+                ),  # This is the Python implementation
+                end_id=0,
+                pad_id=self.config.pad_token_id,
                 max_new_tokens=max_new_tokens,
-                temperature=0.7,
-                top_k=0,  # disable top-k, rely on top-p
-                top_p=0.9,
-                repetition_penalty=1.0,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
-                end_id=-1,  # ignore global EOS; rely on per-codebook EOS handling
-                logits_processor_names=["delay_pattern_logit_processor"],
+                temperature=1.0,
+                top_k=50,
+                top_p=0.95,
             )
 
-        audio_tokens = outputs[0, 0, self.config.audio_out_start :]
+        audio_tokens = outputs[0, 0, input_ids.shape[0] :]
 
         # Debug: show some generated tokens
         print(f"Total generated tokens: {len(audio_tokens)}")
         print(f"Raw audio tokens (first 50): {audio_tokens[:50].tolist()}")
         print(f"Raw audio tokens (last 50): {audio_tokens[-50:].tolist()}")
         print(f"Token range: min={audio_tokens.min().item()}, max={audio_tokens.max().item()}")
-        print(f"Expected flattened range: [0, {self.num_codebooks * self.codebook_size - 1}]")
+        print(
+            f"Expected flattened range: [0, {self.config.num_codebooks * self.config.codebook_size - 1}]"
+        )
 
         # Count different token types
-        flat_max = self.num_codebooks * self.codebook_size
+        flat_max = self.config.num_codebooks * self.config.codebook_size
         is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
-        eos_tokens = audio_tokens % self.codebook_size == self.stream_eos_id
-        bos_tokens = audio_tokens % self.codebook_size == self.stream_bos_id
+        eos_tokens = audio_tokens % self.config.codebook_size == self.config.audio_stream_eos_id
+        bos_tokens = audio_tokens % self.config.codebook_size == self.config.audio_stream_bos_id
         content_tokens = (
-            audio_tokens % self.codebook_size < self.stream_bos_id
+            audio_tokens % self.config.codebook_size < self.config.audio_stream_bos_id
         ) & is_flattened_audio
 
         print(f"Token analysis:")
@@ -742,12 +732,12 @@ class HiggsAudioInfer:
         print(f"  EOS tokens: {eos_tokens.sum().item()}")
         # Map flattened audio token ids to local [0..codebook_size-1] space (do not drop BOS/EOS yet)
         if isinstance(audio_tokens, torch.Tensor):
-            flat_max = self.num_codebooks * self.codebook_size
+            flat_max = self.config.num_codebooks * self.config.codebook_size
             is_flattened_audio = (audio_tokens >= 0) & (audio_tokens < flat_max)
             audio_tokens = audio_tokens[is_flattened_audio]
             if audio_tokens.numel() == 0:
                 raise RuntimeError("No valid audio tokens found after filtering.")
-            local_ids = audio_tokens % self.codebook_size
+            local_ids = audio_tokens % self.config.codebook_size
         else:
             raise RuntimeError("Unexpected type for audio tokens.")
 
@@ -770,32 +760,32 @@ class HiggsAudioInfer:
         # Expect generated_ids to be local token ids in [0..codebook_size-1] including BOS/EOS
         local_ids = generated_ids
         # Ensure we have a multiple of num_codebooks for proper reshaping into frames
-        remainder = local_ids.numel() % self.num_codebooks
+        remainder = local_ids.numel() % self.config.num_codebooks
         if remainder != 0:
             local_ids = local_ids[:-remainder]
         if local_ids.numel() == 0:
             raise RuntimeError("No complete frames to decode after alignment.")
 
         # Reshape into frames (num_frames, num_codebooks)
-        num_frames = local_ids.numel() // self.num_codebooks
-        frames = local_ids.view(num_frames, self.num_codebooks)
+        num_frames = local_ids.numel() // self.config.num_codebooks
+        frames = local_ids.view(num_frames, self.config.num_codebooks)
 
         # Per-codebook trimming to revert delay pattern:
         # - Remove the first c tokens for codebook c (initial BOS delay)
         # - Stop at first EOS if present
         codebook_seqs = []
         min_len = None
-        for c in range(self.num_codebooks):
+        for c in range(self.config.num_codebooks):
             seq = frames[:, c]
             # Trim leading delay by codebook index
             seq = seq[c:]
             # Find EOS index if any (value == stream_eos_id)
-            eos_positions = torch.nonzero(seq == self.stream_eos_id, as_tuple=False)
+            eos_positions = torch.nonzero(seq == self.config.audio_stream_eos_id, as_tuple=False)
             if eos_positions.numel() > 0:
                 end = eos_positions[0].item()
                 seq = seq[:end]
             # Keep content tokens only for decoder (0..1023)
-            seq = seq[seq < self.stream_bos_id]
+            seq = seq[seq < self.config.audio_stream_bos_id]
             if min_len is None:
                 min_len = seq.numel()
             else:
@@ -808,11 +798,11 @@ class HiggsAudioInfer:
         # Truncate all codebooks to the same length
         codes_for_decoder = torch.stack([s[:min_len] for s in codebook_seqs], dim=0)
         print(
-            f"Final codes shape: {codes_for_decoder.shape} (should be {self.num_codebooks} x {min_len})"
+            f"Final codes shape: {codes_for_decoder.shape} (should be {self.config.num_codebooks} x {min_len})"
         )
 
         # Clamp to valid content range
-        codes_for_decoder = torch.clamp(codes_for_decoder, 0, self.stream_bos_id - 1)
+        codes_for_decoder = torch.clamp(codes_for_decoder, 0, self.config.audio_stream_bos_id - 1)
 
         try:
             # Decode to waveform

@@ -62,6 +62,9 @@ def main():
     build_config.plugin_config.dtype = "bfloat16"
     build_config.plugin_config.gpt_attention_plugin = "bfloat16"
     build_config.plugin_config.gemm_plugin = "bfloat16"
+    build_config.max_beam_width = 1
+
+    # build_config.enable_debug_output = True
     # build_config.plugin_config.use_fp8_context_fmha = True
     # build_config.plugin_config._multiple_profiles = True
     # build_config.strongly_typed = False

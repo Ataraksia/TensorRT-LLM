@@ -2,6 +2,8 @@
 # ruff: noqa
 """TensorRT-LLM implementation of Higgs Audio multimodal model."""
 
+import tensorrt as trt
+
 import builtins
 from tkinter import NO
 import librosa
@@ -20,9 +22,11 @@ from torch import nn
 import torchaudio
 import torch.nn.functional as F
 
+
 from tensorrt_llm.bindings import INT32, ModelConfig
 from tensorrt_llm.mapping import Mapping
 
+from tensorrt_llm.models.generation_mixin import GenerationMixin
 from tensorrt_llm.models.model_weights_loader import ModelWeightsLoader
 from tensorrt_llm.models.modeling_utils import (
     DecoderLayerList,
@@ -45,6 +49,7 @@ from tensorrt_llm.functional import (
     gather_last_token_logits,
     int32_array,
     nonzero,
+    not_op,
     op_or,
     pad,
     shape,
@@ -217,11 +222,27 @@ class HiggsAudioTransformer(Module):
 
         self.first_pass = True
 
+    def _calculate_audio_mask(self, input_ids, position_ids: Tensor):
+        """Calculate the audio token mask based on position ids."""
+        #     # audio_in_start = nonzero(input_ids == self.config.audio_bos_id).flatten()
+        #     # audio_in_end = nonzero(input_ids == self.config.audio_eos_id).flatten()
+        #     # audio_out_start = nonzero(input_ids == self.config.audio_out_bos_id).flatten()
+        #     # audio_mask = op_or(
+        #     #     op_and(
+        #     #         position_ids >= audio_in_start,
+        #     #         position_ids <= audio_in_end,
+        #     #     ),
+        #     #     position_ids >= audio_out_start,
+        #     # )
+        #     audio_mask = self.config.audio_out_start >= position_ids
+        #     # self.first_pass = False
+        audio_mask = position_ids >= self.config.audio_out_start
+        return audio_mask  # Shape: (seq_len,)
+
     def _embed_audio_ids(self, audio_ids: Tensor):
         """Embed the audio ids"""
         # Simply repeat the audio_ids for each codebook
         audio_ids = audio_ids.unsqueeze(0)  # Shape: (1, seq_len)
-
         # Create codebook shifts
         codebook_shift = (
             arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
@@ -229,26 +250,9 @@ class HiggsAudioTransformer(Module):
 
         # Broadcast addition will handle the expansion automatically
         shifted_ids = audio_ids + codebook_shift  # Shape: (num_codebooks, seq_len)
-
         # Get embeddings and sum
         audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0)
         return audio_embed  # Shape: (seq_len, embedding_dim)
-
-    # def _calculate_audio_mask(self, input_ids, position_ids: Tensor):
-    #     """Calculate the audio token mask based on position ids."""
-    #     # audio_in_start = nonzero(input_ids == self.config.audio_bos_id).flatten()
-    #     # audio_in_end = nonzero(input_ids == self.config.audio_eos_id).flatten()
-    #     # audio_out_start = nonzero(input_ids == self.config.audio_out_bos_id).flatten()
-    #     # audio_mask = op_or(
-    #     #     op_and(
-    #     #         position_ids >= audio_in_start,
-    #     #         position_ids <= audio_in_end,
-    #     #     ),
-    #     #     position_ids >= audio_out_start,
-    #     # )
-    #     audio_mask = self.config.audio_out_start >= position_ids
-    #     # self.first_pass = False
-    #     return audio_mask  # Shape: (seq_len,)
 
     def forward(
         self,
@@ -261,15 +265,12 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-        # Use a simple position-based mask: everything from audio_out_start onward
-        # is treated as audio tokens. test.py sets this before generation.
-        audio_mask = position_ids >= self.config.audio_out_start
-
-        audio_ids = where(audio_mask, input_ids, 0)
+        mask = self._calculate_audio_mask(input_ids, position_ids)
+        audio_ids = where(mask == 1, input_ids, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
-        text_ids = where(audio_mask, 0, input_ids)
+        text_ids = where(mask == 0, input_ids, 0)
         text_embed = self.vocab_embedding(text_ids)
-        input_embed = where(audio_mask.unsqueeze(-1), audio_embed, text_embed)
+        input_embed = where(mask.unsqueeze(-1), audio_embed, text_embed)
 
         hidden_states = self.layers(
             hidden_states=input_embed,
@@ -277,7 +278,7 @@ class HiggsAudioTransformer(Module):
             attention_mask=attention_mask,
             kv_cache_params=kv_cache_params,
             attention_params=attention_params,
-            vision_token_mask=audio_mask.unsqueeze(-1),
+            vision_token_mask=mask.unsqueeze(-1),
         )
 
         if use_cache:
