@@ -176,7 +176,6 @@ She has a bright, high-pitched voice.<|scene_desc_end|><|eot_id|>
 - `test.py` - Inference and End-to-end validation using speech-to-text and WER
 - `build_engine.py` - rebuild the engine
 - `delay_pattern_logits_processor.py` - Custom logits processor implementing delay pattern for codebooks
-- `higgs_audio_model_runner.py` - Custom model runner for Higgs Audio - not currently used
 - `higgs_audio_transformers.py` - condensed Higgs Audio Transformers implementation
 - `higgs_audio_vllm.py` - condensed Higgs Audio vLLM implementation
 
