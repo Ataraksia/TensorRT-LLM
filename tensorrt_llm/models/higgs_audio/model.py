@@ -61,8 +61,6 @@ from tensorrt_llm.functional import (
     concat,
     index_select,
     op_and,
-    __ge__,
-    __le__,
 )
 from tensorrt_llm.layers import (
     MLP,
@@ -199,6 +197,7 @@ class HiggsAudioTransformer(Module):
     def __init__(self, config: HiggsAudioConfig):
         super().__init__()
         self.config = config
+        self.saved_input_embeddings = []
 
         self.vocab_embedding = Embedding(
             num_embeddings=self.config.text_vocab_size,
@@ -222,36 +221,17 @@ class HiggsAudioTransformer(Module):
 
         self.first_pass = True
 
-    def _calculate_audio_mask(self, input_ids, position_ids: Tensor):
-        """Calculate the audio token mask based on position ids."""
-        #     # audio_in_start = nonzero(input_ids == self.config.audio_bos_id).flatten()
-        #     # audio_in_end = nonzero(input_ids == self.config.audio_eos_id).flatten()
-        #     # audio_out_start = nonzero(input_ids == self.config.audio_out_bos_id).flatten()
-        #     # audio_mask = op_or(
-        #     #     op_and(
-        #     #         position_ids >= audio_in_start,
-        #     #         position_ids <= audio_in_end,
-        #     #     ),
-        #     #     position_ids >= audio_out_start,
-        #     # )
-        #     audio_mask = self.config.audio_out_start >= position_ids
-        #     # self.first_pass = False
-        audio_mask = position_ids >= self.config.audio_out_start
-        return audio_mask  # Shape: (seq_len,)
-
-    def _embed_audio_ids(self, audio_ids: Tensor):
-        """Embed the audio ids"""
-        # Simply repeat the audio_ids for each codebook
-        audio_ids = audio_ids.unsqueeze(0)  # Shape: (1, seq_len)
-        # Create codebook shifts
-        codebook_shift = (
-            arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
-        ).unsqueeze(-1)  # Shape: (num_codebooks, 1)
-
-        # Broadcast addition will handle the expansion automatically
+    def _embed_audio_ids(self, audio_ids: Tensor, codebook_idx: int = -1):
+        if codebook_idx == -1:
+            codebook_shift = (
+                arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
+            )
+        else:
+            codebook_shift = (
+                constant(np.full((1,), codebook_idx, dtype=np.int32)) * self.config.codebook_size
+            )
         shifted_ids = audio_ids + codebook_shift  # Shape: (num_codebooks, seq_len)
-        # Get embeddings and sum
-        audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0)
+        audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0).unsqueeze(0)
         return audio_embed  # Shape: (seq_len, embedding_dim)
 
     def forward(
@@ -265,12 +245,21 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-        mask = self._calculate_audio_mask(input_ids, position_ids)
-        audio_ids = where(mask == 1, input_ids, 0)
-        audio_embed = self._embed_audio_ids(audio_ids)
-        text_ids = where(mask == 0, input_ids, 0)
-        text_embed = self.vocab_embedding(text_ids)
-        input_embed = where(mask.unsqueeze(-1), audio_embed, text_embed)
+
+        if input_ids.shape[0] > 1:
+            mask = self.config.audio_in_end >= position_ids >= self.config.audio_in_start
+            audio_ids = where(mask == 1, input_ids, 0)
+            audio_embed = self._embed_audio_ids(audio_ids)
+            text_ids = where(mask == 0, input_ids, 0)
+            text_embed = self.vocab_embedding(text_ids)
+            input_embed = where(mask, audio_embed, text_embed)
+        else:
+            mask = position_ids > self.config.audio_out_start
+            input_embed = self._embed_audio_ids(input_ids, len(self.saved_input_embeddings))
+            self.saved_input_embeddings.append(input_embed)
+            if len(self.saved_input_embeddings) == self.config.num_codebooks:
+                input_embed = sum(torch.cat(self.saved_input_embeddings), dim=0).unsqueeze(0)
+                self.self.saved_input_embeddings = []
 
         hidden_states = self.layers(
             hidden_states=input_embed,
