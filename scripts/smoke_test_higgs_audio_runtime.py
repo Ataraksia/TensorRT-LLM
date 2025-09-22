@@ -64,8 +64,9 @@ def main():
         kv_cache_free_gpu_memory_fraction=0.5,
     )
 
-    config = HiggsAudioConfig()
-    end_id = config.audio_eos_id  # audio eos
+    config = HiggsAudioConfig.from_hugging_face()
+    # For audio-only head, use -1 to disable early stop since end_id must be < audio vocab (8208)
+    end_id = -1
     pad_id = config.pad_token_id
 
     # Use the same prompt style as in the model's runner (no audio reference for simplicity)

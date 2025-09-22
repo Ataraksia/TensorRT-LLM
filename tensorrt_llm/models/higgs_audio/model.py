@@ -222,17 +222,22 @@ class HiggsAudioTransformer(Module):
         self.first_pass = True
 
     def _embed_audio_ids(self, audio_ids: Tensor, codebook_idx: int = -1):
+        """
+        Embed audio token ids.
+
+        For prefill (codebook_idx == -1) with stacked codebook ids per time step, the caller should
+        pass a tensor shaped (num_codebooks, seq_len) and this function will sum the embeddings.
+
+        For decode (codebook_idx != -1), the input is a flattened id in [0, num_codebooks*codebook_size),
+        already pointing to the correct codebook slice; we embed directly without extra shift.
+        """
         if codebook_idx == -1:
-            codebook_shift = (
-                arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
-            )
+            # Expect shape (num_codebooks, seq_len), sum across codebooks
+            audio_embed = sum(self.codebook_embeddings(audio_ids), dim=0).unsqueeze(0)
+            return audio_embed
         else:
-            codebook_shift = (
-                constant(np.full((1,), codebook_idx, dtype=np.int32)) * self.config.codebook_size
-            )
-        shifted_ids = audio_ids + codebook_shift  # Shape: (num_codebooks, seq_len)
-        audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0).unsqueeze(0)
-        return audio_embed  # Shape: (seq_len, embedding_dim)
+            # Decode step: ids are flattened across codebooks; embed directly
+            return self.codebook_embeddings(audio_ids)
 
     def forward(
         self,
@@ -247,19 +252,14 @@ class HiggsAudioTransformer(Module):
         """Forward pass for Higgs Audio transformer with multimodal support."""
 
         if input_ids.shape[0] > 1:
-            mask = self.config.audio_in_end >= position_ids >= self.config.audio_in_start
-            audio_ids = where(mask == 1, input_ids, 0)
-            audio_embed = self._embed_audio_ids(audio_ids)
-            text_ids = where(mask == 0, input_ids, 0)
-            text_embed = self.vocab_embedding(text_ids)
-            input_embed = where(mask, audio_embed, text_embed)
+            # Prefill: treat entire prompt as text tokens (no audio-in in this path)
+            input_embed = self.vocab_embedding(input_ids)
+            mask = constant(np.array([False], dtype=np.bool_))
         else:
-            mask = position_ids > self.config.audio_out_start
-            input_embed = self._embed_audio_ids(input_ids, len(self.saved_input_embeddings))
-            self.saved_input_embeddings.append(input_embed)
-            if len(self.saved_input_embeddings) == self.config.num_codebooks:
-                input_embed = sum(torch.cat(self.saved_input_embeddings), dim=0).unsqueeze(0)
-                self.self.saved_input_embeddings = []
+            # Decode: we are generating audio; embed flattened audio token id directly
+            input_embed = self._embed_audio_ids(input_ids, codebook_idx=0)
+            # Mark audio tokens after audio_out_start to use audio MLP path
+            mask = position_ids >= constant(np.array([self.config.audio_out_start], dtype=np.int32))
 
         hidden_states = self.layers(
             hidden_states=input_embed,
