@@ -1,19 +1,21 @@
---extra-index-url https://download.pytorch.org/whl/cu128
-
-accelerate>=0.25.0
+--extra-index-url https://download.pytorch.org/whl/cu129
+-c constraints.txt
+accelerate>=1.7.0
 build
 colored
-cuda-python # Do not override the custom version of cuda-python installed in the NGC PyTorch image.
+cuda-python>=12,<13  # <For CUDA 12.9>
+# cuda-python>=12
 diffusers>=0.27.0
 lark
 mpi4py
 numpy<2
-onnx>=1.12.0
+onnx>=1.18.0
 onnx_graphsurgeon>=0.5.2
 openai
 polygraphy
 psutil
-nvidia-ml-py>=12,<13
+# nvidia-ml-py>=12,<13  # <For CUDA 12.9>
+nvidia-ml-py>=12
 # Just a wrapper since nvidia-modelopt requires pynvml
 pynvml==12.0.0
 pulp
@@ -21,16 +23,23 @@ pandas
 h5py==3.12.1
 StrEnum
 sentencepiece>=0.1.99
-tensorrt~=10.11.0
-# https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-25-05.html#rel-25-05 uses 2.8.0a0.
-torch>=2.7.1,<=2.8.0a0
-torchvision
-nvidia-modelopt[torch]~=0.31.0
+# tensorrt>=10.11.0,<=10.13.0  # <For CUDA 12.9>
+tensorrt>=10.13.0
+# https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-25-08.html#rel-25-08 uses 2.8.0a0.
+# torch>=2.7.1,<=2.8.0a0  # <For CUDA 12.9>
+torch==2.8.0+cu129
+torchvision==0.23.0+cu129
+nvidia-modelopt[torch]>=0.33.0
+# https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-25-08.html#rel-25-08 uses 2.27.7
 nvidia-nccl-cu12
-nvidia-cuda-nvrtc-cu12
-transformers~=4.51.1
+nvidia-cuda-nvrtc-cu12  # <For CUDA 12.9>
+# nvidia-cuda-nvrtc
+transformers==4.55.0
+prometheus_client
+prometheus_fastapi_instrumentator
 pydantic>=2.9.1
-pydantic-settings
+pydantic-settings[yaml]
+omegaconf
 pillow==10.3.0
 wheel<=0.45.1
 optimum
@@ -48,9 +57,11 @@ setuptools<80
 ordered-set
 peft
 einops
-flashinfer-python==0.2.5
+flashinfer-python>=0.3.0
 opencv-python-headless
-xgrammar==0.1.18
+xgrammar==0.1.21
+llguidance==0.7.29
+jsonschema
 backoff
 nvtx
 matplotlib # FIXME: this is added to make nvtx happy
@@ -58,372 +69,9 @@ meson
 ninja
 etcd3
 blake3
-llguidance==0.7.29
-# absl-py
-# accelerate
-# aenum
-# aiobotocore
-# aiohappyeyeballs
-# aiohttp
-# aioitertools
-# aiosignal
-# alembic
-# annotated-types
-# antlr4-python3-runtime
-# anyio
-# argbind
-# astor
-# asttokens
-# attrs
-# audioread
-# autoawq
-# autopep8
-# av
-# backoff
-# bandit
-# blake3
-# blobfile
-# boto3
-# botocore
-# build
-# cachetools
-# cbor2
-# certifi
-# cffi
-# cfgv
-# chardet
-# charset-normalizer
-# choreographer
-# click
-# click-option-group
-# cloudpickle
-# cmake
-# colorama
-# colored
-# coloredlogs
-# colorlog
-# compressed-tensors
-# conan
-# contourpy
-# coverage
-# cppimport
-# cramjam
-# cuda-bindings
-# cuda-pathfinder
-# cuda-python
-# cupy-cuda12x
-# cycler
-# dac
-# dacite
-# dataproperty
-# datasets
-# decorator
-# depyf
-# descript-audio-codec
-# descript-audiotools
-# diffusers
-# dill
-# diskcache
-# distlib
-# distro
-# dllist
-# docstring-parser
-# einops
-# einx
-# etcd3
-# evaluate
-# execnet
-# executing
-# fastapi
-# fastembed
-# fasteners
-# fastparquet
-# fastrlock
-# ffmpy
-# filelock
-# fire
-# flashinfer-python
-# flatbuffers
-# flatten-dict
-# fonttools
-# frozendict
-# frozenlist
-# fsspec
-# future
-# genai-perf
-# genson
-# gguf
-# git-filter-repo
-# graphviz
-# greenlet
-# grpcio
-# h11
-# h2
-# h5py
-# hf-xet
-# hpack
-# httpcore
-# httpx
-# huggingface-hub
-# humanfriendly
-# hyperframe
-# hyperpyyaml
-# identify
-# idna
-# importlib-metadata
-# importlib-resources
-# iniconfig
-# ipython
-# ipython-pygments-lexers
-# jedi
-# jieba
-# jinja2
-# jiter
-# jiwer
-# jmespath
-# joblib
-# json-repair
-# jsonlines
-# jsonpath-ng
-# jsonschema
-# jsonschema-specifications
-# julius
-# kaleido
-# kiwisolver
-# langid
-# lark
-# lazy-loader
-# librosa
-# llguidance
-# llvmlite
-# lm-eval
-# logistro
-# loguru
-# lxml
-# mako
-# markdown
-# markdown-it-py
-# markdown2
-# markupsafe
-# matplotlib
-# matplotlib-inline
-# mbstrdecoder
-# mdurl
-# meson
-# mmh3
-# more-itertools
-# mpi4py
-# mpmath
-# msgpack
-# msgspec
-# multidict
-# multiprocess
-# mypy
-# mypy-extensions
-# narwhals
-# networkx
-# ninja
-# nltk
-# nodeenv
-# numba
-# numexpr
-# numpy==2.2.0
-# nvidia-cublas-cu12==12.8.3.14
-# nvidia-cuda-cupti-cu12==12.8.57
-# nvidia-cuda-nvrtc-cu12==12.8.61
-# nvidia-cuda-runtime-cu12==12.8.57
-# nvidia-cuda-runtime-cu13==0.0.0a0
-# nvidia-cudnn-cu12==9.7.1.26
-# nvidia-cudnn-frontend==1.14.0
-# nvidia-cufft-cu12==11.3.3.41
-# nvidia-cufile-cu12==1.13.0.11
-# nvidia-curand-cu12==10.3.9.55
-# nvidia-cusolver-cu12==11.7.2.55
-# nvidia-cusparse-cu12==12.5.7.53
-# nvidia-cusparselt-cu12==0.6.3
-# nvidia-ml-py==12.575.51
-# nvidia-modelopt==0.29.0
-# nvidia-modelopt-core==0.29.0
-# nvidia-nccl-cu12==2.26.2
-# nvidia-nvjitlink-cu12==12.8.61
-# nvidia-nvtx-cu12==12.8.55
-# nvtx==0.2.13
-# omegaconf
-# onnx
-# onnx-graphsurgeon
-# onnxconverter-common
-# onnxruntime
-# onnxruntime-gpu
-# openai
-# opencv-python-headless
-# optimum
-# optuna
-# ordered-set
-# orjson
-# outlines
-# outlines-core
-# oyaml
-# packaging
-# pandas
-# parameterized
-# parso
-# partial-json-parser
-# patch-ng
-# pathspec
-# pathvalidate
-# patsy
-# pbr
-# peft
-# pexpect
-# pillow
-# pip
-# platformdirs
-# plotly
-# pluggy
-# ply
-# polygraphy
-# pooch
-# portalocker
-# pre-commit
-# prometheus-client
-# prometheus-fastapi-instrumentator
-# prompt-toolkit
-# propcache
-# protobuf
-# psutil
-# ptyprocess
-# pulp
-# pure-eval
-# py
-# py-cpuinfo
-# py-rust-stemmers
-# pyarrow
-# pybase64
-# pybind11
-# pybind11-stubgen
-# pycodestyle
-# pycparser
-# pycryptodomex
-# pycuda
-# pydantic
-# pydantic-core
-# pydantic-settings
-# pydub
-# pygments
-# pyloudnorm
-# pynvml
-# pyparsing
-# pyproject-hooks
-# pystoi
-# pytablewriter
-# pytest
-# pytest-asyncio
-# pytest-cov
-# pytest-csv
-# pytest-env
-# pytest-forked
-# pytest-mock
-# pytest-rerunfailures
-# pytest-split
-# pytest-threadleak
-# pytest-timeout
-# pytest-xdist
-# python-dateutil
-# python-dotenv
-# python-rapidjson
-# pytools
-# pytz
-# pyyaml
-# pyzmq
-# qdrant-client
-# randomname
-# rapidfuzz
-# referencing
-# regex
-# requests
-# responses
-# rich
-# rouge
-# rouge-score
-# rpds-py
-# ruamel-yaml
-# ruamel-yaml-clib
-# ruff
-# s3fs
-# s3transfer
-# sacrebleu
-# safetensors
-# scikit-learn
-# scipy
-# sentencepiece
-# setproctitle
-# setuptools
-# shellingham
-# silero-vad
-# simplejson
-# siphash24
-# six
-# sniffio
-# sounddevice
-# soundfile
-# soxr
-# sqlalchemy
-# sqlitedict
-# stack-data
-# starlette
-# statsmodels
-# stevedore
-# strenum
-# sympy
-# tabledata
-# tabulate
-# tcolorpy
-# tenacity
-# tensorboard
-# tensorboard-data-server
-# tensorrt==10.12.0.36
-# tensorrt-cu12==10.12.0.36
-# tensorrt-cu12-bindings==10.12.0.36
-# tensorrt-cu12-libs==10.12.0.36
-# tensorrt-cu13==10.13.2.6
-# tensorrt-cu13-bindings==10.13.2.6
-# tensorrt-cu13-libs==10.13.2.6
-# termcolor
-# threadpoolctl
-# tiktoken
-# tokenizers
-# toml
-# torch==2.7.1+cu128
-# torch-stoi==0.2.3
-# torchaudio==2.7.1+cu128
-# torchprofile==0.0.4
-# torchvision==0.22.1+cu128
-# tornado
-# tqdm
-# tqdm-multiprocess
-# traitlets
-# transformers
-# triton==3.3.1
-# tritonclient
-# typepy
-# typer
-# typing-extensions
-# typing-inspection
-# tzdata
-# urllib3
-# uvicorn
-# uvloop
-# vector-quantize-pytorch
-# virtualenv
-# watchfiles
-# wayland
-# wcwidth
-# werkzeug
-# wheel
-# word2number
-# wrapt
-# xgrammar
-# xxhash
-# yarl
-# zipp
-# zstandard
+soundfile
+triton==3.4.0; platform_machine == "x86_64"
+tiktoken
+blobfile
+openai-harmony==0.0.4
+# nvidia-cutlass-dsl==4.1.0; python_version >= "3.12"
