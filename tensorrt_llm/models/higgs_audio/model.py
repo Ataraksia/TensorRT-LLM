@@ -221,36 +221,17 @@ class HiggsAudioTransformer(Module):
 
         self.first_pass = True
 
-    def _embed_audio_ids(self, audio_ids: Tensor, codebook_idx: int = -1):
-        """Embeds audio ids for one or all codebooks.
+    def _embed_audio_ids(self, audio_ids: Tensor):
+        """Embeds audio ids for all codebooks."""
 
-        Inputs can be either:
-        - Local per-codebook ids in [0, codebook_size), when codebook_idx != -1
-        - Global flattened ids in [0, num_codebooks * codebook_size)
+        # Expecting shape (num_codebooks, seq_len) local ids; create vector of shifts
+        codebook_shift = (
+            arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
+        ).unsqueeze(-1)
+        shifted_ids = audio_ids + codebook_shift  # broadcast to (num_codebooks, seq_len)
+        audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0)
 
-        To avoid out-of-range indices, when a single codebook index is provided
-        (autoregressive step), normalize incoming ids to local by modulo and then
-        re-apply the intended codebook shift.
-        """
-        if codebook_idx == -1:
-            # Expecting shape (num_codebooks, seq_len) local ids; create vector of shifts
-            codebook_shift = (
-                arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
-            )
-            shifted_ids = audio_ids + codebook_shift  # broadcast to (num_codebooks, seq_len)
-            audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0).unsqueeze(0)
-            return audio_embed
-        else:
-            # Autoregressive single-token path. TRT sampler returns GLOBAL ids over
-            # [0, num_codebooks * codebook_size). Convert to LOCAL first, then shift
-            # according to the rotating codebook index to stay within bounds.
-            local_ids = audio_ids % self.config.codebook_size
-            cb_shift = (
-                constant(np.full((1,), codebook_idx, dtype=np.int32)) * self.config.codebook_size
-            )
-            shifted_ids = local_ids + cb_shift  # shape matches input ids
-            audio_embed = self.codebook_embeddings(shifted_ids)
-            return audio_embed
+        return audio_embed
 
     def forward(
         self,
@@ -264,23 +245,14 @@ class HiggsAudioTransformer(Module):
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
 
-        if input_ids.shape[0] > 1:
-            mask = self.config.audio_in_end >= position_ids >= self.config.audio_in_start
-            audio_ids = where(mask == 1, input_ids, 0)
-            audio_embed = self._embed_audio_ids(audio_ids)
-            text_ids = where(mask == 0, input_ids, 0)
-            text_embed = self.vocab_embedding(text_ids)
-            input_embed = where(mask, audio_embed, text_embed)
-        else:
-            # During generation, we emit one token per step and rotate through
-            # codebooks. Embed that token into the corresponding codebook slot.
-            mask = position_ids > self.config.audio_out_start
-            input_embed = self._embed_audio_ids(input_ids, len(self.saved_input_embeddings))
-            self.saved_input_embeddings.append(input_embed)
-            if len(self.saved_input_embeddings) == self.config.num_codebooks:
-                # Sum embeddings from all codebooks to form the final token embedding
-                input_embed = sum(torch.cat(self.saved_input_embeddings, dim=0), dim=0).unsqueeze(0)
-                self.saved_input_embeddings = []
+        mask = (self.config.audio_in_end >= position_ids >= self.config.audio_in_start) or (
+            position_ids >= self.config.audio_out_start
+        )
+        audio_ids = where(mask == 1, input_ids, 0)
+        audio_embed = self._embed_audio_ids(audio_ids)
+        text_ids = where(mask == 0, input_ids, 0)
+        text_embed = self.vocab_embedding(text_ids)
+        input_embed = where(mask, audio_embed, text_embed)
 
         hidden_states = self.layers(
             hidden_states=input_embed,
