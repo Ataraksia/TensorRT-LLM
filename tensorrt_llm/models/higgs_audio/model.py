@@ -24,6 +24,7 @@ import torch.nn.functional as F
 
 
 from tensorrt_llm.bindings import INT32, ModelConfig
+from tensorrt_llm.layers.attention import minimum
 from tensorrt_llm.mapping import Mapping
 
 from tensorrt_llm.models.generation_mixin import GenerationMixin
@@ -42,7 +43,10 @@ from tensorrt_llm.functional import (
     Tensor,
     allgather,
     arange,
+    cast,
+    categorical_sample,
     constant,
+    constant_to_tensor_,
     cumsum,
     expand,
     expand_dims_like,
@@ -53,6 +57,7 @@ from tensorrt_llm.functional import (
     op_or,
     pad,
     shape,
+    softmax,
     unsqueeze,
     view,
     where,
@@ -61,6 +66,7 @@ from tensorrt_llm.functional import (
     concat,
     index_select,
     op_and,
+    slice,
 )
 from tensorrt_llm.layers import (
     MLP,
@@ -71,6 +77,7 @@ from tensorrt_llm.layers import (
     Embedding,
     KeyValueCacheParams,
     RmsNorm,
+    SpecDecodingParams,
 )
 import math
 import copy
@@ -244,7 +251,6 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-
         mask = (self.config.audio_in_end >= position_ids >= self.config.audio_in_start) or (
             position_ids >= self.config.audio_out_start
         )
@@ -252,7 +258,7 @@ class HiggsAudioTransformer(Module):
         audio_embed = self._embed_audio_ids(audio_ids)
         text_ids = where(mask == 0, input_ids, 0)
         text_embed = self.vocab_embedding(text_ids)
-        input_embed = where(mask, audio_embed, text_embed)
+        input_embed = where(mask.unsqueeze(-1), audio_embed, text_embed)
 
         hidden_states = self.layers(
             hidden_states=input_embed,
@@ -289,6 +295,21 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         )
 
         super().__init__(config, transformer, lm_head)
+
+    # def forward(self, *args, **kwargs):
+    #     """
+    #     0. run base model, get logits, hidden_states
+    #     """
+    #     from tensorrt_llm import default_net
+
+    #     lm_logits, hidden_states, all_hidden_states = super().forward(*args, **kwargs)
+
+    #     probs = softmax(lm_logits, dim=-1)
+
+    #     # Step 2: Sample token
+    #     next_token = categorical_sample(probs)
+
+    #     # return new_draft_tokens, new_draft_logits, probs
 
     @classmethod
     def from_hugging_face(

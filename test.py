@@ -36,64 +36,13 @@ from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 import logging
 
-from tensorrt_llm.runtime import LogitsProcessor, SamplingConfig
+from tensorrt_llm.runtime import SamplingConfig
 from tensorrt_llm.runtime import ModelRunnerCpp, ModelRunner
 
 load_dotenv()
 
 # Set up logging at the top level
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-
-class DelayPatternLogitsProcessor(LogitsProcessor):
-    """
-    A LogitsProcessor that enforces a delay pattern for multi-codebook audio generation,
-    inspired by the vLLM implementation for Higgs-Audio.
-
-    This processor is stateful and should be used for a single request at a time.
-    """
-
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.reset()
-
-    def reset(self):
-        """Resets the internal state of the processor for a new request."""
-        # Track the delay state like vLLM
-        self.num_delays = 0
-        self.num_eos_tokens = None
-        self.codebook_idx = 0
-
-    def __call__(
-        self,
-        req_id: int,
-        logits: torch.Tensor,
-        token_ids: List[List[int]],
-        stream_ptr: Optional[int],
-        client_id: Optional[int],
-    ) -> None:
-        """
-        Apply delay pattern constraints to logits during generation.
-        Implements the exact delay pattern from vLLM reference.
-        """
-        with torch.cuda.stream(torch.cuda.ExternalStream(stream_ptr)):
-            input_ids = token_ids[0]
-            logits = logits.view(-1)[0 : self.config.codebook_size]
-            if self.num_delays < self.config.num_codebooks - 1:
-                if self.num_delays < self.codebook_idx:
-                    logits[...] = -1
-                    logits[self.config.audio_stream_bos_id] = 0
-                self.num_delays += 1 if self.codebook_idx == self.config.num_codebooks - 1 else 0
-            if self.num_eos_tokens is not None or input_ids[-1] == self.config.audio_stream_eos_id:
-                self.num_eos_tokens = 0 if self.num_eos_tokens is None else self.num_eos_tokens
-                self.num_eos_tokens += 1 if self.codebook_idx == 0 else 0
-            if self.num_eos_tokens and self.num_eos_tokens >= self.config.num_codebooks:
-                logits[...] = -1
-                logits[self.config.audio_stream_eos_id] = 0
-                self.reset()
-            logits = logits.view(1, 1, -1)
-            self.codebook_idx = (self.codebook_idx + 1) % self.config.num_codebooks
 
 
 def _build_delay_pattern_mask(input_ids: torch.LongTensor, bos_token_id: int, pad_token_id: int):
@@ -617,14 +566,8 @@ class HiggsAudioInfer:
 
         self.audio_tokenizer = load_higgs_audio_tokenizer(self.audio_tokenizer_dir)
 
-        self.runner = ModelRunnerCpp.from_dir(
+        self.runner = ModelRunner.from_dir(
             engine_dir=self.engine_dir,
-            kv_cache_free_gpu_memory_fraction=0.5,  # For CPP implementation only
-            logits_processor_map={
-                "delay_pattern_logit_processor": DelayPatternLogitsProcessor(self.config)
-            },  # For CPP implementation only
-            # use_gpu_direct_storage=True, # For CPP implementation only
-            # cuda_graph_mode=True, # For CPP implementation only
         )
 
         # Preload the part of the input that doesn't change
@@ -743,15 +686,14 @@ class HiggsAudioInfer:
 
         with torch.no_grad():
             outputs = self.runner.generate(
-                batch_input_ids=[input_ids],
-                logits_processor_names=[
-                    "delay_pattern_logit_processor"
-                ],  # This is the CPP implementation
+                batch_input_ids=[input_ids]
                 end_id=0,
+                pad_id=self.config.pad_token_id,
                 max_new_tokens=max_new_tokens,
                 temperature=1.0,
                 top_k=50,
                 top_p=0.95,
+                num_beams=1,
             )
 
         audio_ids = outputs[0, 0, input_ids.shape[0] :]
