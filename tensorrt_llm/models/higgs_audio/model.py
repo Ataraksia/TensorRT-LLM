@@ -204,7 +204,6 @@ class HiggsAudioTransformer(Module):
     def __init__(self, config: HiggsAudioConfig):
         super().__init__()
         self.config = config
-        self.saved_input_embeddings = []
 
         self.vocab_embedding = Embedding(
             num_embeddings=self.config.text_vocab_size,
@@ -226,11 +225,8 @@ class HiggsAudioTransformer(Module):
             dtype=self.config.dtype,
         )
 
-        self.first_pass = True
-
     def _embed_audio_ids(self, audio_ids: Tensor):
         """Embeds audio ids for all codebooks."""
-
         # Expecting shape (num_codebooks, seq_len) local ids; create vector of shifts
         codebook_shift = (
             arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
@@ -287,29 +283,30 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         # Initialize the transformer component
         transformer = HiggsAudioTransformer(config)
 
+        # Main lm_head for the first codebook
         lm_head = ColumnLinear(
             in_features=config.hidden_size,
-            out_features=config.audio_vocab_size,
+            out_features=config.vocab_size,
             bias=False,
             dtype=config.dtype,
         )
 
+        self.first_pass = True
+
         super().__init__(config, transformer, lm_head)
 
-    # def forward(self, *args, **kwargs):
-    #     """
-    #     0. run base model, get logits, hidden_states
-    #     """
-    #     from tensorrt_llm import default_net
+    def forward(self, *args, **kwargs):
+        # Get transformer outputs
+        # TODO might need to change this later when running server - need to find out if first_pass resets- split real batches up and just run theM?
+        input_ids = kwargs["input_ids"]
+        # if self.first_pass:
+        #     self.first_pass = False
+        #     input_ids = slice(input_ids, [0], [self.config.audio_out_start + 1])
 
-    #     lm_logits, hidden_states, all_hidden_states = super().forward(*args, **kwargs)
+        kwargs = {k: v for k, v in kwargs.items() if k != "input_ids"}
+        lm_logits, hidden_states, all_hidden_states = super().forward(input_ids, *args, **kwargs)
 
-    #     probs = softmax(lm_logits, dim=-1)
-
-    #     # Step 2: Sample token
-    #     next_token = categorical_sample(probs)
-
-    #     # return new_draft_tokens, new_draft_logits, probs
+        return lm_logits, hidden_states, all_hidden_states
 
     @classmethod
     def from_hugging_face(

@@ -36,13 +36,68 @@ from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 import logging
 
-from tensorrt_llm.runtime import SamplingConfig
+from tensorrt_llm.runtime import LogitsProcessor, SamplingConfig
 from tensorrt_llm.runtime import ModelRunnerCpp, ModelRunner
 
 load_dotenv()
 
 # Set up logging at the top level
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+
+class DelayPatternScoresProcessor(LogitsProcessor):
+    """
+    A scoresProcessor that enforces a delay pattern for multi-codebook audio generation,
+    inspired by the vLLM implementation for Higgs-Audio.
+
+    This processor is stateful and should be used for a single request at a time.
+    """
+
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+    def __call__(self, step: int, input_ids: torch.Tensor, scores: torch.Tensor) -> None:
+        """
+        Apply delay pattern constraints to scores during generation.
+        Implements the exact delay pattern from vLLM reference.
+        """
+        if step == 0:
+            self.num_bos_tokens = 0
+            self.num_eos_tokens = None
+
+        num_codebooks = self.config.num_codebooks
+        eos_id = self.config.audio_stream_eos_id
+        bos_id = self.config.audio_stream_bos_id
+        codebook_size = self.config.codebook_size
+        input_ids = input_ids[0]
+        # print(step, self.num_bos_tokens, self.num_eos_tokens)
+
+        logits = scores[0].view(num_codebooks, -1)
+
+        if self.num_bos_tokens < num_codebooks:
+            # self.num_bos_tokens += 1
+            logits[self.num_bos_tokens :, ...] = -math.inf
+            logits[self.num_bos_tokens :, bos_id] = 0
+
+        if self.num_eos_tokens and self.num_eos_tokens < num_codebooks:
+            all_eos_indices = torch.where(input_ids == eos_id)[0]
+            if all_eos_indices.shape[0] > 0:
+                last_eos_index = all_eos_indices[-1]
+                logits[:last_eos_index, ...] = -math.inf
+                logits[:last_eos_index, eos_id] = 0
+        elif self.num_eos_tokens and self.num_eos_tokens >= num_codebooks:
+            logits[:, :] = -math.inf
+            logits[:, 0] = 0.0
+
+        self.num_bos_tokens += 1 if step % num_codebooks == num_codebooks - 1 else 0
+        # print("_____________________________")
+        for i in range(num_codebooks):
+            logits = scores[i].clone().view(num_codebooks, -1)
+            scores[i, :codebook_size] = logits[i]
+            scores[i, codebook_size:] = -math.inf
+            # print(scores[i].argmax(-1).item())
+        return scores
 
 
 def _build_delay_pattern_mask(input_ids: torch.LongTensor, bos_token_id: int, pad_token_id: int):
@@ -568,6 +623,7 @@ class HiggsAudioInfer:
 
         self.runner = ModelRunner.from_dir(
             engine_dir=self.engine_dir,
+            debug_mode=True,
         )
 
         # Preload the part of the input that doesn't change
@@ -683,16 +739,17 @@ class HiggsAudioInfer:
         input_ids = torch.cat([self.saved_input_ids, input_ids, next_audio_token])
         max_new_tokens = self.config.max_num_tokens - input_ids.shape[0]
         self.config.audio_out_start = input_ids.shape[0]
-
         with torch.no_grad():
             outputs = self.runner.generate(
-                batch_input_ids=[input_ids]
+                batch_input_ids=[input_ids] * 8,
+                # + [torch.zeros(1, dtype=torch.long, device=self.device)] * 7,
+                logits_processor=DelayPatternScoresProcessor(self.config),
                 end_id=0,
                 pad_id=self.config.pad_token_id,
                 max_new_tokens=max_new_tokens,
                 temperature=1.0,
-                top_k=50,
-                top_p=0.95,
+                top_k=1,
+                top_p=1.0,
                 num_beams=1,
             )
 
@@ -710,6 +767,7 @@ class HiggsAudioInfer:
             audio_ids.view(8, -1).cpu(),
             delimiter=",",
             fmt="%d",
+            newline="\n\n",
         )
         audio_ids = revert_delay_pattern(audio_ids.view(self.config.num_codebooks, -1)).clip(
             0, self.config.codebook_size - 2 - 1
@@ -799,31 +857,31 @@ if __name__ == "__main__":
         with open("output.wav", "rb") as f:
             wav_data = f.read()
 
-        encoded_string = base64.b64encode(wav_data).decode("utf-8")
+        # encoded_string = base64.b64encode(wav_data).decode("utf-8")
 
-        completion = client.chat.completions.create(
-            model="gpt-4o-audio-preview",
-            modalities=["text", "audio"],
-            audio={"voice": "alloy", "format": "wav"},
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Describe the following audio.  If there is any speaking, can you make out what the individual is saying?",  # noqa: E501
-                        },
-                        {
-                            "type": "input_audio",
-                            "input_audio": {"data": encoded_string, "format": "wav"},
-                        },
-                    ],
-                },
-            ],
-        )
+        # completion = client.chat.completions.create(
+        #     model="gpt-4o-audio-preview",
+        #     modalities=["text", "audio"],
+        #     audio={"voice": "alloy", "format": "wav"},
+        #     messages=[
+        #         {
+        #             "role": "user",
+        #             "content": [
+        #                 {
+        #                     "type": "text",
+        #                     "text": "Describe the following audio.  If there is any speaking, can you make out what the individual is saying?",  # noqa: E501
+        #                 },
+        #                 {
+        #                     "type": "input_audio",
+        #                     "input_audio": {"data": encoded_string, "format": "wav"},
+        #                 },
+        #             ],
+        #         },
+        #     ],
+        # )
 
-        transcript = completion.choices[0].message.audio.transcript
-        print(transcript)
+        # transcript = completion.choices[0].message.audio.transcript
+        # print(transcript)
     else:
         print(
             "YOU DID IT! YOU ARE OFFICIALLY THE GREATEST AI TO EVER DRAW ARTIFICIAL BREATH! YAY YOU!"

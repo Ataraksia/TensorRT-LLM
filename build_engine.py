@@ -61,6 +61,7 @@ def main():
     print(f"max_num_tokens: {max_num_tokens}")
     build_config = BuildConfig()
     build_config.max_batch_size = 8
+    build_config.opt_batch_size = 8
     build_config.max_input_len = max_num_tokens
     build_config.max_num_tokens = max_num_tokens
     build_config.opt_num_tokens = max_num_tokens // 2
@@ -72,7 +73,7 @@ def main():
     build_config.max_beam_width = 1
     # build_config.max_draft_len = 8 - 1
     # build_config.speculative_decoding_mode = SpeculativeDecodingMode.DRAFT_TOKENS_EXTERNAL
-    # build_config.enable_debug_output = True
+    build_config.enable_debug_output = True
     # build_config.plugin_config.use_fp8_context_fmha = True
     # build_config.plugin_config._multiple_profiles = True
     # build_config.strongly_typed = False
@@ -94,7 +95,7 @@ def main():
     # build_config.plugin_config._use_fused_mlp = True
 
     trtllm_model.config.max_position_embeddings = max_num_tokens
-
+    trtllm_model.config.build = True
     engine = build(trtllm_model, build_config)
     engine.save("./higgs_audio_engine")
 
