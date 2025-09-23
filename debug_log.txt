@@ -5561,3 +5561,1718 @@ Word error rate: 10.090909090909092
 The test was unsuccessful. The model did not generate the prompt accurately. You can use the audio judge that follows to determine if what is being outputted actually matches the Whisper transcription or is just gibberish.
 The audio contains a rhythmic percussion sound along with some background talking, but the speech is not very clear and seems muffled. It's hard to make out any specific words or phrases from this clip.
 [TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM] TensorRT-LLM version: 0.20.0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Rank 0 is using GPU 0
+[TensorRT-LLM][INFO] TRTGptModel maxNumSequences: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBatchSize: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBeamWidth: 1
+[TensorRT-LLM][INFO] TRTGptModel maxSequenceLen: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxDraftLen: 0
+[TensorRT-LLM][INFO] TRTGptModel mMaxAttentionWindowSize: (2048) * 28
+[TensorRT-LLM][INFO] TRTGptModel enableTrtOverlap: 0
+[TensorRT-LLM][INFO] TRTGptModel normalizeLogProbs: 1
+[TensorRT-LLM][INFO] TRTGptModel maxNumTokens: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxInputLen: 2047 = min(maxSequenceLen - 1, maxNumTokens) since context FMHA and usePackedInput are enabled
+[TensorRT-LLM][INFO] TRTGptModel If model type is encoder, maxInputLen would be reset in trtEncoderModel to maxInputLen: min(maxSequenceLen, maxNumTokens).
+[TensorRT-LLM][INFO] Capacity Scheduler Policy: GUARANTEED_NO_EVICT
+[TensorRT-LLM][INFO] Context Chunking Scheduler Policy: None
+[TensorRT-LLM][INFO] Loaded engine size: 6822 MiB
+[TensorRT-LLM][INFO] Engine load time 3936 ms
+[TensorRT-LLM][INFO] Inspecting the engine to identify potential runtime issues...
+[TensorRT-LLM][INFO] The profiling verbosity of the engine does not allow this analysis to proceed. Re-build the engine with 'detailed' profiling verbosity to get more diagnostics.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 164.02 MiB for execution context memory.
+[TensorRT-LLM][INFO] gatherContextLogits: 0
+[TensorRT-LLM][INFO] gatherGenerationLogits: 0
+[TensorRT-LLM][INFO] [MS] Running engine with multi stream info
+[TensorRT-LLM][INFO] [MS] Number of aux streams is 1
+[TensorRT-LLM][INFO] [MS] Number of total worker streams is 2
+[TensorRT-LLM][INFO] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[TensorRT-LLM][INFO] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +0, now: CPU 0, GPU 6816 (MiB)
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 80.13 KB GPU memory for runtime buffers.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 224.90 KB GPU memory for decoder.
+[TensorRT-LLM][INFO] Memory usage when calculating max tokens in paged kv cache: total: 31.84 GiB, available: 21.67 GiB, extraCostMemory: 0.00 GiB
+[TensorRT-LLM][INFO] Number of blocks in KV cache primary pool: 3171
+[TensorRT-LLM][INFO] Number of blocks in KV cache secondary pool: 0, onboard blocks to primary memory before reuse: true
+[TensorRT-LLM][INFO] before Create KVCacheManager cacheTransPreAllocaSize:0
+[TensorRT-LLM][INFO] Max KV cache pages per sequence: 64 [window size=2048]
+[TensorRT-LLM][INFO] Number of tokens per block: 32.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 10.84 GiB for max tokens in paged KV cache (101472).
+[TensorRT-LLM][ERROR] Encountered an error when fetching new request: [TensorRT-LLM][ERROR] Assertion failed: EndId (128001) is not within acceptable range [-1, 8208). (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/batch_manager/llmRequest.cpp:207)
+1       0x795384310477 tensorrt_llm::common::throwRuntimeError(char const*, int, char const*) + 76
+2       0x7953851cf402 tensorrt_llm::batch_manager::LlmRequest::validate(int, int, int, int, std::optional<int>, bool) + 770
+3       0x7953852fbad9 tensorrt_llm::executor::Executor::Impl::fetchNewRequests[abi:cxx11](int, std::optional<float>) + 1161
+4       0x7953852fe0c1 tensorrt_llm::executor::Executor::Impl::executionLoop() + 1361
+5       0x7959060e1f74 /usr/lib/libstdc++.so.6(+0xe1f74) [0x7959060e1f74]
+6       0x7959064a80d6 /usr/lib/libc.so.6(+0xa80d6) [0x7959064a80d6]
+7       0x79590653b01c /usr/lib/libc.so.6(+0x13b01c) [0x79590653b01c]
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM] TensorRT-LLM version: 0.20.0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Rank 0 is using GPU 0
+[TensorRT-LLM][INFO] TRTGptModel maxNumSequences: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBatchSize: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBeamWidth: 1
+[TensorRT-LLM][INFO] TRTGptModel maxSequenceLen: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxDraftLen: 0
+[TensorRT-LLM][INFO] TRTGptModel mMaxAttentionWindowSize: (2048) * 28
+[TensorRT-LLM][INFO] TRTGptModel enableTrtOverlap: 0
+[TensorRT-LLM][INFO] TRTGptModel normalizeLogProbs: 1
+[TensorRT-LLM][INFO] TRTGptModel maxNumTokens: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxInputLen: 2047 = min(maxSequenceLen - 1, maxNumTokens) since context FMHA and usePackedInput are enabled
+[TensorRT-LLM][INFO] TRTGptModel If model type is encoder, maxInputLen would be reset in trtEncoderModel to maxInputLen: min(maxSequenceLen, maxNumTokens).
+[TensorRT-LLM][INFO] Capacity Scheduler Policy: GUARANTEED_NO_EVICT
+[TensorRT-LLM][INFO] Context Chunking Scheduler Policy: None
+[TensorRT-LLM][INFO] Loaded engine size: 6822 MiB
+[TensorRT-LLM][INFO] Engine load time 3722 ms
+[TensorRT-LLM][INFO] Inspecting the engine to identify potential runtime issues...
+[TensorRT-LLM][INFO] The profiling verbosity of the engine does not allow this analysis to proceed. Re-build the engine with 'detailed' profiling verbosity to get more diagnostics.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 164.02 MiB for execution context memory.
+[TensorRT-LLM][INFO] gatherContextLogits: 0
+[TensorRT-LLM][INFO] gatherGenerationLogits: 0
+[TensorRT-LLM][INFO] [MS] Running engine with multi stream info
+[TensorRT-LLM][INFO] [MS] Number of aux streams is 1
+[TensorRT-LLM][INFO] [MS] Number of total worker streams is 2
+[TensorRT-LLM][INFO] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[TensorRT-LLM][INFO] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +0, now: CPU 0, GPU 6816 (MiB)
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 80.13 KB GPU memory for runtime buffers.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 224.90 KB GPU memory for decoder.
+[TensorRT-LLM][INFO] Memory usage when calculating max tokens in paged kv cache: total: 31.84 GiB, available: 21.67 GiB, extraCostMemory: 0.00 GiB
+[TensorRT-LLM][INFO] Number of blocks in KV cache primary pool: 3171
+[TensorRT-LLM][INFO] Number of blocks in KV cache secondary pool: 0, onboard blocks to primary memory before reuse: true
+[TensorRT-LLM][INFO] before Create KVCacheManager cacheTransPreAllocaSize:0
+[TensorRT-LLM][INFO] Max KV cache pages per sequence: 64 [window size=2048]
+[TensorRT-LLM][INFO] Number of tokens per block: 32.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 10.84 GiB for max tokens in paged KV cache (101472).
+Total generated tokens (global ids): 1967
+Raw global audio tokens (first 50): [914, 2050, 3076, 4102, 5128, 6154, 7180, 8206, 529, 1290, 3076, 4102, 5128, 6154, 7180, 8206, 537, 1225, 2061, 4102, 5128, 6154, 7180, 8206, 693, 1415, 2889, 3283, 5128, 6154, 7180, 8206, 895, 1390, 2061, 4103, 4589, 6154, 7180, 8206, 914, 1243, 2449, 4103, 4761, 6067, 7180, 8206, 914, 1906]
+Raw global audio tokens (last 50): [6027, 6892, 7865, 844, 2051, 2131, 3888, 4627, 6121, 6686, 7976, 9, 1590, 2950, 4103, 4533, 5537, 6509, 8131, 266, 1282, 2799, 3566, 5129, 6155, 6567, 7976, 618, 1677, 2776, 4103, 4627, 5700, 6686, 7534, 861, 1895, 2776, 4103, 4627, 5462, 6627, 7435, 266, 1491, 2776, 4103, 4714, 5157, 6972]
+Global token range: min=9, max=8206
+Total generated tokens (local ids): 1967
+Remapped local audio tokens (first 50): [914, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 529, 264, 1024, 1024, 1024, 1024, 1024, 1024, 537, 199, 9, 1024, 1024, 1024, 1024, 1024, 693, 389, 837, 205, 1024, 1024, 1024, 1024, 895, 364, 9, 1025, 485, 1024, 1024, 1024, 914, 217, 397, 1025, 657, 937, 1024, 1024, 914, 880]
+Remapped local audio tokens (last 50): [897, 736, 683, 844, 1025, 79, 810, 523, 991, 530, 794, 9, 564, 898, 1025, 429, 407, 353, 949, 266, 256, 747, 488, 1025, 1025, 411, 794, 618, 651, 724, 1025, 523, 570, 530, 352, 861, 869, 724, 1025, 523, 332, 471, 253, 266, 465, 724, 1025, 610, 27, 816]
+Local token range: min=2, max=1025
+  BOS tokens: 28
+  EOS tokens: 137
+Audio codes shape: torch.Size([1967])
+Audio codes shape: torch.Size([1960])
+Audio codes shape: torch.Size([8, 238])
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c382983c tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1340
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c382984a tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1354
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829858 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1368
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829866 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1382
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829874 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1396
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829882 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1410
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829890 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1424
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c382989e tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1438
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829a7a tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1914
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829a88 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1928
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829b46 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2118
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829b54 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2132
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829b62 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2146
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829b70 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2160
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829b7e tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2174
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829b90 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2192
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829c6e tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2414
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829c8a tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2442
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380c7c2 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 66
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380c7d3 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 83
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380c7e4 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 100
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380c7f5 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 117
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380c828 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 168
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3811e37 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 55
+5       0x7a43c380ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+8       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+10      0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+21      0x7a4944a27c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3811e59 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 89
+5       0x7a43c380ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+8       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+10      0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+21      0x7a4944a27c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3811f85 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 389
+5       0x7a43c380ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+8       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+10      0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+21      0x7a4944a27c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3811fa1 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 417
+5       0x7a43c380ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+8       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+10      0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+21      0x7a4944a27c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3811fcb tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 459
+5       0x7a43c380ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+8       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+10      0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+21      0x7a4944a27c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380cbe6 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 1126
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380ccab tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 1323
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c380ccc7 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 1351
+5       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+7       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+9       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+20      0x7a4944a27c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x7a43c291c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x7a43c291c9ce]
+2       0x7a43c2e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+4       0x7a43c3829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+5       0x7a43c2bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x7a43c2bceaba]
+6       0x7a43c38e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x7a4432d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x7a4432d25479]
+8       0x7a4432cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x7a4432cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x7a4944a27b8b /usr/lib/libc.so.6(+0x27b8b) [0x7a4944a27b8b]
+19      0x7a4944a27c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM] TensorRT-LLM version: 0.20.0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Rank 0 is using GPU 0
+[TensorRT-LLM][INFO] TRTGptModel maxNumSequences: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBatchSize: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBeamWidth: 1
+[TensorRT-LLM][INFO] TRTGptModel maxSequenceLen: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxDraftLen: 0
+[TensorRT-LLM][INFO] TRTGptModel mMaxAttentionWindowSize: (2048) * 28
+[TensorRT-LLM][INFO] TRTGptModel enableTrtOverlap: 0
+[TensorRT-LLM][INFO] TRTGptModel normalizeLogProbs: 1
+[TensorRT-LLM][INFO] TRTGptModel maxNumTokens: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxInputLen: 2047 = min(maxSequenceLen - 1, maxNumTokens) since context FMHA and usePackedInput are enabled
+[TensorRT-LLM][INFO] TRTGptModel If model type is encoder, maxInputLen would be reset in trtEncoderModel to maxInputLen: min(maxSequenceLen, maxNumTokens).
+[TensorRT-LLM][INFO] Capacity Scheduler Policy: GUARANTEED_NO_EVICT
+[TensorRT-LLM][INFO] Context Chunking Scheduler Policy: None
+[TensorRT-LLM][INFO] Loaded engine size: 6822 MiB
+[TensorRT-LLM][INFO] Engine load time 3901 ms
+[TensorRT-LLM][INFO] Inspecting the engine to identify potential runtime issues...
+[TensorRT-LLM][INFO] The profiling verbosity of the engine does not allow this analysis to proceed. Re-build the engine with 'detailed' profiling verbosity to get more diagnostics.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 164.02 MiB for execution context memory.
+[TensorRT-LLM][INFO] gatherContextLogits: 0
+[TensorRT-LLM][INFO] gatherGenerationLogits: 0
+[TensorRT-LLM][INFO] [MS] Running engine with multi stream info
+[TensorRT-LLM][INFO] [MS] Number of aux streams is 1
+[TensorRT-LLM][INFO] [MS] Number of total worker streams is 2
+[TensorRT-LLM][INFO] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[TensorRT-LLM][INFO] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +0, now: CPU 0, GPU 6816 (MiB)
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 80.13 KB GPU memory for runtime buffers.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 224.90 KB GPU memory for decoder.
+[TensorRT-LLM][INFO] Memory usage when calculating max tokens in paged kv cache: total: 31.84 GiB, available: 21.67 GiB, extraCostMemory: 0.00 GiB
+[TensorRT-LLM][INFO] Number of blocks in KV cache primary pool: 3171
+[TensorRT-LLM][INFO] Number of blocks in KV cache secondary pool: 0, onboard blocks to primary memory before reuse: true
+[TensorRT-LLM][INFO] before Create KVCacheManager cacheTransPreAllocaSize:0
+[TensorRT-LLM][INFO] Max KV cache pages per sequence: 64 [window size=2048]
+[TensorRT-LLM][INFO] Number of tokens per block: 32.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 10.84 GiB for max tokens in paged KV cache (101472).
+Total generated tokens (global ids): 1967
+Raw global audio tokens (first 50): [914, 2050, 3076, 4102, 5128, 6154, 7180, 8206, 529, 1290, 3076, 4102, 5128, 6154, 7180, 8206, 537, 1225, 2061, 4102, 5128, 6154, 7180, 8206, 693, 1415, 2889, 3283, 5128, 6154, 7180, 8206, 895, 1390, 2061, 4103, 4589, 6154, 7180, 8206, 914, 1243, 2449, 4103, 4761, 6067, 7180, 8206, 914, 1906]
+Raw global audio tokens (last 50): [6027, 6892, 7865, 844, 2051, 2131, 3888, 4627, 6121, 6686, 7976, 9, 1590, 2950, 4103, 4533, 5537, 6509, 8131, 266, 1282, 2799, 3566, 5129, 6155, 6567, 7976, 618, 1677, 2776, 4103, 4627, 5700, 6686, 7534, 861, 1895, 2776, 4103, 4627, 5462, 6627, 7435, 266, 1491, 2776, 4103, 4714, 5157, 6972]
+Global token range: min=9, max=8206
+Total generated tokens (local ids): 1967
+Remapped local audio tokens (first 50): [914, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 529, 264, 1024, 1024, 1024, 1024, 1024, 1024, 537, 199, 9, 1024, 1024, 1024, 1024, 1024, 693, 389, 837, 205, 1024, 1024, 1024, 1024, 895, 364, 9, 1025, 485, 1024, 1024, 1024, 914, 217, 397, 1025, 657, 937, 1024, 1024, 914, 880]
+Remapped local audio tokens (last 50): [897, 736, 683, 844, 1025, 79, 810, 523, 991, 530, 794, 9, 564, 898, 1025, 429, 407, 353, 949, 266, 256, 747, 488, 1025, 1025, 411, 794, 618, 651, 724, 1025, 523, 570, 530, 352, 861, 869, 724, 1025, 523, 332, 471, 253, 266, 465, 724, 1025, 610, 27, 816]
+Local token range: min=2, max=1025
+  BOS tokens: 28
+  EOS tokens: 137
+Audio codes shape: torch.Size([1967])
+Audio codes shape: torch.Size([1960])
+Audio codes shape: torch.Size([8, 238])
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2182983c tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1340
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2182984a tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1354
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829858 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1368
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829866 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1382
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829874 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1396
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829882 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1410
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829890 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1424
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2182989e tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1438
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829a7a tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1914
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829a88 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 1928
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829b46 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2118
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829b54 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2132
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829b62 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2146
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829b70 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2160
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829b7e tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2174
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeHost(ptr): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:178)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e8e516 virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::PinnedAllocator>::~GenericTensor() + 118
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829b90 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2192
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829c6e tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2414
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829c8a tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2442
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180c7c2 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 66
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180c7d3 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 83
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180c7e4 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 100
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180c7f5 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 117
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180c828 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 168
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21811e37 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 55
+5       0x73ad2180ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+8       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+10      0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+21      0x73b2a3427c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21811e59 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 89
+5       0x73ad2180ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+8       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+10      0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+21      0x73b2a3427c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21811f85 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 389
+5       0x73ad2180ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+8       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+10      0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+21      0x73b2a3427c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21811fa1 tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 417
+5       0x73ad2180ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+8       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+10      0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+21      0x73b2a3427c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21811fcb tensorrt_llm::batch_manager::TransformerBuffers::~TransformerBuffers() + 459
+5       0x73ad2180ca6a tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 746
+6       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+7       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+8       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+9       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+10      0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+11           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+12           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+13           0x1642443 PyDict_SetItem + 1447
+14           0x164464c _PyModule_ClearDict + 396
+15           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+16           0x17a3afb Py_FinalizeEx + 225
+17           0x17a20d5 Py_RunMain + 575
+18           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+19           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+20      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+21      0x73b2a3427c4b __libc_start_main + 139
+22           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180cbe6 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 1126
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180ccab tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 1323
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad2180ccc7 tensorrt_llm::batch_manager::RuntimeBuffers::~RuntimeBuffers() + 1351
+5       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+6       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+7       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+8       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+9       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+10           0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+11           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+12           0x1642443 PyDict_SetItem + 1447
+13           0x164464c _PyModule_ClearDict + 396
+14           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+15           0x17a3afb Py_FinalizeEx + 225
+16           0x17a20d5 Py_RunMain + 575
+17           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+18           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+19      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+20      0x73b2a3427c4b __libc_start_main + 139
+21           0x17b5129 _start + 41
+[TensorRT-LLM][ERROR] tensorrt_llm::common::TllmException: [TensorRT-LLM][ERROR] CUDA runtime error in ::cudaFreeAsync(ptr, mCudaStream->get()): device-side assert triggered (/home/jenkins/agent/workspace/LLM/release-0.20/L0_Test-x86_64/tensorrt_llm/cpp/tensorrt_llm/runtime/tllmBuffers.h:131)
+1       0x73ad2091c9ce /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1d1c9ce) [0x73ad2091c9ce]
+2       0x73ad20e90b6a virtual thunk to tensorrt_llm::runtime::GenericTensor<tensorrt_llm::runtime::CudaAllocatorAsync>::~GenericTensor() + 138
+3       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+4       0x73ad21829d09 tensorrt_llm::batch_manager::TrtGptModelInflightBatching::~TrtGptModelInflightBatching() + 2569
+5       0x73ad20bceaba /home/me/TTS/TensorRT-LLM/tensorrt_llm/libs/libtensorrt_llm.so(+0x1fceaba) [0x73ad20bceaba]
+6       0x73ad218e1bb1 tensorrt_llm::executor::Executor::~Executor() + 17
+7       0x73ad90d25479 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0x125479) [0x73ad90d25479]
+8       0x73ad90cacef5 /home/me/TTS/TensorRT-LLM/tensorrt_llm/bindings.cpython-312-x86_64-linux-gnu.so(+0xacef5) [0x73ad90cacef5]
+9            0x162ffb1 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x162ffb1]
+10           0x1630004 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x1630004]
+11           0x1642443 PyDict_SetItem + 1447
+12           0x164464c _PyModule_ClearDict + 396
+13           0x17a5123 /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17a5123]
+14           0x17a3afb Py_FinalizeEx + 225
+15           0x17a20d5 Py_RunMain + 575
+16           0x17d25fa /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d25fa]
+17           0x17d23ed /home/me/TTS/TensorRT-LLM/.venv/bin/python() [0x17d23ed]
+18      0x73b2a3427b8b /usr/lib/libc.so.6(+0x27b8b) [0x73b2a3427b8b]
+19      0x73b2a3427c4b __libc_start_main + 139
+20           0x17b5129 _start + 41
+[TensorRT-LLM] TensorRT-LLM version: 0.20.0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Rank 0 is using GPU 0
+[TensorRT-LLM][INFO] TRTGptModel maxNumSequences: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBatchSize: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBeamWidth: 1
+[TensorRT-LLM][INFO] TRTGptModel maxSequenceLen: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxDraftLen: 0
+[TensorRT-LLM][INFO] TRTGptModel mMaxAttentionWindowSize: (2048) * 28
+[TensorRT-LLM][INFO] TRTGptModel enableTrtOverlap: 0
+[TensorRT-LLM][INFO] TRTGptModel normalizeLogProbs: 1
+[TensorRT-LLM][INFO] TRTGptModel maxNumTokens: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxInputLen: 2047 = min(maxSequenceLen - 1, maxNumTokens) since context FMHA and usePackedInput are enabled
+[TensorRT-LLM][INFO] TRTGptModel If model type is encoder, maxInputLen would be reset in trtEncoderModel to maxInputLen: min(maxSequenceLen, maxNumTokens).
+[TensorRT-LLM][INFO] Capacity Scheduler Policy: GUARANTEED_NO_EVICT
+[TensorRT-LLM][INFO] Context Chunking Scheduler Policy: None
+[TensorRT-LLM][INFO] Loaded engine size: 6822 MiB
+[TensorRT-LLM][INFO] Engine load time 4295 ms
+[TensorRT-LLM][INFO] Inspecting the engine to identify potential runtime issues...
+[TensorRT-LLM][INFO] The profiling verbosity of the engine does not allow this analysis to proceed. Re-build the engine with 'detailed' profiling verbosity to get more diagnostics.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 164.02 MiB for execution context memory.
+[TensorRT-LLM][INFO] gatherContextLogits: 0
+[TensorRT-LLM][INFO] gatherGenerationLogits: 0
+[TensorRT-LLM][INFO] [MS] Running engine with multi stream info
+[TensorRT-LLM][INFO] [MS] Number of aux streams is 1
+[TensorRT-LLM][INFO] [MS] Number of total worker streams is 2
+[TensorRT-LLM][INFO] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[TensorRT-LLM][INFO] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +0, now: CPU 0, GPU 6816 (MiB)
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 80.13 KB GPU memory for runtime buffers.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 224.90 KB GPU memory for decoder.
+[TensorRT-LLM][INFO] Memory usage when calculating max tokens in paged kv cache: total: 31.84 GiB, available: 21.67 GiB, extraCostMemory: 0.00 GiB
+[TensorRT-LLM][INFO] Number of blocks in KV cache primary pool: 3171
+[TensorRT-LLM][INFO] Number of blocks in KV cache secondary pool: 0, onboard blocks to primary memory before reuse: true
+[TensorRT-LLM][INFO] before Create KVCacheManager cacheTransPreAllocaSize:0
+[TensorRT-LLM][INFO] Max KV cache pages per sequence: 64 [window size=2048]
+[TensorRT-LLM][INFO] Number of tokens per block: 32.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 10.84 GiB for max tokens in paged KV cache (101472).
+Total generated tokens (global ids): 1967
+Raw global audio tokens (first 50): [914, 2050, 3076, 4102, 5128, 6154, 7180, 8206, 529, 1290, 3076, 4102, 5128, 6154, 7180, 8206, 537, 1225, 2061, 4102, 5128, 6154, 7180, 8206, 693, 1415, 2889, 3522, 5128, 6154, 7180, 8206, 895, 1278, 2061, 3637, 4830, 6154, 7180, 8206, 914, 1243, 2131, 3870, 4761, 6153, 7180, 8206, 914, 1121]
+Raw global audio tokens (last 50): [5930, 6469, 7437, 844, 1031, 2255, 3117, 4233, 5736, 6615, 8141, 575, 1677, 2267, 3089, 4628, 5573, 6595, 7516, 844, 1178, 2508, 3566, 4506, 6045, 6892, 7346, 642, 1415, 2309, 3566, 4627, 5271, 6449, 7534, 861, 1031, 2102, 3148, 4627, 5210, 6180, 7427, 844, 1491, 2776, 3424, 4626, 5157, 6972]
+Global token range: min=34, max=8206
+Total generated tokens (local ids): 1967
+Remapped local audio tokens (first 50): [914, 0, 0, 0, 0, 0, 0, 0, 529, 264, 0, 0, 0, 0, 0, 0, 537, 199, 9, 0, 0, 0, 0, 0, 693, 389, 837, 444, 0, 0, 0, 0, 895, 252, 9, 559, 726, 0, 0, 0, 914, 217, 79, 792, 657, 1023, 0, 0, 914, 95]
+Remapped local audio tokens (last 50): [800, 313, 255, 844, 5, 203, 39, 129, 606, 459, 959, 575, 651, 215, 11, 524, 443, 439, 334, 844, 152, 456, 488, 402, 915, 736, 164, 642, 389, 257, 488, 523, 141, 293, 352, 861, 5, 50, 70, 523, 80, 24, 245, 844, 465, 724, 346, 522, 27, 816]
+Local token range: min=0, max=1023
+  BOS tokens: 28
+  EOS tokens: 0
+Audio codes shape: torch.Size([1967])
+Audio codes shape: torch.Size([1960])
+Audio codes shape: torch.Size([8, 238])
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM] TensorRT-LLM version: 0.20.0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Engine version 0.20.0 found in the config file, assuming engine(s) built by new builder API.
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM][INFO] MPI size: 1, MPI local size: 1, rank: 0
+[TensorRT-LLM][INFO] Rank 0 is using GPU 0
+[TensorRT-LLM][INFO] TRTGptModel maxNumSequences: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBatchSize: 1
+[TensorRT-LLM][INFO] TRTGptModel maxBeamWidth: 1
+[TensorRT-LLM][INFO] TRTGptModel maxSequenceLen: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxDraftLen: 0
+[TensorRT-LLM][INFO] TRTGptModel mMaxAttentionWindowSize: (2048) * 28
+[TensorRT-LLM][INFO] TRTGptModel enableTrtOverlap: 0
+[TensorRT-LLM][INFO] TRTGptModel normalizeLogProbs: 1
+[TensorRT-LLM][INFO] TRTGptModel maxNumTokens: 2048
+[TensorRT-LLM][INFO] TRTGptModel maxInputLen: 2047 = min(maxSequenceLen - 1, maxNumTokens) since context FMHA and usePackedInput are enabled
+[TensorRT-LLM][INFO] TRTGptModel If model type is encoder, maxInputLen would be reset in trtEncoderModel to maxInputLen: min(maxSequenceLen, maxNumTokens).
+[TensorRT-LLM][INFO] Capacity Scheduler Policy: GUARANTEED_NO_EVICT
+[TensorRT-LLM][INFO] Context Chunking Scheduler Policy: None
+[TensorRT-LLM][INFO] Loaded engine size: 6822 MiB
+[TensorRT-LLM][INFO] Engine load time 4098 ms
+[TensorRT-LLM][INFO] Inspecting the engine to identify potential runtime issues...
+[TensorRT-LLM][INFO] The profiling verbosity of the engine does not allow this analysis to proceed. Re-build the engine with 'detailed' profiling verbosity to get more diagnostics.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 164.02 MiB for execution context memory.
+[TensorRT-LLM][INFO] gatherContextLogits: 0
+[TensorRT-LLM][INFO] gatherGenerationLogits: 0
+[TensorRT-LLM][INFO] [MS] Running engine with multi stream info
+[TensorRT-LLM][INFO] [MS] Number of aux streams is 1
+[TensorRT-LLM][INFO] [MS] Number of total worker streams is 2
+[TensorRT-LLM][INFO] [MS] The main stream provided by execute/enqueue calls is the first worker stream
+[TensorRT-LLM][INFO] [MemUsageChange] TensorRT-managed allocation in IExecutionContext creation: CPU +0, GPU +0, now: CPU 0, GPU 6816 (MiB)
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 80.13 KB GPU memory for runtime buffers.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 224.90 KB GPU memory for decoder.
+[TensorRT-LLM][INFO] Memory usage when calculating max tokens in paged kv cache: total: 31.84 GiB, available: 21.67 GiB, extraCostMemory: 0.00 GiB
+[TensorRT-LLM][INFO] Number of blocks in KV cache primary pool: 3171
+[TensorRT-LLM][INFO] Number of blocks in KV cache secondary pool: 0, onboard blocks to primary memory before reuse: true
+[TensorRT-LLM][INFO] before Create KVCacheManager cacheTransPreAllocaSize:0
+[TensorRT-LLM][INFO] Max KV cache pages per sequence: 64 [window size=2048]
+[TensorRT-LLM][INFO] Number of tokens per block: 32.
+[TensorRT-LLM][INFO] [MemUsageChange] Allocated 10.84 GiB for max tokens in paged KV cache (101472).
+Total generated tokens (global ids): 1967
+Raw global audio tokens (first 50): [914, 2050, 3076, 4102, 5128, 6154, 7180, 8206, 529, 1290, 3076, 4102, 5128, 6154, 7180, 8206, 537, 1225, 2061, 4102, 5128, 6154, 7180, 8206, 693, 1415, 2889, 3522, 5128, 6154, 7180, 8206, 895, 1278, 2061, 3637, 4830, 6154, 7180, 8206, 914, 1243, 2131, 3870, 4761, 6153, 7180, 8206, 914, 1121]
+Raw global audio tokens (last 50): [5930, 6469, 7437, 844, 1031, 2255, 3117, 4233, 5736, 6615, 8141, 575, 1677, 2267, 3089, 4628, 5573, 6595, 7516, 844, 1178, 2508, 3566, 4506, 6045, 6892, 7346, 642, 1415, 2309, 3566, 4627, 5271, 6449, 7534, 861, 1031, 2102, 3148, 4627, 5210, 6180, 7427, 844, 1491, 2776, 3424, 4626, 5157, 6972]
+Global token range: min=34, max=8206
+Total generated tokens (local ids): 1967
+Remapped local audio tokens (first 50): [914, 0, 0, 0, 0, 0, 0, 0, 529, 264, 0, 0, 0, 0, 0, 0, 537, 199, 9, 0, 0, 0, 0, 0, 693, 389, 837, 444, 0, 0, 0, 0, 895, 252, 9, 559, 726, 0, 0, 0, 914, 217, 79, 792, 657, 1023, 0, 0, 914, 95]
+Remapped local audio tokens (last 50): [800, 313, 255, 844, 5, 203, 39, 129, 606, 459, 959, 575, 651, 215, 11, 524, 443, 439, 334, 844, 152, 456, 488, 402, 915, 736, 164, 642, 389, 257, 488, 523, 141, 293, 352, 861, 5, 50, 70, 523, 80, 24, 245, 844, 465, 724, 346, 522, 27, 816]
+Local token range: min=0, max=1023
+  BOS tokens: 28
+  EOS tokens: 0
+Audio codes shape: torch.Size([1967])
+Audio codes shape: torch.Size([1960])
+Audio codes shape: torch.Size([8, 238])
+Decoded waveform: 152320 samples at 16000Hz
+Successfully generated audio: 152320 samples
+Expected: Chat, stop backseating! I totally know what I'm doing... I think
+Whisper Transcription:  I don't know.
+Word error rate: 0.9090909090909091
+The test was unsuccessful. The model did not generate the prompt accurately. You can use the audio judge that follows to determine if what is being outputted actually matches the Whisper transcription or is just gibberish.
+The audio seems to be quite fast-paced and somewhat jumbled. It’s hard to clearly distinguish the words or specific content being spoken. The speech might be in another language or simply too quick to catch distinctly. Without more context or clearer audio, it's difficult to make out exactly what the individual is saying.
+[TensorRT-LLM][INFO] Refreshed the MPI local session
+[TensorRT-LLM] TensorRT-LLM version: 0.20.0
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.attn_bias = False
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.rotary_base = 100000.0
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.rotary_scaling = None
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.disable_weight_only_quant_plugin = False
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.seq_length = 2048
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.use_logn_attn = False
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.num_labels = 1
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.tie_word_embeddings = True
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.attn_bias = False
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.rotary_base = 100000.0
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.rotary_scaling = None
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.disable_weight_only_quant_plugin = False
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.seq_length = 2048
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.use_logn_attn = False
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.num_labels = 1
+[09/22/2025-20:54:13] [TRT-LLM] [W] Implicitly setting HiggsAudioConfig.tie_word_embeddings = True
+max_num_tokens: 2048
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set remove_input_padding to True.
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set dtype to bfloat16.
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set gpt_attention_plugin to bfloat16.
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set gemm_plugin to bfloat16.
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set dtype to bfloat16.
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set paged_kv_cache to True.
+[09/22/2025-20:54:13] [TRT-LLM] [W] Overriding paged_state to False
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set paged_state to False.
+[09/22/2025-20:54:13] [TRT-LLM] [W] padding removal and fMHA are both enabled, max_input_len is not required and will be ignored
+[09/22/2025-20:54:13] [TRT-LLM] [I] Set use_fp8_context_fmha to False.
+[09/22/2025-20:54:13] [TRT-LLM] [W] FP8 Context FMHA is disabled because it must be used together with the fp8 quantization workflow.
+[09/22/2025-20:54:13] [TRT] [I] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 1765 (MiB)
+[09/22/2025-20:54:18] [TRT] [I] [MemUsageChange] Init builder kernel library: CPU +0, GPU +4, now: CPU 0, GPU 1769 (MiB)
+[09/22/2025-20:54:18] [TRT-LLM] [I] Set nccl_plugin to None.
+[09/22/2025-20:54:18] [TRT-LLM] [I] Total time of constructing network from module object 4.628000020980835 seconds
+[09/22/2025-20:54:18] [TRT-LLM] [I] Total optimization profiles added: 1
+[09/22/2025-20:54:18] [TRT-LLM] [I] Total time to initialize the weights in network Unnamed Network 0: 00:00:00
+[09/22/2025-20:54:18] [TRT-LLM] [I] Build TensorRT engine Unnamed Network 0
+[09/22/2025-20:54:18] [TRT] [I] Global timing cache in use. Profiling results in this builder pass will be stored.
+[09/22/2025-20:54:18] [TRT] [I] Compiler backend is used during engine build.
+[09/22/2025-20:54:20] [TRT] [I] [GraphReduction] The approximate region cut reduction algorithm is called.
+[09/22/2025-20:54:20] [TRT] [I] Detected 17 inputs and 1 output network tensors.
+[09/22/2025-20:54:32] [TRT] [I] Total Host Persistent Memory: 98560 bytes
+[09/22/2025-20:54:32] [TRT] [I] Total Device Persistent Memory: 0 bytes
+[09/22/2025-20:54:32] [TRT] [I] Max Scratch Memory: 46154240 bytes
+[09/22/2025-20:54:32] [TRT] [I] [BlockAssignment] Started assigning block shifts. This will take 608 steps to complete.
+[09/22/2025-20:54:32] [TRT] [I] [BlockAssignment] Algorithm ShiftNTopDown took 11.7504ms to assign 21 blocks to 608 nodes requiring 171992576 bytes.
+[09/22/2025-20:54:32] [TRT] [I] Total Activation Memory: 171990528 bytes
+[09/22/2025-20:54:32] [TRT] [I] Total Weights Memory: 7147985024 bytes
+[09/22/2025-20:54:32] [TRT] [I] Compiler backend is used during engine execution.
+[09/22/2025-20:54:32] [TRT] [I] Engine generation completed in 14.1721 seconds.
+[09/22/2025-20:54:32] [TRT] [I] [MemUsageStats] Peak memory usage of TRT CPU/GPU memory allocators: CPU 0 MiB, GPU 6817 MiB
+[09/22/2025-20:54:36] [TRT-LLM] [I] Total time of building Unnamed Network 0: 00:00:17
+[09/22/2025-20:54:36] [TRT] [I] Serialized 27 bytes of code generator cache.
+[09/22/2025-20:54:36] [TRT] [I] Serialized 319487 bytes of compilation cache.
+[09/22/2025-20:54:36] [TRT] [I] Serialized 8 timing cache entries
+[09/22/2025-20:54:36] [TRT-LLM] [I] Timing cache serialized to model.cache
+[09/22/2025-20:54:36] [TRT-LLM] [I] Build phase peak memory: 19730.26 MB, children: 0.00 MB
+[09/22/2025-20:54:36] [TRT-LLM] [I] Serializing engine to ./higgs_audio_engine/rank0.engine...
+[09/22/2025-20:54:40] [TRT-LLM] [I] Engine serialized. Total time: 00:00:04

@@ -48,7 +48,6 @@ class HiggsAudioConfig(PretrainedConfig):
         audio_ffn_hidden_size: int = 3072,
         audio_ffn_intermediate_size: int = 8192,
         text_vocab_size: int = 128256,
-        audio_vocab_size: int = 8208,
         # Audio codebook configuration
         num_codebooks: int = 8,
         codebook_size: int = 1024 + 2,  # +2 for special tokens
@@ -73,7 +72,6 @@ class HiggsAudioConfig(PretrainedConfig):
         **kwargs,
     ):
         self.text_vocab_size = text_vocab_size
-        self.audio_vocab_size = audio_vocab_size
 
         # Initialize base PretrainedConfig
         super().__init__(**kwargs)
@@ -89,6 +87,7 @@ class HiggsAudioConfig(PretrainedConfig):
         self.codebook_size = codebook_size
         self.audio_stream_bos_id = audio_stream_bos_id
         self.audio_stream_eos_id = audio_stream_eos_id
+        self.audio_vocab_size = num_codebooks * codebook_size
 
         # Special tokens
         self.audio_bos_token = audio_bos_token
@@ -121,6 +120,7 @@ class HiggsAudioConfig(PretrainedConfig):
             "audio_ffn_intermediate_size",
             "num_codebooks",
             "codebook_size",
+            "audio_sampling_vocab_size",
             "audio_stream_bos_id",
             "audio_stream_eos_id",
             "audio_bos_token",

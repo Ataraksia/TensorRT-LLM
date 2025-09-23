@@ -2,7 +2,7 @@
 
 ## Primary Objective
 
-Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.
+Implement the Higgs Audio model natively in `TensorRT-LLM` to achieve successful text-to-speech generation with Word Error Rate < 0.25 using `test.py` as the acceptance criterion. You are free to rebuild the engine with `build_engine.py` as necessary. You should use `higgs_audio_transformers` and `higgs_audio_vllm` as references. Do not attempt to employ other engines in your solution, this should be a 100% `TensorRT-LLM` implementation, although you are free to use them temporarily while testing.  You shouldn't modify any of the base TensorRT-LLM engine.  If it's absolutely required to change something, you should create a new class that inherits from the original and make the necessary changes there.
 
 Here is a list of things that are definitely not the issue, and you should not waste time investigating them:
 

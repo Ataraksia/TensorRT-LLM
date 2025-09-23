@@ -80,23 +80,20 @@ class DelayPatternLogitsProcessor(LogitsProcessor):
         with torch.cuda.stream(torch.cuda.ExternalStream(stream_ptr)):
             input_ids = token_ids[0]
             logits = logits.view(-1)[0 : self.config.codebook_size]
-            # start_idx = self.codebook_idx * self.config.codebook_size
-            # end_idx = (self.codebook_idx + 1) * self.config.codebook_size
             if self.num_delays < self.config.num_codebooks - 1:
                 if self.num_delays < self.codebook_idx:
-                    logits[...] = -math.inf
-                    logits[self.config.audio_stream_bos_id] = 0  # * (self.codebook_idx + 1)] = 0
+                    logits[...] = -1
+                    logits[self.config.audio_stream_bos_id] = 0
                 self.num_delays += 1 if self.codebook_idx == self.config.num_codebooks - 1 else 0
             if self.num_eos_tokens is not None or input_ids[-1] == self.config.audio_stream_eos_id:
                 self.num_eos_tokens = 0 if self.num_eos_tokens is None else self.num_eos_tokens
                 self.num_eos_tokens += 1 if self.codebook_idx == 0 else 0
             if self.num_eos_tokens and self.num_eos_tokens >= self.config.num_codebooks:
-                logits[...] = -math.inf
-                logits[self.config.audio_stream_eos_id] = 0  # * (self.codebook_idx + 1)] = 0
+                logits[...] = -1
+                logits[self.config.audio_stream_eos_id] = 0
                 self.reset()
             logits = logits.view(1, 1, -1)
             self.codebook_idx = (self.codebook_idx + 1) % self.config.num_codebooks
-            print(self.codebook_idx, self.num_delays, self.num_eos_tokens)
 
 
 def _build_delay_pattern_mask(input_ids: torch.LongTensor, bos_token_id: int, pad_token_id: int):
@@ -750,11 +747,7 @@ class HiggsAudioInfer:
                 logits_processor_names=[
                     "delay_pattern_logit_processor"
                 ],  # This is the CPP implementation
-                # logits_processor=DelayPatternLogitsProcessor(
-                # self.config
-                # ),  # This is the Python implementation
                 end_id=0,
-                pad_id=self.config.pad_token_id,
                 max_new_tokens=max_new_tokens,
                 temperature=1.0,
                 top_k=50,
@@ -762,40 +755,30 @@ class HiggsAudioInfer:
             )
 
         audio_ids = outputs[0, 0, input_ids.shape[0] :]
-        eos_tokens = audio_ids == self.config.audio_stream_eos_id
-        bos_tokens = audio_ids == self.config.audio_stream_bos_id
-        # Debug: show some generated tokens
-        print(f"Total generated tokens: {len(audio_ids)}")
-        print(f"Raw audio tokens (first 50): {audio_ids[:50].tolist()}")
-        print(f"Raw audio tokens (last 50): {audio_ids[-50:].tolist()}")
-        print(f"Token range: min={audio_ids.min().item()}, max={audio_ids.max().item()}")
-        print(f"  BOS tokens: {bos_tokens.sum().item()}")
-        print(f"  EOS tokens: {eos_tokens.sum().item()}")
+        print(f"Total generated tokens (global ids): {len(audio_ids)}")
+        print(f"Raw global audio tokens (first 50): {audio_ids[:50].tolist()}")
+        print(f"Raw global audio tokens (last 50): {audio_ids[-50:].tolist()}")
+        print(f"Global token range: min={audio_ids.min().item()}, max={audio_ids.max().item()}")
 
-        print(f"Audio codes shape: {audio_ids.shape}")
         remainder = audio_ids.numel() % self.config.num_codebooks
         if remainder != 0:
             audio_ids = audio_ids[:-remainder]
-        print(f"Audio codes shape: {audio_ids.shape}")
         np.savetxt(
-            "4.txt",
+            "debug_ids.txt",
             audio_ids.view(8, -1).cpu(),
             delimiter=",",
             fmt="%d",
         )
-        audio_ids = revert_delay_pattern(audio_ids.view(self.config.num_codebooks, -1))
-        np.savetxt(
-            "5.txt",
-            audio_ids.view(8, -1).cpu(),
-            delimiter=",",
-            fmt="%d",
+        audio_ids = revert_delay_pattern(audio_ids.view(self.config.num_codebooks, -1)).clip(
+            0, self.config.codebook_size - 2 - 1
         )
-        print(f"Audio codes shape: {audio_ids.shape}")
         waveform, sr = self.audio_tokenizer.decode(audio_ids)
         # Resample if needed
         target_sr = 16000
         if sr != target_sr:
-            waveform = librosa.resample(waveform.cpu(), orig_sr=sr, target_sr=target_sr)
+            # waveform may be numpy.ndarray already
+            wv_np = waveform if isinstance(waveform, np.ndarray) else waveform.cpu().numpy()
+            waveform = librosa.resample(wv_np, orig_sr=sr, target_sr=target_sr)
 
         print(f"Decoded waveform: {len(waveform)} samples at {target_sr}Hz")
 

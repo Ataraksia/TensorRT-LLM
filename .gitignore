@@ -123,3 +123,10 @@ audio_ids_in.txt
 .kilocode/system-prompt-debug
 .kilocode/system-prompt-orchestrator
 5.txt
+.kilocode/rules-code/system-prompt-architect
+.kilocode/rules-code/system-prompt-code
+.kilocode/rules-code/system-prompt-debug
+.kilocode/rules-code/system-prompt-orchestrator
+allout.txt
+debug_audio_tokens.txt
+debug_ids.txt
