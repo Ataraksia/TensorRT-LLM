@@ -17,10 +17,7 @@
 
 #include "connection.h"
 #include "tensorrt_llm/common/envUtils.h"
-<<<<<<< HEAD
-=======
 #include "tensorrt_llm/executor/cache_transmission/cacheSplitConcat.h"
->>>>>>> upstream/main
 #include <string>
 #include <unistd.h>
 
@@ -38,8 +35,6 @@ std::string genUniqueAgentName()
     return std::string(hostname) + "_" + std::to_string(pid) + "_" + std::to_string(counter++);
 }
 
-<<<<<<< HEAD
-=======
 // NIXL connection is specific ,and different from the UCX and mpi connection, since NIXL only support one-sided
 // communication. gen send buffer metaData to context when it sending requestInfo, but don't send buffer offset, since
 // unformmatter has not called yet, it didn't know the cacheSize and offset. We assume the recv_size is the same as the
@@ -62,7 +57,6 @@ auto computeSendOffsetRatio(
     return std::make_pair(offsetLayer, selfSendLayer);
 }
 
->>>>>>> upstream/main
 AgentConnection::AgentConnection(
     std::string mAgentName, std::string mRemoteAgentName, AgentConnectionManager* mAgentConnectionManager)
     : mAgentName(mAgentName)
@@ -110,14 +104,9 @@ void AgentConnection::send(DataContext const& ctx, void const* data, size_t size
     MemoryDesc srcDesc{
         reinterpret_cast<uintptr_t>(data), size, static_cast<uint32_t>(mAgentConnectionManager->getDeviceId())};
     MemoryDescs srcDescs{MemoryType::kVRAM, {srcDesc}};
-<<<<<<< HEAD
-    auto dstBaseDesc = mSenderState.mReceiverBufferDesc;
-    MemoryDesc dstDesc{dstBaseDesc.getAddr() + (mSenderState.validSegmentIdx * size), size, dstBaseDesc.getDeviceId()};
-=======
     auto dstBaseDesc = mSenderState.mCacheReceiverBufferDesc;
     auto offset = size / mSenderState.mOffsetRatio.second * mSenderState.mOffsetRatio.first;
     MemoryDesc dstDesc{dstBaseDesc.getAddr() + offset, size, dstBaseDesc.getDeviceId()};
->>>>>>> upstream/main
     TLLM_LOG_DEBUG(
         "send dstDesc: %p, size: %ld ,validSegmentIdx: %ld", dstDesc.getAddr(), size, mSenderState.validSegmentIdx);
     MemoryDescs dstDescs{MemoryType::kVRAM, {dstDesc}};
@@ -172,19 +161,12 @@ void AgentConnection::sendRequestAndBufferInfo(
     mAgentConnectionManager->getAgent()->notifySyncMessage(mRemoteAgentName, ss.str());
 }
 
-<<<<<<< HEAD
-void AgentConnection::setSenderState(MemoryDesc mReceiverBufferDesc, int validSegmentIdx)
-{
-    mSenderState.mReceiverBufferDesc = mReceiverBufferDesc;
-    mSenderState.validSegmentIdx = validSegmentIdx;
-=======
 void AgentConnection::setSenderState(
     MemoryDesc mCacheReceiverBufferDesc, int validSegmentIdx, std::pair<size_t, size_t> offsetRatio)
 {
     mSenderState.mCacheReceiverBufferDesc = mCacheReceiverBufferDesc;
     mSenderState.validSegmentIdx = validSegmentIdx;
     mSenderState.mOffsetRatio = offsetRatio;
->>>>>>> upstream/main
 }
 
 void AgentConnection::setHasLoadRemoteAgent(bool hasLoadRemoteAgent)
@@ -199,14 +181,9 @@ bool AgentConnection::hasLoadRemoteAgent() const
 }
 
 AgentConnectionManager::AgentConnectionManager(
-<<<<<<< HEAD
-    batch_manager::kv_cache_manager::CacheTransBufferManager* cacheTransBufferManager)
-    : mRegMemDescs(MemoryType::kVRAM, {})
-=======
     batch_manager::kv_cache_manager::CacheTransBufferManager* cacheTransBufferManager, CacheState cacheState)
     : mCacheState(std::move(cacheState))
     , mRegMemDescs(MemoryType::kVRAM, {})
->>>>>>> upstream/main
 {
     TLLM_CUDA_CHECK(cudaGetDevice(&mDeviceId));
     TLLM_CHECK(mDeviceId != -1);
@@ -310,14 +287,10 @@ AgentConnection const* AgentConnectionManager::recvConnectionAndRequestInfo(batc
                     auto remoteAgentName = requestAndBufferInfo.mAgentName;
                     TLLM_LOG_DEBUG(" recv Address:%s", address.c_str());
                     auto connection = connect(remoteAgentName, address, metadataOpt, true);
-<<<<<<< HEAD
-                    connection->setSenderState(bufferDesc, validConnectionIdx);
-=======
                     // to compute the offset.
                     auto offsetRatio = computeSendOffsetRatio(requestInfo.getTransState().getCacheState().value(),
                         requestInfo.getTransState().getCommState()->getSelfIdx(), mCacheState, validConnectionIdx);
                     connection->setSenderState(bufferDesc, validConnectionIdx, offsetRatio);
->>>>>>> upstream/main
                     it2 = notifs.erase(it2);
                     if (notifs.empty())
                     {
@@ -385,11 +358,7 @@ batch_manager::kv_cache_manager::CacheTransBufferManager* AgentConnectionManager
     return mCacheTransBufferManager;
 }
 
-<<<<<<< HEAD
-AgentConnection* AgentConnectionManager::connect(std::string const& remoteAgentName, std::string const& connecitonInfo,
-=======
 AgentConnection* AgentConnectionManager::connect(std::string const& remoteAgentName, std::string const& connectionInfo,
->>>>>>> upstream/main
     std::optional<std::string> metadata, bool isSender)
 {
 
@@ -430,11 +399,7 @@ AgentConnection* AgentConnectionManager::connect(std::string const& remoteAgentN
             TLLM_CHECK_WITH_INFO(!isSender, "Sender shouldn't call connectRemoteAgent");
             TLLM_LOG_DEBUG(mpi::MpiComm::world().getRank(), "mAgentName: %s connect to %s with connectRemoteAgent",
                 mAgentName.c_str(), remoteAgentName.c_str());
-<<<<<<< HEAD
-            m_Agent->connectRemoteAgent(remoteAgentName, connecitonInfo);
-=======
             m_Agent->connectRemoteAgent(remoteAgentName, connectionInfo);
->>>>>>> upstream/main
         }
     }
     else

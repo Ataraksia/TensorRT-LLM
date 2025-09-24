@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# Copyright (c) 2024, Tri Dao, Albert Gu.
-# Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/layernorm_gated.py
-=======
 # Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/layernorm_gated.py
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 #
@@ -19,7 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
->>>>>>> upstream/main
 
 import torch
 import triton

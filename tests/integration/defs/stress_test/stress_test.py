@@ -15,8 +15,6 @@
 """
 Stress test script for inference of model using TensorRT-LLM with PyTorch/TRT backend.
 This script is used for stress testing inference performance using trtllm-serve and genai-perf.
-<<<<<<< HEAD
-=======
 
 The script supports three test modes:
 1. "stress-test": Runs performance test followed by stress test
@@ -29,7 +27,6 @@ Accuracy testing is performed using lm_eval with GSM8K dataset:
 
 Usage example for accuracy testing:
     pytest tests/integration/defs/stress_test/stress_test.py::test_run_stress_test[stress-test-with-accuracy]
->>>>>>> upstream/main
 """
 import contextlib
 import json
@@ -141,8 +138,6 @@ class StressTestConfig:
     customized_stress_concurrency: int = 128
     customized_stress_request_rate: int = 20
 
-<<<<<<< HEAD
-=======
     # Accuracy test parameters
     enable_accuracy_test: bool = False  # Enable accuracy testing with GSM8K
     accuracy_test_timeout: int = 1200  # 20 minutes timeout for accuracy tests
@@ -151,7 +146,6 @@ class StressTestConfig:
     accuracy_test_max_gen_toks: int = 256  # Max generation tokens for accuracy tests
     accuracy_test_max_length: int = 4096  # Max input length for accuracy tests
 
->>>>>>> upstream/main
     @property
     def request_count_stress_test(self) -> int:
         """Calculate request count for stress test"""
@@ -346,15 +340,10 @@ def check_server_health(server_url: str,
         return False, f"Unexpected error during health check: {str(e)}"
 
 
-<<<<<<< HEAD
-@pytest.mark.parametrize("test_mode", ["stress-test", "stress-stage-alone"],
-                         ids=lambda x: x)
-=======
 @pytest.mark.parametrize(
     "test_mode",
     ["stress-test", "stress-stage-alone", "stress-test-with-accuracy"],
     ids=lambda x: x)
->>>>>>> upstream/main
 @pytest.mark.parametrize("backend", ["trt", "pytorch"], ids=lambda x: x)
 @pytest.mark.parametrize("capacity_scheduler_policy",
                          ["GUARANTEED_NO_EVICT", "MAX_UTILIZATION"],
@@ -449,11 +438,6 @@ def stress_test(config,
     elif test_mode == "stress-stage-alone":
         run_performance = False
         run_stress = True
-<<<<<<< HEAD
-    else:
-        pytest.skip(f"Skipping test for unsupported mode: {test_mode}. "
-                    f"Supported modes: stress-test, stress-stage-alone")
-=======
     elif test_mode == "stress-test-with-accuracy":
         run_performance = True
         run_stress = True
@@ -462,7 +446,6 @@ def stress_test(config,
             f"Skipping test for unsupported mode: {test_mode}. "
             f"Supported modes: stress-test, stress-stage-alone, stress-test-with-accuracy"
         )
->>>>>>> upstream/main
         return
 
     # Skip if not enough GPU memory
@@ -502,15 +485,9 @@ def stress_test(config,
             pp_size=test_server_config.pp_size,
             ep_size=8,  # DeepSeek-V3 or DeepSeek-R1 specific ep_size
             max_batch_size=
-<<<<<<< HEAD
-            161,  # DeepSeek-V3 or DeepSeek-R1 specific max_batch_size
-            max_num_tokens=
-            1160,  # DeepSeek-V3 or DeepSeek-R1 specific max_num_tokens
-=======
             2048,  # DeepSeek-V3 or DeepSeek-R1 specific max_batch_size
             max_num_tokens=
             2048,  # DeepSeek-V3 or DeepSeek-R1 specific max_num_tokens
->>>>>>> upstream/main
             kv_cache_free_gpu_memory_fraction=
             0.7,  # DeepSeek-V3 or DeepSeek-R1 specific kv_cache fraction
             capacity_scheduler_policy=test_server_config.
@@ -522,17 +499,12 @@ def stress_test(config,
 
     # Create a StressTestConfig with customized time parameters if provided
     if run_stress:
-<<<<<<< HEAD
-        stress_config = StressTestConfig(model_config=config,
-                                         server_config=test_server_config)
-=======
         # Enable accuracy test for stress-test-with-accuracy mode
         enable_accuracy = (test_mode == "stress-test-with-accuracy")
 
         stress_config = StressTestConfig(model_config=config,
                                          server_config=test_server_config,
                                          enable_accuracy_test=enable_accuracy)
->>>>>>> upstream/main
 
         # Override stress_time and stress_timeout if provided
         if stress_time is not None:
@@ -541,12 +513,8 @@ def stress_test(config,
                 server_config=test_server_config,
                 stress_time=stress_time,
                 stress_timeout=stress_timeout
-<<<<<<< HEAD
-                if stress_timeout is not None else stress_time * 2)
-=======
                 if stress_timeout is not None else stress_time * 2,
                 enable_accuracy_test=enable_accuracy)
->>>>>>> upstream/main
     else:
         stress_config = None
 
@@ -696,15 +664,12 @@ def stress_test(config,
             print_info(
                 f"Server is running with model {model_name}. Starting tests...")
 
-<<<<<<< HEAD
-=======
             # Run baseline accuracy test first if enabled
             baseline_accuracy_success = True
             if stress_config and stress_config.enable_accuracy_test:
                 baseline_accuracy_success, baseline_accuracy_value = run_accuracy_test(
                     model_path, test_server_config, stress_config, "baseline")
 
->>>>>>> upstream/main
             # Run performance test first if enabled
             stage2_output = None  # Initialize stage2_output to None
             if run_performance:
@@ -737,8 +702,6 @@ def stress_test(config,
                              stress_config,
                              None,
                              request_counter=request_counter)
-<<<<<<< HEAD
-=======
 
             # Run post-stress accuracy test if enabled
             post_stress_accuracy_success = True
@@ -785,7 +748,6 @@ def stress_test(config,
                         print_warning("✗ Post-stress accuracy test: FAILED")
                     print_warning(
                         "Model accuracy may be affected by stress conditions")
->>>>>>> upstream/main
     finally:
         # Clean up temp yaml file
         if os.path.exists(extra_llm_options_path):
@@ -1106,8 +1068,6 @@ def format_time(seconds: int) -> str:
         return f"{seconds}s"
 
 
-<<<<<<< HEAD
-=======
 def parse_accuracy_from_lm_eval_output(output_text: str) -> float:
     """
     Parse accuracy value from lm_eval output for GSM8K flexible-extract exact_match
@@ -1214,7 +1174,6 @@ def run_accuracy_test(model_path: str,
         return False, None
 
 
->>>>>>> upstream/main
 def extract_stress_test_metrics(artifacts_dir="./artifacts",
                                 current_model=None):
     """

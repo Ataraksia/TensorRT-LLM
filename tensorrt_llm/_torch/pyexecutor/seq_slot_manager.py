@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-import itertools
-
-=======
->>>>>>> upstream/main
 from .llm_request import LlmRequest
 from .resource_manager import BaseResourceManager, SlotManager
 from .scheduler import ScheduledRequests
@@ -20,14 +15,6 @@ class SeqSlotManager(BaseResourceManager):
         return 1
 
     def prepare_resources(self, scheduled_batch: ScheduledRequests) -> None:
-<<<<<<< HEAD
-        for llm_req in itertools.chain(scheduled_batch.context_requests,
-                                       scheduled_batch.generation_requests):
-            if (llm_req.is_context_init_state and llm_req.seq_slot is None) or \
-                llm_req.is_disagg_generation_transmission_complete:
-                llm_req.seq_slot = self.slot_manager.add_slot(
-                    llm_req.request_id)
-=======
         for llm_req in scheduled_batch.all_requests():
             if llm_req.is_disagg_generation_init_state:
                 logger.info(
@@ -40,7 +27,6 @@ class SeqSlotManager(BaseResourceManager):
                 llm_req.py_seq_slot = llm_req.seq_slot
                 if llm_req.return_perf_metrics:
                     llm_req.set_first_scheduled_time()
->>>>>>> upstream/main
 
     def free_resources(self, request: LlmRequest) -> None:
         self.slot_manager.remove_slot(request.request_id)

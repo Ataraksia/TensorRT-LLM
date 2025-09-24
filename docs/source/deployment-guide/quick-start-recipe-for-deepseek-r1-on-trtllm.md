@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-# Quick Start Recipe for DeepSeek R1 on TensorRT-LLM - Blackwell & Hopper Hardware
-
-## Introduction
-
-This deployment guide provides step-by-step instructions for running the DeepSeek R1 model using TensorRT-LLM with FP8 and NVFP4 quantization, optimized for NVIDIA GPUs. It covers the complete setup required; from accessing model weights and preparing the software environment to configuring TensorRT-LLM parameters, launching the server, and validating inference output.
-
-The guide is intended for developers and practitioners seeking high-throughput or low-latency inference using NVIDIA’s accelerated stack—starting with the PyTorch container from NGC, then installing TensorRT-LLM for model serving, FlashInfer for optimized CUDA kernels, and ModelOpt to enable FP8 and NVFP4 quantized execution.
-=======
 # Quick Start Recipe for DeepSeek R1 on TensorRT LLM - Blackwell & Hopper Hardware
 
 ## Introduction
@@ -14,7 +5,6 @@ The guide is intended for developers and practitioners seeking high-throughput o
 This deployment guide provides step-by-step instructions for running the DeepSeek R1 model using TensorRT LLM with FP8 and NVFP4 quantization, optimized for NVIDIA GPUs. It covers the complete setup required; from accessing model weights and preparing the software environment to configuring TensorRT LLM parameters, launching the server, and validating inference output.
 
 The guide is intended for developers and practitioners seeking high-throughput or low-latency inference using NVIDIA’s accelerated stack—starting with the PyTorch container from NGC, then installing TensorRT LLM for model serving, FlashInfer for optimized CUDA kernels, and ModelOpt to enable FP8 and NVFP4 quantized execution.
->>>>>>> upstream/main
 
 ## Prerequisites
 
@@ -40,11 +30,7 @@ There are multiple MOE backends inside TRT-LLM, not all of them supporting every
 | B200/GB200 EP<=8 | NVFP4 | CUTLASS, TRTLLM |
 | B200/GB200 EP<=8 | FP8 | DEEPGEMM |
 | GB200 NVL72 EP>8 | NVFP4 |  WIDEEP |
-<<<<<<< HEAD
-| GB200 NVL72 EP>8 | FP8 | N/A (WIP) |
-=======
 | GB200 NVL72 EP>8 | FP8 | WIDEEP without EPLB |
->>>>>>> upstream/main
 
 The default moe backend is `CUTLASS`, so for the combination which is not supported by `CUTLASS`, one must set the `moe_config.backend` explicitly to run the model.
 
@@ -52,11 +38,7 @@ The default moe backend is `CUTLASS`, so for the combination which is not suppor
 
 ### Run Docker Container
 
-<<<<<<< HEAD
-Run the docker container using the TensorRT-LLM NVIDIA NGC image.
-=======
 Run the docker container using the TensorRT LLM NVIDIA NGC image.
->>>>>>> upstream/main
 
 ```shell
 docker run --rm -it \
@@ -76,19 +58,11 @@ Note:
 * The command also maps port `8000` from the container to your host so you can access the LLM API endpoint from your host
 * See the <https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release/tags> for all the available containers. The containers published in the main branch weekly have `rcN` suffix, while the monthly release with QA tests has no `rcN` suffix. Use the `rc` release to get the latest model and feature support.
 
-<<<<<<< HEAD
-If you want to use latest main branch, you can choose to build from source to install TensorRT-LLM, the steps refer to <https://nvidia.github.io/TensorRT-LLM/latest/installation/build-from-source-linux.html>.
-
-### Creating the TRT-LLM Server config
-
-We create a YAML configuration file `/tmp/config.yml` for the TensorRT-LLM Server and populate it with the following recommended performance settings.
-=======
 If you want to use latest main branch, you can choose to build from source to install TensorRT LLM, the steps refer to [https://nvidia.github.io/TensorRT-LLM/latest/installation/build-from-source-linux.html](https://nvidia.github.io/TensorRT-LLM/latest/installation/build-from-source-linux.html) 
 
 ### Creating the TRT-LLM Server config
 
 We create a YAML configuration file /tmp/config.yml for the TensorRT LLM Server and populate it with the following recommended performance settings.
->>>>>>> upstream/main
 
 ```shell
 EXTRA_LLM_API_FILE=/tmp/config.yml
@@ -169,11 +143,7 @@ These options are used directly on the command line when you start the `trtllm-s
 
 #### `--backend pytorch`
 
-<<<<<<< HEAD
-* **Description:** Tells TensorRT-LLM to use the **pytorch** backend.
-=======
 &emsp;**Description:** Tells TensorRT LLM to use the **pytorch** backend.
->>>>>>> upstream/main
 
 #### `--max_batch_size`
 
@@ -189,11 +159,7 @@ These options are used directly on the command line when you start the `trtllm-s
 
 #### `--trust_remote_code`
 
-<<<<<<< HEAD
-* **Description:** Allows TensorRT-LLM to download models and tokenizers from Hugging Face. This flag is passed directly to the Hugging Face API.
-=======
 &emsp;**Description:** Allows TensorRT LLM to download models and tokenizers from Hugging Face. This flag is passed directly to the Hugging Face API.
->>>>>>> upstream/main
 
 
 #### Extra LLM API Options (YAML Configuration)
@@ -264,11 +230,7 @@ Refer to the wide EP [examples](https://github.com/NVIDIA/TensorRT-LLM/tree/main
 
 ### Basic Test
 
-<<<<<<< HEAD
-Start a new terminal on the host to test the TensorRT-LLM server you just launched.
-=======
 Start a new terminal on the host to test the TensorRT LLM server you just launched. 
->>>>>>> upstream/main
 
 You can query the health/readiness of the server using:
 
@@ -308,20 +270,12 @@ Here is an example response, showing that the TRT-LLM server returns “New York
 
 We use the `lm-eval` tool to test the model’s accuracy. For more information see [https://github.com/EleutherAI/lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness).
 
-<<<<<<< HEAD
-To run the evaluation harness exec into the running TensorRT-LLM container and install with this command:
-=======
 To run the evaluation harness exec into the running TensorRT LLM container and install with this command:
->>>>>>> upstream/main
 
 ```shell
 docker exec -it tensorrt_llm /bin/bash
 
-<<<<<<< HEAD
-pip install lm_eval
-=======
 pip install -U lm-eval
->>>>>>> upstream/main
 ```
 
 FP8 command for GSM8K:
@@ -364,11 +318,7 @@ Sample result in Blackwell:
 
 ## Benchmarking Performance
 
-<<<<<<< HEAD
-To benchmark the performance of your TensorRT-LLM server you can leverage the built-in `benchmark_serving.py` script. To do this first creating a wrapper `bench.sh` script.
-=======
 To benchmark the performance of your TensorRT LLM server you can leverage the built-in “benchmark\_serving.py” script. To do this first creating a wrapper [bench.sh](http://bench.sh) script.
->>>>>>> upstream/main
 
 ```shell
 cat <<EOF >  bench.sh
@@ -416,11 +366,7 @@ Run `bench.sh` to begin a serving benchmark. This will take a long time if you r
 ./bench.sh
 ```
 
-<<<<<<< HEAD
-Sample TensorRT-LLM serving benchmark output. Your results may vary due to ongoing software optimizations.
-=======
 Sample TensorRT LLM serving benchmark output. Your results may vary due to ongoing software optimizations.
->>>>>>> upstream/main
 
 ```
 ============ Serving Benchmark Result ============

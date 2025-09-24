@@ -72,15 +72,6 @@ input [
         dims: [ 1 ]
         optional: true
     },
-<<<<<<< HEAD
-    # input tensors for llava_onevision
-    {
-        name: "image_sizes"
-        data_type: TYPE_INT64
-        dims: [ 2 ]
-        optional: true
-    },
-=======
     # Required for llava_onevision and pixtral
     {
         name: "image_sizes"
@@ -89,7 +80,6 @@ input [
         optional: true
     },
     # Required for llava_onevision
->>>>>>> upstream/main
     {
         name: "is_video_input"
         data_type: TYPE_BOOL
@@ -125,11 +115,7 @@ input [
 output [
     {
         name: "OUT_PROMPT_EMBEDDING_TABLE"
-<<<<<<< HEAD
-        data_type: TYPE_FP16
-=======
         data_type: ${prompt_embedding_table_data_type}
->>>>>>> upstream/main
         dims: [ -1, -1 ]
     },
     {

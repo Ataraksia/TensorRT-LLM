@@ -76,10 +76,6 @@ std::shared_ptr<tb::LlmRequest> LlmRequest::toTrtLlm() const
         ? std::make_shared<std::vector<TokenIdType>>(*mEncoderTokens.value().get())
         : nullptr;
     auto const optEncoderInputTokens = std::optional<std::shared_ptr<std::vector<TokenIdType>>>(encoderInputTokens);
-<<<<<<< HEAD
-    // 49 parameters
-=======
->>>>>>> upstream/main
     return std::make_shared<tb::LlmRequest>(                       //
         mRequestId,                                                //
         mMaxNewTokens,                                             //
@@ -129,12 +125,8 @@ std::shared_ptr<tb::LlmRequest> LlmRequest::toTrtLlm() const
         mGuidedDecodingParams,                                     //
         mLanguageAdapterUid,                                       //
         mAllottedTimeMs,                                           //
-<<<<<<< HEAD
-        mContextPhaseParams                                        //
-=======
         mContextPhaseParams,                                       //
         mCacheSaltID,                                              //
         mPerfMetrics.timingMetrics.arrivalTime                     //
->>>>>>> upstream/main
     );
 }

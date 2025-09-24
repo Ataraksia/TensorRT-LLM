@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
 /*
  * SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION &
  * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
@@ -22,10 +18,7 @@
 
 namespace batchedGemm
 {
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/main
 // This is device code
 
 struct KernelParams
@@ -36,11 +29,6 @@ struct KernelParams
     //
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-    // Maximum number of CTAs
-    static constexpr int MaxNumCtas = 2048;
-
-=======
     // Maximum number of CTAs in the batch-token dimension.
     static constexpr int MaxNumCtas = 2048;
 
@@ -93,7 +81,6 @@ struct KernelParams
     // + tileN = ctaGridDimY * tileN which is equal to the 3rd dimension size and will be filtered
     // out. That's why we need to extend the tensor size by tileN.
     //
->>>>>>> upstream/main
     // TMA descriptor for A.
     // Must be setup using gemm::buildNdTmaDescriptor with shapes and strides from
     // makeTmaShapeStrideAbc.
@@ -273,17 +260,6 @@ struct KernelParams
     //   x_linear = x_linear.clamp(min=-limit, max=limit)
     float const* ptrClampLimit{nullptr};
 
-<<<<<<< HEAD
-    // The alpha and beta for SwiGlu.
-    // Shape is [B]. One alpha and one beta per tensor in batch.
-    // Alpha is 1.f if nullptr.
-    // Beta is 0.f if nullptr.
-    // The formula:
-    //
-    //   out_glu  = x_glu * torch.sigmoid(alpha * x_glu) * (x_linear + beta)
-    float const* ptrSwiGluAlpha{nullptr};
-    float const* ptrSwiGluBeta{nullptr};
-=======
     // The alpha and beta for SwiGlu or GeGlu.
     // Shape is [B]. One alpha and one beta per tensor in batch.
     // Alpha is 1.f if nullptr.
@@ -293,7 +269,6 @@ struct KernelParams
     //   out_glu  = x_glu * torch.sigmoid(alpha * x_glu) * (x_linear + beta)
     float const* ptrGatedActAlpha{nullptr};
     float const* ptrGatedActBeta{nullptr};
->>>>>>> upstream/main
 
     // The K dimension. It is the hidden dimension of the input matrices.
     int32_t k;

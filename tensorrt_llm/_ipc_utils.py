@@ -17,31 +17,20 @@ import struct
 import sys
 from typing import List, Tuple
 
-<<<<<<< HEAD
-from cuda import cuda, cudart
-from cuda.cudart import cudaError_t
-=======
 try:
     from cuda.bindings import driver as cuda
     from cuda.bindings import runtime as cudart
 except ImportError:
     from cuda import cuda, cudart
->>>>>>> upstream/main
 
 from ._utils import mpi_comm
 from .logger import logger
 from .mapping import Mapping
 
 
-<<<<<<< HEAD
-def _raise_if_error(error: cudaError_t | cuda.CUresult):
-    if isinstance(error, cudaError_t):
-        if error != cudaError_t.cudaSuccess:
-=======
 def _raise_if_error(error: cudart.cudaError_t | cuda.CUresult):
     if isinstance(error, cudart.cudaError_t):
         if error != cudart.cudaError_t.cudaSuccess:
->>>>>>> upstream/main
             raise RuntimeError(f"CUDA Runtime API error: {repr(error)}")
     if isinstance(error, cuda.CUresult):
         if error != cuda.CUresult.CUDA_SUCCESS:
@@ -56,13 +45,7 @@ def can_access_peer(mapping: Mapping) -> bool:
 
         # Early exit if devices are on different nodes
         if mapping.get_node_rank(rank) != mapping.node_rank:
-<<<<<<< HEAD
-            logger.info(
-                f"Detect inter-node TP between rank {mapping.rank} and rank {rank}"
-            )
-=======
             logger.info(f"Detect inter-node TP between rank {mapping.rank} and rank {rank}")
->>>>>>> upstream/main
             return False
 
         # Skip if same device
@@ -81,12 +64,7 @@ def can_access_peer(mapping: Mapping) -> bool:
     return True
 
 
-<<<<<<< HEAD
-class IpcMemory():
-
-=======
 class IpcMemory:
->>>>>>> upstream/main
     # WARNING: Must in sync with FLAGS_SIZE in cpp/include/tensorrt_llm/runtime/ipcUtils.h
     # (Max all reduce blocks + 1) * sizeof(int)
     IPC_BARRIERS_SIZE_PER_GPU = (24 + 1) * 4
@@ -95,12 +73,7 @@ class IpcMemory:
         self.mapping = mapping
         self.open_ipc = open_ipc and mapping.tp_size <= mapping.gpus_per_node
         if self.open_ipc:
-<<<<<<< HEAD
-            self.peer_ptrs, self.local_ptr = IpcMemory.open_ipc_memory(
-                self.mapping, size, True)
-=======
             self.peer_ptrs, self.local_ptr = IpcMemory.open_ipc_memory(self.mapping, size, True)
->>>>>>> upstream/main
         else:
             self.peer_ptrs = [0] * mapping.tp_size
             self.local_ptr = 0
@@ -117,17 +90,10 @@ class IpcMemory:
         return array.array("Q", buffer).tolist()
 
     @staticmethod
-<<<<<<< HEAD
-    def open_ipc_memory(mapping: Mapping,
-                        size: int,
-                        set_to_zero: bool = False) -> Tuple[List[int], int]:
-        """ Allocates a buffer with the given *size* on each GPU. Then, enables IPC communication between TP groups.
-=======
     def open_ipc_memory(
         mapping: Mapping, size: int, set_to_zero: bool = False
     ) -> Tuple[List[int], int]:
         """Allocates a buffer with the given *size* on each GPU. Then, enables IPC communication between TP groups.
->>>>>>> upstream/main
         Returns a list of buffer pointers, buffers[i] is a handle to the corresponding buffer residing on GPU #i.
         Call close_ipc_handle with the *buffer*.
         """
@@ -138,13 +104,8 @@ class IpcMemory:
             return size
 
         comm = mpi_comm().Split(
-<<<<<<< HEAD
-            mapping.pp_rank * mapping.cp_size + mapping.cp_rank,
-            mapping.tp_rank)
-=======
             mapping.pp_rank * mapping.cp_size + mapping.cp_rank, mapping.tp_rank
         )
->>>>>>> upstream/main
 
         # see allocateIpcMemory in cpp/tensorrt_llm/runtime/ipcUtils.cpp for alignment reason
         # 1 << 21 is 2MB
@@ -169,12 +130,8 @@ class IpcMemory:
                 peer_ptrs.append(local_ptr)
             else:
                 error, ptr = cudart.cudaIpcOpenMemHandle(
-<<<<<<< HEAD
-                    handle, cudart.cudaIpcMemLazyEnablePeerAccess)
-=======
                     handle, cudart.cudaIpcMemLazyEnablePeerAccess
                 )
->>>>>>> upstream/main
                 _raise_if_error(error)
                 peer_ptrs.append(ptr)
 

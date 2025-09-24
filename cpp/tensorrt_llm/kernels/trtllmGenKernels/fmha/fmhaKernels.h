@@ -17,32 +17,19 @@
 #pragma once
 
 #include "cuda_runtime_api.h"
-<<<<<<< HEAD
-#include <cstdint>
-=======
->>>>>>> upstream/main
 #include <memory>
 #include <mutex>
 #include <unordered_map>
 
-<<<<<<< HEAD
-#include "tensorrt_llm/common/assert.h"
-=======
->>>>>>> upstream/main
 #include "tensorrt_llm/common/cudaDriverWrapper.h"
 #include "tensorrt_llm/common/envUtils.h"
 #include "tensorrt_llm/common/logger.h"
 
 #include "cubin/kernelMetaInfo.h"
-<<<<<<< HEAD
-#include "fmhaRunnerParams.h"
-#include "kernelParams.h"
-=======
 #include "fmhaReduction.h"
 #include "fmhaRunnerParams.h"
 #include "kernelParams.h"
 #include "tensorrt_llm/kernels/multiHeadAttentionCommon.h"
->>>>>>> upstream/main
 
 namespace tc = tensorrt_llm::common;
 
@@ -53,8 +40,6 @@ namespace kernels
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 constexpr bool isSMCompatible(int gpuSM, int kernelSM)
 {
     if (gpuSM == kSM_103)
@@ -69,7 +54,6 @@ constexpr bool isSMCompatible(int gpuSM, int kernelSM)
     return gpuSM == kernelSM;
 }
 
->>>>>>> upstream/main
 class TllmGenFmhaKernel
 {
 public:
@@ -96,11 +80,7 @@ public:
         for (unsigned int i = 0; i < mKernelMetaCount; ++i)
         {
             auto const& kernelMeta = mKernelMeta[i];
-<<<<<<< HEAD
-            if (static_cast<unsigned int>(kernelMeta.mSM) == mSM && kernelMeta.mDataTypeQ == mDtypeQ
-=======
             if (isSMCompatible(mSM, kernelMeta.mSM) && kernelMeta.mDataTypeQ == mDtypeQ
->>>>>>> upstream/main
                 && kernelMeta.mDataTypeKv == mDtypeKv && kernelMeta.mDataTypeO == mDtypeOut)
             {
                 // Load CUmodules
@@ -293,13 +273,10 @@ public:
             }
 
             TLLM_CU_CHECK(mDriver->cuLaunchKernelEx(&launch_config, func, kernelParamsList, nullptr));
-<<<<<<< HEAD
-=======
 
             // Run the separate reduction kernel if needed.
             runFmhaReduction(kernelMeta, kernelParams, params.mMultiProcessorCount, params.stream);
 
->>>>>>> upstream/main
             // Break the while op.
             break;
         }
@@ -510,14 +487,11 @@ private:
             {
                 // Otherwise, we use the high-throughput kernel.
                 kernelType = FmhaKernelType::KeepsMmaAbForGeneration;
-<<<<<<< HEAD
-=======
                 // Always use the separate reduction kernel.
                 if (isMultiCtasKvEnabled(selectKernelParams.mMultiCtasKvMode))
                 {
                     selectKernelParams.mMultiCtasKvMode = MultiCtasKvMode::GmemReductionWithSeparateKernel;
                 }
->>>>>>> upstream/main
                 // The 2CTA keepsMmaAbForGeneration kernel is used when the numHeadsQPerKv is 128.
                 if (params.mNumHeadsQPerKv == 128)
                 {
@@ -575,13 +549,9 @@ private:
         int numTokensPerPage = (!isPagedKv(params.mQkvLayout)) ? 0 : params.mNumTokensPerPage;
 
         // Debug info.
-<<<<<<< HEAD
-        std::string info = "qkvLayout=" + std::to_string(static_cast<int>(params.mQkvLayout))
-=======
         std::string info = "dtypeQ=" + std::to_string(static_cast<int>(mDtypeQ)) + ", dtypeKv="
             + std::to_string(static_cast<int>(mDtypeKv)) + ", dtypeOut=" + std::to_string(static_cast<int>(mDtypeOut))
             + ", sm=" + std::to_string(mSM) + ", qkvLayout=" + std::to_string(static_cast<int>(params.mQkvLayout))
->>>>>>> upstream/main
             + ", maskType=" + std::to_string(static_cast<int>(selectKernelParams.mMaskType))
             + ", kernelType=" + std::to_string(static_cast<int>(kernelType))
             + ", tileScheduler=" + std::to_string(static_cast<int>(selectKernelParams.mTileScheduler))
@@ -673,11 +643,7 @@ inline TllmGenFmhaKernel const* getTllmFmhaKernels(
     Data_type dtypeQ, Data_type dtypeKv, Data_type dtypeOut, unsigned int sm)
 {
 
-<<<<<<< HEAD
-#ifndef EXCLUDE_SM_100
-=======
 #if !defined(EXCLUDE_SM_100) || !defined(EXCLUDE_SM_103)
->>>>>>> upstream/main
     return TllmFmhaKernelFactory::Get().getKernels(sTllmGenFmhaKernelMetaInfos,
         sizeof(sTllmGenFmhaKernelMetaInfos) / sizeof(sTllmGenFmhaKernelMetaInfos[0]), dtypeQ, dtypeKv, dtypeOut, sm);
 #else

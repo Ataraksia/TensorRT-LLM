@@ -1,15 +1,6 @@
 #!/usr/bin/env python
 import asyncio
 import copy
-<<<<<<< HEAD
-import json
-import logging
-import os
-import signal
-from contextlib import asynccontextmanager
-from http import HTTPStatus
-from typing import List, Optional, Type, Union
-=======
 import itertools
 import os
 import signal
@@ -18,19 +9,12 @@ from collections import deque
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from typing import Callable, Optional, Type, Union
->>>>>>> upstream/main
 
 import aiohttp
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-<<<<<<< HEAD
-
-# yapf: disable
-from tensorrt_llm.executor import CppExecutorError
-from tensorrt_llm.llmapi.disagg_utils import RouterConfig
-=======
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
 # yapf: disable
@@ -40,43 +24,21 @@ from tensorrt_llm.llmapi.disagg_utils import (DisaggServerConfig,
                                               get_ctx_gen_server_urls)
 from tensorrt_llm.logger import logger
 from tensorrt_llm.serve.metadata_server import create_metadata_server
->>>>>>> upstream/main
 from tensorrt_llm.serve.openai_protocol import (ChatCompletionRequest,
                                                 ChatCompletionResponse,
                                                 CompletionRequest,
                                                 CompletionResponse,
                                                 DisaggregatedParams,
                                                 ErrorResponse)
-<<<<<<< HEAD
-from tensorrt_llm.serve.router import create_router
-from tensorrt_llm.version import __version__ as VERSION
-
-logging.basicConfig(level=logging.INFO)
-
-=======
 from tensorrt_llm.serve.router import KvCacheAwareRouter, create_router
 from tensorrt_llm.version import __version__ as VERSION
 
->>>>>>> upstream/main
 # yapf: enale
 TIMEOUT_KEEP_ALIVE = 10  # seconds.
 
 class OpenAIDisaggServer:
 
     def __init__(self,
-<<<<<<< HEAD
-                 ctx_servers: List[str] = None,
-                 gen_servers: List[str] = None,
-                 req_timeout_secs: int = 180,
-                 server_start_timeout_secs: int = 180,
-                 ctx_router_config: Optional[RouterConfig] = None,
-                 gen_router_config: Optional[RouterConfig] = None):
-
-        self.ctx_servers = ctx_servers
-        self.gen_servers = gen_servers
-        self.ctx_router = create_router(ctx_router_config, ctx_servers)
-        self.gen_router = create_router(gen_router_config, gen_servers)
-=======
                  config: DisaggServerConfig,
                  req_timeout_secs: int = 180,
                  server_start_timeout_secs: int = 180,
@@ -118,16 +80,10 @@ class OpenAIDisaggServer:
         self.metrics_interval_secs = metrics_interval_secs
 
         logger.info(f"Server max retries: {self.max_retries}")
->>>>>>> upstream/main
 
         if (len(self.gen_servers) == 0):
             raise ValueError("At least one generation server must be provided")
 
-<<<<<<< HEAD
-        if os.getenv("TRTLLM_DISAGG_BENCHMARK_GEN_ONLY") != "1" and len(ctx_servers) == 0:
-            raise ValueError("At least one context server must be provided")
-
-=======
         if os.getenv("TRTLLM_DISAGG_BENCHMARK_GEN_ONLY") != "1" and len(self.ctx_servers) == 0:
             raise ValueError("At least one context server must be provided")
 
@@ -135,7 +91,6 @@ class OpenAIDisaggServer:
                 not isinstance(self.gen_router, KvCacheAwareRouter):
             raise ValueError("Generation router must be a KvCacheAwareRouter to enable conditional disaggregation")
 
->>>>>>> upstream/main
         # Session will be initialized in lifespan
         self.session: Optional[aiohttp.ClientSession] = None
 
@@ -143,14 +98,6 @@ class OpenAIDisaggServer:
         async def lifespan(app: FastAPI):
             # Create a persistent aiohttp ClientSession
             self.session = aiohttp.ClientSession(
-<<<<<<< HEAD
-                connector=aiohttp.TCPConnector(limit=0, limit_per_host=0, keepalive_timeout=300),
-                timeout=aiohttp.ClientTimeout(total=req_timeout_secs))
-
-            logging.info("Waiting for context and generation servers to be ready")
-            await self.wait_for_servers_ready(server_start_timeout_secs)
-            yield
-=======
                 connector=aiohttp.TCPConnector(limit=0, limit_per_host=0, force_close=True),
                 timeout=aiohttp.ClientTimeout(total=req_timeout_secs))
 
@@ -181,7 +128,6 @@ class OpenAIDisaggServer:
                 except asyncio.CancelledError:
                     pass
 
->>>>>>> upstream/main
             await self.session.close()  # Ensure session cleanup
 
         self.app = FastAPI(lifespan=lifespan)
@@ -192,8 +138,6 @@ class OpenAIDisaggServer:
 
         self.register_routes()
 
-<<<<<<< HEAD
-=======
     async def _increment_metric(self, key: str, amount: int = 1):
         if self.metrics_interval_secs > 0:
             async with self._metrics_lock:
@@ -217,7 +161,6 @@ class OpenAIDisaggServer:
         except asyncio.CancelledError:
             pass
 
->>>>>>> upstream/main
     @staticmethod
     def create_error_response(
             message: str,
@@ -227,10 +170,7 @@ class OpenAIDisaggServer:
     def register_routes(self):
         self.app.add_api_route("/health", self.health, methods=["GET"])
         self.app.add_api_route("/version", self.version, methods=["GET"])
-<<<<<<< HEAD
-=======
         self.app.add_api_route("/perf_metrics", self.perf_metrics, methods=["GET"])
->>>>>>> upstream/main
         self.app.add_api_route("/v1/completions",
                                self.openai_completion,
                                methods=["POST"])
@@ -245,8 +185,6 @@ class OpenAIDisaggServer:
         ver = {"version": VERSION}
         return JSONResponse(content=ver)
 
-<<<<<<< HEAD
-=======
     async def _add_perf_metrics_keys(self, ctx_server: str, gen_server: str, ctx_request_id: int):
         async with self.perf_metrics_keys_lock:
             self.perf_metrics_keys.append((ctx_server, gen_server, ctx_request_id))
@@ -302,31 +240,10 @@ class OpenAIDisaggServer:
 
         return JSONResponse(content=return_metrics)
 
->>>>>>> upstream/main
     async def merge_streaming_responses(self, ctx_response,
                                         gen_server: str,
                                         gen_req: Union[CompletionRequest, ChatCompletionRequest]):
         try:
-<<<<<<< HEAD
-            # First yield the context response if it's not None
-            if ctx_response is not None:
-                # Remove the disaggregated params from the context response
-                data = ctx_response.model_dump()
-                del data['choices'][0]['disaggregated_params']
-                data = json.dumps(data)
-                yield f"data: {data}\n\n".encode('utf-8')
-
-            # Then yield the generation responses
-            if isinstance(gen_req, CompletionRequest):
-                gen_response = await self.send_completion_request(gen_server, gen_req)
-            elif isinstance(gen_req, ChatCompletionRequest):
-                gen_response = await self.send_chat_request(gen_server, gen_req)
-            else:
-                raise TypeError("Invalid request type: {type(gen_req).__name__}")
-
-            async for chunk in gen_response.body_iterator:
-                yield chunk
-=======
             if ctx_response is not None and len(ctx_response.choices) != 1:
                 raise ValueError("Context server did not return a single choice. This is not expected")
 
@@ -346,17 +263,12 @@ class OpenAIDisaggServer:
                 async for chunk in gen_response.body_iterator:
                     yield chunk
                 await self._increment_metric("gen_completed_requests")
->>>>>>> upstream/main
 
         finally:
             await self.gen_router.finish_request(gen_req)
 
     async def openai_completion(self, req: CompletionRequest) -> Response:
         try:
-<<<<<<< HEAD
-            gen_req = copy.deepcopy(req)
-=======
->>>>>>> upstream/main
             if not isinstance(req.prompt, str):
                 # Check if it's a list and contains integers
                 if type(req.prompt) is list and len(req.prompt) == 1:
@@ -364,13 +276,7 @@ class OpenAIDisaggServer:
                 elif not isinstance(req.prompt, list) or not all(isinstance(x, int) for x in req.prompt):
                     raise ValueError("Disaggregated server currently only supports single string prompt or list of integers in request")
 
-<<<<<<< HEAD
-            ctx_response = await self._process_context_server_request(req, "completion")
-
-            return await self._process_generation_server_request(gen_req, ctx_response)
-=======
             return await self._send_disagg_request(req)
->>>>>>> upstream/main
 
         except Exception as e:
             await self._handle_exception(e)
@@ -378,95 +284,17 @@ class OpenAIDisaggServer:
     async def openai_chat_completion(self, req: ChatCompletionRequest) -> Response:
 
         try:
-<<<<<<< HEAD
-            gen_req = copy.deepcopy(req)
-            ctx_response = await self._process_context_server_request(req, "chat")
-
-            return await self._process_generation_server_request(gen_req, ctx_response)
-=======
             return await self._send_disagg_request(req)
->>>>>>> upstream/main
         except Exception as e:
             await self._handle_exception(e)
 
     async def _handle_exception(self, exception):
         if isinstance(exception, CppExecutorError):
-<<<<<<< HEAD
-            logging.exception(exception)
-=======
             logger.error(traceback.format_exc())
->>>>>>> upstream/main
             signal.raise_signal(signal.SIGINT)
         elif isinstance(exception, HTTPException):
             raise exception  # Re-raise HTTP exceptions properly
         else:
-<<<<<<< HEAD
-            logging.exception(exception)
-            raise HTTPException(status_code=500, detail=f"Internal server error {str(exception)}")
-
-    async def _process_context_server_request(self, ctx_req, request_type: str):
-        # No need to send request to context server if we are benchmarking generation only
-        if os.getenv("TRTLLM_DISAGG_BENCHMARK_GEN_ONLY") == "1":
-            return None
-
-        try:
-            if request_type == "chat":
-                ctx_req.max_completion_tokens = 1
-            elif request_type == "completion":
-                ctx_req.max_tokens = 1
-            ctx_req.disaggregated_params = DisaggregatedParams(request_type="context_only")
-            ctx_req.stream = False
-            ctx_req.stream_options = None
-
-            ctx_server, _ = await self.ctx_router.get_next_server(ctx_req)
-            logging.info("Sending request to ctx server: %s", ctx_server)
-
-            if request_type == "chat":
-                response = await self.send_chat_request(ctx_server, ctx_req)
-            else:
-                response = await self.send_completion_request(ctx_server, ctx_req)
-            return response  # Don't forget to return the response if needed
-        finally:
-            await self.ctx_router.finish_request(ctx_req)
-
-    async def _process_generation_server_request(self, gen_req, ctx_response):
-        if os.getenv("TRTLLM_DISAGG_BENCHMARK_GEN_ONLY") == "1":
-            # Hard-code first token, ctx_request_id for testing
-            gen_req.disaggregated_params = DisaggregatedParams(request_type="generation_only", first_gen_tokens=[7], ctx_request_id=1, encoded_opaque_state=None, draft_tokens=None)
-            # Since KV cache for prompt tokens will be uninitialized, need to ignore eos
-            gen_req.ignore_eos = True
-        else:
-            choices = ctx_response.choices
-            if len(choices) > 1:
-                raise ValueError("Disagg server returned more than one choice. This is currently not supported in disaggregated server.")
-            if choices[0].disaggregated_params is None:
-                raise ValueError("Context server did not return disaggregated params")
-
-            # Append disaggregates parameters to generation request
-            gen_req.disaggregated_params = choices[0].disaggregated_params
-        gen_req.disaggregated_params.request_type = "generation_only"
-
-        # Pick a generation server and send request
-        gen_server, _ = await self.gen_router.get_next_server(gen_req)
-        logging.info("Sending request to gen server: %s", gen_server)
-
-        if not gen_req.stream:
-            try:
-                if isinstance(gen_req, CompletionRequest):
-                    gen_response = await self.send_completion_request(gen_server, gen_req)
-                elif isinstance(gen_req, ChatCompletionRequest):
-                    gen_response = await self.send_chat_request(gen_server, gen_req)
-
-                return gen_response
-            finally:
-                await self.gen_router.finish_request(gen_req)
-        else:
-            # Return a streaming response that combines both context and generation responses
-            return StreamingResponse(
-                self.merge_streaming_responses(ctx_response, gen_server, gen_req),
-                media_type="text/event-stream"
-            )
-=======
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Internal server error {str(exception)}")
 
@@ -588,7 +416,6 @@ class OpenAIDisaggServer:
                 await self.gen_router.finish_request(req)
             raise
 
->>>>>>> upstream/main
 
     async def __call__(self, host, port):
         config = uvicorn.Config(self.app,
@@ -611,11 +438,7 @@ class OpenAIDisaggServer:
                             yield line
                             await asyncio.sleep(0)
                 except Exception as e:
-<<<<<<< HEAD
-                    logging.error(f"Unexpected error in stream: {e}")
-=======
                     logger.error(f"Unexpected error in stream: {e}")
->>>>>>> upstream/main
                     raise
 
     async def create_completion_generator(self, url: str, request: CompletionRequest):
@@ -630,23 +453,6 @@ class OpenAIDisaggServer:
                            request: Union[CompletionRequest, ChatCompletionRequest],
                            endpoint: str,
                            response_type: Type[Union[CompletionResponse, ChatCompletionResponse]],
-<<<<<<< HEAD
-                           create_generator: callable) -> Union[CompletionResponse, ChatCompletionResponse, StreamingResponse]:
-        if request.stream:
-            response_generator = create_generator(url, request)
-            return StreamingResponse(content=response_generator, media_type="text/event-stream")
-        else:
-            async with self.session.post(url + endpoint, json=request.model_dump(exclude_unset=True)) as response:
-                content_type = response.headers.get("Content-Type", "")
-                if "text/event-stream" in content_type:
-                    raise ValueError("Received an event-stream although request stream was False")
-
-                response_dict = await response.json()
-                if not response.ok:
-                    logging.error(f"Received failed response {response_dict}")
-                    response.raise_for_status()
-                return response_type(**response_dict)
-=======
                            create_generator: Callable) -> Union[CompletionResponse, ChatCompletionResponse, StreamingResponse]:
         for attempt in range(self.max_retries + 1):
             try:
@@ -674,7 +480,6 @@ class OpenAIDisaggServer:
                 logger.error(f"Error encountered while processing request to {url+endpoint}: {e}")
                 raise
 
->>>>>>> upstream/main
 
     async def send_completion_request(self, url: str, request: CompletionRequest) -> Union[CompletionResponse, StreamingResponse]:
         return await self.send_request(url, request, "/v1/completions", CompletionResponse, self.create_completion_generator)
@@ -682,34 +487,14 @@ class OpenAIDisaggServer:
     async def send_chat_request(self, url: str, request: ChatCompletionRequest) -> ChatCompletionResponse:
         return await self.send_request(url, request, "/v1/chat/completions", ChatCompletionResponse, self.create_chat_generator)
 
-<<<<<<< HEAD
-    async def check_server_ready(self, server_url: str) -> bool:
-        try:
-            async with self.session.get(server_url+"/health") as response:
-=======
     @classmethod
     async def check_server_ready(cls, session: aiohttp.ClientSession, server_url: str) -> bool:
         try:
             async with session.get(server_url+"/health") as response:
->>>>>>> upstream/main
                 return response.status == 200
         except Exception:
             return False
 
-<<<<<<< HEAD
-    async def wait_for_servers_ready(self, server_start_timeout_secs: int = 180):
-        async def are_servers_ready():
-            context_ready = all([await self.check_server_ready(url) for url in self.ctx_servers])
-            generation_ready = all([await self.check_server_ready(url) for url in self.gen_servers])
-            return context_ready and generation_ready
-
-        async def check_all_servers_ready():
-            while not await are_servers_ready():
-                wait_time = 3
-                logging.info("Context and generation servers are not ready. Waiting...")
-                await asyncio.sleep(wait_time)
-
-=======
     @classmethod
     async def wait_for_all_servers_ready(cls, session: aiohttp.ClientSession,
                                          ctx_servers: list[str],
@@ -730,15 +515,11 @@ class OpenAIDisaggServer:
                 await asyncio.sleep(wait_time)
                 iter += 1
                 unready_servers = await get_unready_servers(unready_servers)
->>>>>>> upstream/main
         try:
             await asyncio.wait_for(check_all_servers_ready(), timeout=server_start_timeout_secs)
         except asyncio.CancelledError:
             raise TimeoutError("Timeout waiting for context and generation servers to be ready")
-<<<<<<< HEAD
-=======
         logger.info("Context and generation servers are ready")
 
     async def wait_for_servers_ready(self, server_start_timeout_secs: int = 180):
         await self.wait_for_all_servers_ready(self.session, self.ctx_servers, self.gen_servers, server_start_timeout_secs)
->>>>>>> upstream/main

@@ -30,18 +30,9 @@ from tensorrt_llm._torch.modules.fused_moe.interface import MoEWeightLoadingMode
 
 # isort and yapf will fight against each other here, so we disable isort
 # isort: off
-<<<<<<< HEAD
-from tensorrt_llm._torch.modules.fused_moe import (BaseMoeRoutingMethod,
-                                                   CutlassFusedMoE,
-                                                   DefaultMoeRoutingMethod,
-                                                   RenormalizeMoeRoutingMethod,
-                                                   TritonFusedMoE, VanillaMoE,
-                                                   create_moe, WideEPMoE)
-=======
 from tensorrt_llm._torch.modules.fused_moe import (
     BaseMoeRoutingMethod, CutlassFusedMoE, DefaultMoeRoutingMethod,
     RenormalizeMoeRoutingMethod, TritonFusedMoE, create_moe, WideEPMoE)
->>>>>>> upstream/main
 # isort: on
 from tensorrt_llm._torch.modules.fused_moe.fused_moe_triton import \
     IS_TRITON_KERNELS_AVAILABLE
@@ -82,17 +73,11 @@ def test_fused_moe(moe_backend,
     if bias and moe_backend not in ["TRITON"]:
         pytest.skip("Bias not supported.")
 
-<<<<<<< HEAD
-    mapping = Mapping()
-    mapping.rank = mpi_rank()
-
-=======
     mapping = mapping or Mapping()
     mapping.rank = mpi_rank()
 
     torch.cuda.set_device(mapping.rank)
 
->>>>>>> upstream/main
     with torch.device(f'cuda:{mapping.rank}'):
         SEQ_LEN = 8
         HIDDEN_SIZE = 64
@@ -179,31 +164,19 @@ def test_fused_moe(moe_backend,
 
 @pytest.mark.skipif(torch.cuda.device_count() < 4,
                     reason="needs 4 GPUs to run this test")
-<<<<<<< HEAD
-@pytest.mark.parametrize("moe_cls", [CutlassFusedMoE, VanillaMoE])
-=======
 @pytest.mark.parametrize("moe_cls", ["CUTLASS", "VANILLA"])
->>>>>>> upstream/main
 @pytest.mark.parametrize("ep_size", [1, 2, 4])
 def test_fused_moe_multi_gpu(moe_cls, ep_size):
     world_size = 4
     with MPIPoolExecutor(max_workers=world_size) as executor:
         results = executor.map(
             test_fused_moe,
-<<<<<<< HEAD
-            *zip(*[(moe_cls, torch.bfloat16, 512, DefaultMoeRoutingMethod,
-                    Mapping(world_size=world_size,
-                            tp_size=world_size,
-                            moe_ep_size=ep_size,
-                            moe_tp_size=world_size // ep_size))] * world_size),
-=======
             *zip(
                 *[(moe_cls, torch.bfloat16, 512, DefaultMoeRoutingMethod, False,
                    Mapping(world_size=world_size,
                            tp_size=world_size,
                            moe_ep_size=ep_size,
                            moe_tp_size=world_size // ep_size))] * world_size),
->>>>>>> upstream/main
         )
         for r in results:
             assert r is None
@@ -293,27 +266,17 @@ def test_fused_moe_alltoall(alltoall_method_type):
                     x,
                     router_logits,
                     all_rank_num_tokens=all_rank_num_tokens,
-<<<<<<< HEAD
-                    all_rank_max_num_tokens=m,
-=======
->>>>>>> upstream/main
                     use_dp_padding=False)
                 ref_output = ref_model.forward(
                     x,
                     router_logits,
                     all_rank_num_tokens=all_rank_num_tokens,
-<<<<<<< HEAD
-                    all_rank_max_num_tokens=m,
-                    use_dp_padding=False)
-
-=======
                     use_dp_padding=False)
 
             if alltoall_method_type == AlltoallMethodType.MNNVL and output.ndim == 3:
                 output = output.sum(dim=1)
             print(f"output: {output.shape}")
             print(f"ref_output: {ref_output.shape}")
->>>>>>> upstream/main
             # Evaluate outputs
             torch.testing.assert_close(output,
                                        ref_output,
@@ -328,10 +291,7 @@ def test_fused_moe_alltoall(alltoall_method_type):
             assert r is None
 
 
-<<<<<<< HEAD
-=======
 @pytest.mark.skip(reason="https://nvbugs/5467531")
->>>>>>> upstream/main
 @pytest.mark.skipif(torch.cuda.device_count() < 4,
                     reason="needs 4 GPUs to run this test")
 @pytest.mark.parametrize("alltoall_method_type", [
@@ -497,19 +457,11 @@ def test_fused_moe_alltoall_fp4(alltoall_method_type):
                     x,
                     router_logits,
                     all_rank_num_tokens=all_rank_num_tokens,
-<<<<<<< HEAD
-                    all_rank_max_num_tokens=m,
-=======
->>>>>>> upstream/main
                     use_dp_padding=False)
                 ref_output = ref_model.forward(
                     x,
                     router_logits,
                     all_rank_num_tokens=all_rank_num_tokens,
-<<<<<<< HEAD
-                    all_rank_max_num_tokens=m,
-=======
->>>>>>> upstream/main
                     use_dp_padding=False)
 
             # Evaluate outputs
@@ -687,8 +639,6 @@ def set_tensor_value_4(x, num_row, num_cols):
 
 
 @skip_pre_blackwell
-<<<<<<< HEAD
-=======
 @pytest.mark.skipif(torch.cuda.device_count() < 4,
                     reason="needs 4 GPUs to run this test")
 @pytest.mark.parametrize(
@@ -844,7 +794,6 @@ def test_fused_moe_fp8_blockwise_wide_ep(alltoall_method_type):
 
 
 @skip_pre_blackwell
->>>>>>> upstream/main
 @pytest.mark.parametrize(
     "dtype, num_experts, seq_len, hidden_size, RoutingMethodCls",
     product(

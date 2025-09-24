@@ -201,58 +201,6 @@ Metrics Endpoint
 
 .. note::
 
-<<<<<<< HEAD
-   This endpoint is beta maturity.
-
-   The statistics for the PyTorch backend are beta and not as comprehensive as those for the TensorRT backend.
-
-   Some fields, such as CPU memory usage, are not available for the PyTorch backend.
-
-   Enabling ``enable_iter_perf_stats`` in the PyTorch backend can impact performance slightly, depending on the serving configuration.
-
-The ``/metrics`` endpoint provides runtime-iteration statistics such as GPU memory use and inflight-batching details.
-For the TensorRT backend, these statistics are enabled by default.
-However, for the PyTorch backend, you must explicitly enable iteration statistics logging by setting the `enable_iter_perf_stats` field in a YAML configuration file as shown in the following example:
-
-.. code-block:: yaml
-
-   # extra-llm-api-config.yml
-   pytorch_backend_config:
-    enable_iter_perf_stats: true
-
-Then start the server and specify the ``--extra_llm_api_options`` argument with the path to the YAML file as shown in the following example:
-
-.. code-block:: bash
-
-   trtllm-serve <model> \
-     --extra_llm_api_options <path-to-extra-llm-api-config.yml> \
-     [--tp_size <tp> --pp_size <pp> --ep_size <ep> --host <host> --port <port>]
-
-After at least one inference request is sent to the server, you can fetch the runtime-iteration statistics by polling the `/metrics` endpoint:
-
-.. code-block:: bash
-
-   curl -X GET http://<host>:<port>/metrics
-
-*Example Output*
-
-.. code-block:: json
-
-   [
-       {
-           "gpuMemUsage": 56401920000,
-        "inflightBatchingStats": {
-            ...
-        },
-        "iter": 1,
-        "iterLatencyMS": 16.505143404006958,
-        "kvCacheStats": {
-            ...
-        },
-        "newActiveRequestsQueueLatencyMS": 0.0007503032684326172
-    }
-]
-=======
    The metrics endpoint for the default PyTorch backend are in beta and are not as comprehensive as those for the TensorRT backend.
 
    Some fields, such as CPU memory usage, are not yet available for the PyTorch backend.
@@ -307,7 +255,6 @@ Example output:
     ]
 
 
->>>>>>> upstream/main
 
 Syntax
 ------

@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-# Copyright (c) 2024, Tri Dao, Albert Gu.
-# Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/ssd_state_passing.py
-"""We want triton==2.1.0 or 2.2.0 for this"""
-=======
 # Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/ssd_state_passing.py
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 #
@@ -20,7 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
->>>>>>> upstream/main
 
 import torch
 import triton
@@ -47,11 +41,8 @@ def _state_passing_fwd_kernel(
     dA_cs_ptr,
     initstates_ptr,
     seq_idx_ptr,
-<<<<<<< HEAD
-=======
     chunk_offsets_ptr,
     chunk_meta_num,
->>>>>>> upstream/main
     # Matrix dimensions
     dim,
     nchunks,
@@ -72,10 +63,7 @@ def _state_passing_fwd_kernel(
     stride_dA_cs_batch,
     stride_dA_cs_chunk,
     stride_dA_cs_head,
-<<<<<<< HEAD
-=======
     stride_dA_cs_csize,
->>>>>>> upstream/main
     stride_initstates_batch,
     stride_initstates_head,
     stride_initstates_dim,
@@ -84,35 +72,23 @@ def _state_passing_fwd_kernel(
     # Meta-parameters
     HAS_INITSTATES: tl.constexpr,
     HAS_SEQ_IDX: tl.constexpr,
-<<<<<<< HEAD
-=======
     IS_CONT_BATCHED: tl.constexpr,
->>>>>>> upstream/main
     BLOCK_SIZE: tl.constexpr,
 ):
     pid_b = tl.program_id(axis=1)
     pid_h = tl.program_id(axis=2)
     pid_m = tl.program_id(axis=0)
     states_ptr += pid_b * stride_states_batch + pid_h * stride_states_head
-<<<<<<< HEAD
-    dA_cs_ptr += pid_b * stride_dA_cs_batch + pid_h * stride_dA_cs_head
-=======
     dA_cs_ptr += pid_b * stride_dA_cs_batch + pid_h * stride_dA_cs_head + (
         chunk_size - 1) * stride_dA_cs_csize
->>>>>>> upstream/main
     out_ptr += pid_b * stride_out_batch + pid_h * stride_out_head
     final_states_ptr += (pid_b * stride_final_states_batch +
                          pid_h * stride_final_states_head)
     if HAS_INITSTATES:
-<<<<<<< HEAD
-        initstates_ptr += (pid_b * stride_initstates_batch +
-                           pid_h * stride_initstates_head)
-=======
         initstates_ptr += pid_h * stride_initstates_head
         if not IS_CONT_BATCHED:
             initstates_ptr += pid_b * stride_initstates_batch
 
->>>>>>> upstream/main
     if HAS_SEQ_IDX:
         seq_idx_ptr += pid_b * stride_seq_idx_batch
 
@@ -121,12 +97,6 @@ def _state_passing_fwd_kernel(
     out_ptrs = out_ptr + offs_m * stride_out_dim
     final_states_ptrs = final_states_ptr + offs_m * stride_final_states_dim
 
-<<<<<<< HEAD
-    if not HAS_INITSTATES:
-        states = tl.zeros((BLOCK_SIZE, ), dtype=tl.float32)
-    else:
-        initstates_ptrs = initstates_ptr + offs_m * stride_initstates_dim
-=======
     # - states will be the past state of the sequence that continues on the current check
     if not HAS_INITSTATES:
         states = tl.zeros((BLOCK_SIZE, ), dtype=tl.float32)
@@ -135,30 +105,16 @@ def _state_passing_fwd_kernel(
         initstates_ptrs = initstates_ptr
         # - for cont batches, for the first chunk mean it will be the first batch's
         #   init state
->>>>>>> upstream/main
         states = tl.load(initstates_ptrs, mask=offs_m < dim,
                          other=0.0).to(tl.float32)
     tl.store(out_ptrs, states, mask=offs_m < dim)
     out_ptrs += stride_out_chunk
-<<<<<<< HEAD
-    seq_idx = 0
-=======
     prev_seq_idx_chunk_end = 0
     logical_chunk_idx = 0
->>>>>>> upstream/main
     for c in range(nchunks):
         new_states = tl.load(states_ptrs, mask=offs_m < dim,
                              other=0.0).to(tl.float32)
         dA_cs = tl.load(dA_cs_ptr).to(tl.float32)
-<<<<<<< HEAD
-        scale = tl.exp(dA_cs)
-        if HAS_SEQ_IDX:
-            seq_idx_new = tl.load(seq_idx_ptr +
-                                  (min((c + 1) * chunk_size, seqlen) - 1) *
-                                  stride_seq_idx_seqlen)
-            scale = tl.where(seq_idx_new == seq_idx, scale, 0.0)
-            seq_idx = seq_idx_new
-=======
         scale_mask = True
         if HAS_SEQ_IDX:
             # - the seq to pass forward is the one that is flushed to the right
@@ -210,7 +166,6 @@ def _state_passing_fwd_kernel(
             prev_seq_idx_chunk_end = seq_idx_chunk_end
 
         scale = tl.where(scale_mask, tl.exp(dA_cs), 0.0)
->>>>>>> upstream/main
         states = scale * states + new_states
         if c < nchunks - 1:
             tl.store(out_ptrs, states, mask=offs_m < dim)
@@ -223,24 +178,11 @@ def _state_passing_fwd_kernel(
 
 def _state_passing_fwd(
     states,
-<<<<<<< HEAD
-    dA_chunk_cumsum,
-=======
     dA_cumsum,
->>>>>>> upstream/main
     initial_states=None,
     seq_idx=None,
     chunk_size=None,
     out_dtype=None,
-<<<<<<< HEAD
-):
-    batch, nchunks, nheads, dim = states.shape
-    assert dA_chunk_cumsum.shape == (batch, nheads, nchunks)
-    if initial_states is not None:
-        assert initial_states.shape == (batch, nheads, dim)
-    if seq_idx is not None:
-        assert chunk_size is not None
-=======
     is_cont_batched=False,
     chunk_offsets=None,
 ):
@@ -266,7 +208,6 @@ def _state_passing_fwd(
             assert initial_states.shape == (batch, nheads, dim)
 
     if seq_idx is not None:
->>>>>>> upstream/main
         seqlen = seq_idx.shape[-1]
         assert seq_idx.shape == (batch, seqlen)
     out_dtype = states.dtype if out_dtype is None else out_dtype
@@ -282,15 +223,6 @@ def _state_passing_fwd(
             states,
             out,
             final_states,
-<<<<<<< HEAD
-            dA_chunk_cumsum,
-            initial_states,
-            seq_idx,
-            dim,
-            nchunks,
-            seqlen if seq_idx is not None else 0,
-            chunk_size if seq_idx is not None else 0,
-=======
             dA_cumsum,
             initial_states,
             seq_idx,
@@ -300,7 +232,6 @@ def _state_passing_fwd(
             nchunks,
             seqlen if seq_idx is not None else 0,
             chunk_size,
->>>>>>> upstream/main
             states.stride(0),
             states.stride(1),
             states.stride(2),
@@ -312,16 +243,10 @@ def _state_passing_fwd(
             final_states.stride(0),
             final_states.stride(1),
             final_states.stride(2),
-<<<<<<< HEAD
-            dA_chunk_cumsum.stride(0),
-            dA_chunk_cumsum.stride(2),
-            dA_chunk_cumsum.stride(1),
-=======
             dA_cumsum.stride(0),
             dA_cumsum.stride(2),
             dA_cumsum.stride(1),
             dA_cumsum.stride(3),
->>>>>>> upstream/main
             *((
                 initial_states.stride(0),
                 initial_states.stride(1),
@@ -331,9 +256,6 @@ def _state_passing_fwd(
               (0, 0)),
             HAS_INITSTATES=initial_states is not None,
             HAS_SEQ_IDX=seq_idx is not None,
-<<<<<<< HEAD
-=======
             IS_CONT_BATCHED=is_cont_batched,
->>>>>>> upstream/main
         )
     return out, final_states

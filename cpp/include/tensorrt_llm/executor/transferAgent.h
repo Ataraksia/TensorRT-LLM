@@ -17,20 +17,14 @@
 #pragma once
 
 #include "tensorrt_llm/common/assert.h"
-<<<<<<< HEAD
-=======
 #include <fcntl.h>
->>>>>>> upstream/main
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
-<<<<<<< HEAD
-=======
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
->>>>>>> upstream/main
 #include <unordered_map>
 #include <vector>
 
@@ -119,8 +113,6 @@ private:
     std::vector<MemoryDesc> mDescs;
 };
 
-<<<<<<< HEAD
-=======
 class FileDesc
 {
 public:
@@ -195,7 +187,6 @@ private:
     std::vector<FileDesc> mDescs;
 };
 
->>>>>>> upstream/main
 using TransferDescs = MemoryDescs;
 using RegisterDescs = MemoryDescs;
 using SyncMessage = std::string;
@@ -282,10 +273,7 @@ struct BaseAgentConfig
 {
     std::string mName;
     bool useProgThread;
-<<<<<<< HEAD
-=======
     bool multiThread;
->>>>>>> upstream/main
 };
 
 class BaseTransferAgent
@@ -312,8 +300,6 @@ public:
     virtual bool checkRemoteDescs(std::string const& name, MemoryDescs const& memoryDescs) = 0;
 };
 
-<<<<<<< HEAD
-=======
 class BaseLoopbackAgent
 {
 public:
@@ -321,7 +307,6 @@ public:
     virtual void executeLoopbackRequest(MemoryDescs const& memoryDescs, FileDescs const& fileDescs, bool isOffload) = 0;
 };
 
->>>>>>> upstream/main
 class DynLibLoader final
 {
 public:
@@ -365,8 +350,6 @@ template <typename... Args>
     TLLM_THROW("Unknown backend name.");
 }
 
-<<<<<<< HEAD
-=======
 template <typename... Args>
 [[nodiscard]] std::shared_ptr<BaseLoopbackAgent> makeLoopbackAgent(std::string const& backend, Args&&... args)
 {
@@ -381,5 +364,4 @@ template <typename... Args>
     TLLM_THROW("Unknown backend name.");
 }
 
->>>>>>> upstream/main
 } // namespace tensorrt_llm::executor::kv_cache

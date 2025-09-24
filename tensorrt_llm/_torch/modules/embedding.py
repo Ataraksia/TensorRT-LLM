@@ -9,10 +9,7 @@ from tensorrt_llm.functional import AllReduceParams
 from tensorrt_llm.mapping import Mapping
 
 from ..distributed import allgather
-<<<<<<< HEAD
-=======
 from ..utils import create_lm_head_tp_mapping
->>>>>>> upstream/main
 from .linear import Linear, TensorParallelMode
 
 
@@ -39,10 +36,6 @@ class LMHead(Linear):
         local_in_features = embedding_dim
         local_out_features = num_embeddings
         mapping = mapping or Mapping()
-<<<<<<< HEAD
-        tp_size = mapping.tp_size
-
-=======
         self.enable_lm_head_tp_in_adp = mapping.enable_attention_dp and \
             getattr(mapping, 'enable_lm_head_tp_in_adp', False)
         if self.enable_lm_head_tp_in_adp:
@@ -54,18 +47,14 @@ class LMHead(Linear):
         if mapping.enable_attention_dp:
             tensor_parallel_mode = None
 
->>>>>>> upstream/main
         if tensor_parallel_mode == TensorParallelMode.ROW:
             local_in_features = math.ceil(embedding_dim / tp_size)
             self.padding_size = tp_size * local_in_features - embedding_dim
         elif tensor_parallel_mode == TensorParallelMode.COLUMN:
             local_out_features = math.ceil(num_embeddings / tp_size)
             self.padding_size = tp_size * local_out_features - num_embeddings
-<<<<<<< HEAD
-=======
         else:
             self.padding_size = 0
->>>>>>> upstream/main
 
         super().__init__(
             local_in_features * tp_size,
@@ -89,8 +78,6 @@ class LMHead(Linear):
         self.weight = Parameter(torch.empty(weight_shape, dtype=dtype))
         self.register_parameter("bias", None)
 
-<<<<<<< HEAD
-=======
         # For LM head TP in ADP, we need to slice the weight for the LM head
         self.lm_head_slice_obj = None
         if self.enable_lm_head_tp_in_adp:
@@ -103,7 +90,6 @@ class LMHead(Linear):
             slice_obj[0] = slice(slice_start, slice_end)
             self.lm_head_slice_obj = tuple(slice_obj)
 
->>>>>>> upstream/main
     @property
     def vocab_size_padded(self) -> int:
         if self.tp_mode == TensorParallelMode.COLUMN and self.gather_output:
@@ -112,14 +98,6 @@ class LMHead(Linear):
             return self.out_features
 
     def forward(
-<<<<<<< HEAD
-            self,
-            input: torch.Tensor,
-            *,
-            all_reduce_params: Optional[AllReduceParams] = None
-    ) -> torch.Tensor:
-        output = super().forward(input, all_reduce_params=all_reduce_params)
-=======
         self,
         input: torch.Tensor,
         *,
@@ -130,7 +108,6 @@ class LMHead(Linear):
             output = F.linear(input, self.weight[self.lm_head_slice_obj], None)
         else:
             output = super().forward(input, all_reduce_params=all_reduce_params)
->>>>>>> upstream/main
         if (self.tp_mode == TensorParallelMode.COLUMN and self.gather_output
                 and self.padding_size > 0):
             output = output[..., :-self.padding_size]
@@ -171,8 +148,6 @@ def get_masked_input_and_mask(
     return input_, ~vocab_mask.unsqueeze(-1)
 
 
-<<<<<<< HEAD
-=======
 def pre_comm_embedding_ops(
     input_: torch.Tensor,
     weight: torch.Tensor,
@@ -206,7 +181,6 @@ def pre_comm_embedding_ops(
     return output
 
 
->>>>>>> upstream/main
 class Embedding(LMHead):
     """Embedding layer.
 
@@ -228,10 +202,7 @@ class Embedding(LMHead):
         mapping: Optional[Mapping] = None,
         tensor_parallel_mode: Optional[TensorParallelMode] = None,
         gather_output: bool = False,
-<<<<<<< HEAD
-=======
         enable_torch_compile_for_embedding: Optional[bool] = False,
->>>>>>> upstream/main
     ):
         super().__init__(
             embedding_dim=embedding_dim,
@@ -241,35 +212,14 @@ class Embedding(LMHead):
             tensor_parallel_mode=tensor_parallel_mode,
             gather_output=gather_output,
         )
-<<<<<<< HEAD
-=======
 
         self.enable_torch_compile_for_embedding = enable_torch_compile_for_embedding
 
->>>>>>> upstream/main
         if self.tp_size > 1:
             slice_width = math.ceil(num_embeddings / self.tp_size)
             self.vocab_start_index = self.tp_rank * slice_width
             self.vocab_end_index = min((self.tp_rank + 1) * slice_width,
                                        num_embeddings)
-<<<<<<< HEAD
-
-    def forward(self, input):
-        if self.tp_size > 1:
-            if self.tp_mode == TensorParallelMode.COLUMN:
-                # Build the mask.
-                input, input_mask = get_masked_input_and_mask(
-                    input,
-                    self.vocab_start_index,
-                    self.vocab_end_index,
-                )
-        # Get the embeddings.
-        output = F.embedding(input, self.weight)
-        # Mask the output embedding.
-        if self.tp_size > 1:
-            if self.tp_mode == TensorParallelMode.COLUMN:
-                output.masked_fill_(input_mask, 0)
-=======
         else:
             self.vocab_start_index = 0
             self.vocab_end_index = num_embeddings
@@ -294,20 +244,13 @@ class Embedding(LMHead):
         # Run the all_reduce/all_gather.
         if self.tp_size > 1:
             if self.tp_mode == TensorParallelMode.COLUMN:
->>>>>>> upstream/main
                 # Reduce across all the model parallel GPUs.
                 output = self.all_reduce(output)
             elif self.tp_mode == TensorParallelMode.ROW:
                 if self.gather_output:
-<<<<<<< HEAD
-                    if self.tp_rank == self.tp_size - 1 and self.padding_size > 0:
-                        output = F.pad(output, (0, self.padding_size))
-                    output = allgather(output, self.mapping)
-=======
                     # Run allgather.
                     output = allgather(output, self.mapping)
                     # Remove the padding.
->>>>>>> upstream/main
                     if self.padding_size > 0:
                         output = output[..., :-self.padding_size]
 

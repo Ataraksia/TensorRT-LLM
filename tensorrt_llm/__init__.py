@@ -29,15 +29,12 @@ _add_trt_llm_dll_directory()
 
 import sys
 
-<<<<<<< HEAD
-=======
 # Need to import torch before tensorrt_llm library, otherwise some shared binary files
 # cannot be found for the public PyTorch, raising errors like:
 # ImportError: libc10.so: cannot open shared object file: No such file or directory
 import torch  # noqa
 
 import tensorrt_llm._torch.models as torch_models
->>>>>>> upstream/main
 import tensorrt_llm.functional as functional
 import tensorrt_llm.math_utils as math_utils
 import tensorrt_llm.models as models
@@ -55,12 +52,8 @@ from .auto_parallel import AutoParallelConfig, auto_parallel
 from .builder import BuildConfig, Builder, BuilderConfig, build
 from .disaggregated_params import DisaggregatedParams
 from .functional import Tensor, constant
-<<<<<<< HEAD
-from .llmapi.llm import LLM, LlmArgs
-=======
 from .llmapi import LLM, MultimodalEncoder
 from .llmapi.llm_args import LlmArgs, TorchLlmArgs, TrtLlmArgs
->>>>>>> upstream/main
 from .logger import logger
 from .mapping import Mapping
 from .models.automodel import AutoConfig, AutoModelForCausalLM
@@ -113,12 +106,6 @@ __all__ = [
     'quantization',
     'tools',
     'LLM',
-<<<<<<< HEAD
-    'LlmArgs',
-    'SamplingParams',
-    'DisaggregatedParams',
-    'KvCacheConfig',
-=======
     'MultimodalEncoder',
     'LlmArgs',
     'TorchLlmArgs',
@@ -127,7 +114,6 @@ __all__ = [
     'DisaggregatedParams',
     'KvCacheConfig',
     'math_utils',
->>>>>>> upstream/main
     '__version__',
 ]
 

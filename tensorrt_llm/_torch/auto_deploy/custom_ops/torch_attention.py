@@ -8,9 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-<<<<<<< HEAD
-@torch.library.custom_op("attention::repeat_kv", mutates_args=())
-=======
 def _apply_logit_softcapping(attn_scores: torch.Tensor, logit_cap: Optional[float]) -> torch.Tensor:
     """Apply logit softcapping using the formula: logit_cap * tanh(logits / logit_cap)"""
     if logit_cap is not None and logit_cap > 0.0:
@@ -35,7 +32,6 @@ def _convert_boolean_mask_to_float(attn_mask: torch.Tensor, dtype: torch.dtype) 
 
 
 @torch.library.custom_op("auto_deploy::torch_attention_repeat_kv", mutates_args=())
->>>>>>> upstream/main
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     """
     This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
@@ -58,11 +54,7 @@ def repeat_kv_fake(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     return torch.empty(replicated_shape, device=hidden_states.device, dtype=hidden_states.dtype)
 
 
-<<<<<<< HEAD
-@torch.library.custom_op("attention::scaled_dot_product_attention", mutates_args=())
-=======
 @torch.library.custom_op("auto_deploy::torch_attention_sdpa", mutates_args=())
->>>>>>> upstream/main
 def scaled_dot_product_attention(
     query: torch.Tensor,
     key: torch.Tensor,
@@ -71,10 +63,7 @@ def scaled_dot_product_attention(
     dropout_p: float = 0.0,
     is_causal: bool = False,
     scale: Optional[float] = None,
-<<<<<<< HEAD
-=======
     enable_gqa: bool = False,
->>>>>>> upstream/main
 ) -> torch.Tensor:
     """A carbon copy of torch.nn.functional.scaled_dot_product_attention as custom op.
 
@@ -90,24 +79,12 @@ def scaled_dot_product_attention(
         dropout_p=dropout_p,
         is_causal=is_causal,
         scale=scale,
-<<<<<<< HEAD
-=======
         enable_gqa=enable_gqa,
->>>>>>> upstream/main
     )
 
 
 @scaled_dot_product_attention.register_fake
 def scaled_dot_product_attention_fake(
-<<<<<<< HEAD
-    query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
-):
-    """Fake implementation of scaled_dot_product_attention."""
-    return torch.empty_like(query.contiguous())
-
-
-@torch.library.custom_op("attention::grouped_sdpa", mutates_args=())
-=======
     query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None, enable_gqa=False
 ):
     """Fake implementation of scaled_dot_product_attention."""
@@ -115,7 +92,6 @@ def scaled_dot_product_attention_fake(
 
 
 @torch.library.custom_op("auto_deploy::torch_attention_grouped_sdpa", mutates_args=())
->>>>>>> upstream/main
 def grouped_sdpa(
     query: torch.Tensor,
     key: torch.Tensor,
@@ -124,21 +100,6 @@ def grouped_sdpa(
     dropout_p: float = 0.0,
     is_causal: bool = False,
     scale: Optional[float] = None,
-<<<<<<< HEAD
-) -> torch.Tensor:
-    """SDPA attention that can handle GQA."""
-
-    return F.scaled_dot_product_attention(
-        query.contiguous(),
-        key.contiguous(),
-        value.contiguous(),
-        attn_mask=attn_mask,
-        dropout_p=dropout_p,
-        is_causal=is_causal,
-        scale=scale,
-        enable_gqa=True,
-    )
-=======
     sinks: Optional[torch.Tensor] = None,
     sliding_window: Optional[int] = None,
     logit_cap: Optional[float] = None,
@@ -229,7 +190,6 @@ def grouped_sdpa(
 
     # Return in bnsd format (same as input format)
     return attn_out
->>>>>>> upstream/main
 
 
 @grouped_sdpa.register_fake
@@ -241,18 +201,6 @@ def grouped_sdpa_fake(
     dropout_p=0.0,
     is_causal=False,
     scale=None,
-<<<<<<< HEAD
-):
-    """Fake implementation of grouped SDPA."""
-    return torch.empty_like(query.contiguous())
-
-
-@torch.library.custom_op("attention::bsnd_grouped_sdpa", mutates_args=())
-def bsnd_grouped_sdpa(
-    query: torch.Tensor,  # layout: [b, n, s_q, d]
-    key: torch.Tensor,  # layout: [b, n, s_k, d]
-    value: torch.Tensor,  # layout: [b, n, s_k, d]
-=======
     sinks=None,
     sliding_window=None,
     logit_cap=None,
@@ -266,33 +214,19 @@ def bsnd_grouped_sdpa(
     query: torch.Tensor,  # layout: [b, s_q, n, d]
     key: torch.Tensor,  # layout: [b, s_k, n, d]
     value: torch.Tensor,  # layout: [b, s_k, n, d]
->>>>>>> upstream/main
     attn_mask: Optional[torch.Tensor] = None,  # layout: [b, n, s_q, s_k]
     dropout_p: float = 0.0,
     is_causal: bool = False,
     scale: Optional[float] = None,
-<<<<<<< HEAD
-=======
     sinks: Optional[torch.Tensor] = None,
     sliding_window: Optional[int] = None,
     logit_cap: Optional[float] = None,
->>>>>>> upstream/main
 ) -> torch.Tensor:
     """Attention that assumes the input layout is bsnd.
 
     Note that attn_mask layout is still assumed to be [b, n, s_q, s_k] and is consistent with the
     original sdpa op!
     """
-<<<<<<< HEAD
-    # let's transpose to bnsd so we can use the grouped sdpa
-    query = query.transpose(1, 2).contiguous()
-    key = key.transpose(1, 2).contiguous()
-    value = value.transpose(1, 2).contiguous()
-
-    out = grouped_sdpa(query, key, value, attn_mask, dropout_p, is_causal, scale)
-
-    # let's transpose back to bnsd
-=======
     # Transpose inputs to bnsd format for grouped_sdpa
     query = query.transpose(1, 2).contiguous()  # [b, s_q, n, d] -> [b, n, s_q, d]
     key = key.transpose(1, 2).contiguous()  # [b, s_k, n, d] -> [b, n, s_k, d]
@@ -303,18 +237,11 @@ def bsnd_grouped_sdpa(
         query, key, value, attn_mask, dropout_p, is_causal, scale, sinks, sliding_window, logit_cap
     )
     # Transpose back to bsnd format
->>>>>>> upstream/main
     return out.transpose(1, 2).contiguous()
 
 
 @bsnd_grouped_sdpa.register_fake
 def bsnd_grouped_sdpa_fake(
-<<<<<<< HEAD
-    query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None
-):
-    """Fake implementation of bnsd grouped SDPA."""
-    return torch.empty_like(query.contiguous())
-=======
     query,
     key,
     value,
@@ -328,7 +255,6 @@ def bsnd_grouped_sdpa_fake(
 ):
     """Fake implementation of bnsd grouped SDPA."""
     return query.new_empty(*query.shape[:-1], value.shape[-1]).contiguous()
->>>>>>> upstream/main
 
 
 def update_kv_cache(
@@ -355,11 +281,7 @@ def update_kv_cache(
         )
 
 
-<<<<<<< HEAD
-@torch.library.custom_op("attention::fused_mla_ref", mutates_args=())
-=======
 @torch.library.custom_op("auto_deploy::torch_attention_fused_mla_ref", mutates_args=())
->>>>>>> upstream/main
 def fused_mla_ref(
     q_nope: torch.Tensor,
     q_pe: torch.Tensor,
@@ -412,11 +334,7 @@ def fused_mla_ref(
             q_slice = q_pe[start : start + length]
             k_slice = k_pe[start : start + length]
 
-<<<<<<< HEAD
-            q_rot, k_rot = torch.ops.rope.torch_apply_rope_with_qk_interleaving(
-=======
             q_rot, k_rot = torch.ops.auto_deploy.torch_rope_with_qk_interleaving(
->>>>>>> upstream/main
                 q_slice,
                 k_slice,
                 cos,
@@ -516,11 +434,7 @@ def fused_mla_ref_fake(
     return torch.empty_like(kv[..., -v_head_dim:])
 
 
-<<<<<<< HEAD
-@torch.library.custom_op("deepseek::fused_mla", mutates_args=())
-=======
 @torch.library.custom_op("auto_deploy::torch_attention_deepseek_fused_mla", mutates_args=())
->>>>>>> upstream/main
 def fused_mla(
     q_nope: torch.Tensor,
     q_pe: torch.Tensor,
@@ -545,11 +459,7 @@ def fused_mla(
 
     cos = cos[position_ids]
     sin = sin[position_ids]
-<<<<<<< HEAD
-    q_pe, k_pe = torch.ops.rope.torch_apply_rope_with_qk_interleaving(q_pe, k_pe, cos, sin)
-=======
     q_pe, k_pe = torch.ops.auto_deploy.torch_rope_with_qk_interleaving(q_pe, k_pe, cos, sin)
->>>>>>> upstream/main
 
     query_states = k_pe.new_empty(bs, num_heads, q_len, q_head_dim)
     query_states[:, :, :, :qk_nope_head_dim] = q_nope
@@ -608,11 +518,7 @@ def fused_mla(
     return torch.empty_like(kv[..., -v_head_dim:])
 
 
-<<<<<<< HEAD
-@torch.library.custom_op("deepseek::mla", mutates_args=())
-=======
 @torch.library.custom_op("auto_deploy::torch_attention_deepseek_mla", mutates_args=())
->>>>>>> upstream/main
 def mla(
     q_nope: torch.Tensor,  # Down projected q_nope
     q_pe: torch.Tensor,  # q_pe after applying rope

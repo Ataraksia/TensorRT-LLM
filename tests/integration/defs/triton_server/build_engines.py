@@ -1763,8 +1763,6 @@ def prepare_rcca_nvbug_4714193_engine(tensorrt_llm_example_root,
 
     assert os.path.exists(engine_dir), f"{engine_dir} does not exists."
     return engine_dir
-<<<<<<< HEAD
-=======
 
 
 def prepare_mistral3_pixtral_engine(tensorrt_llm_multimodal_example_root,
@@ -1837,4 +1835,3 @@ def prepare_mistral3_pixtral_engine(tensorrt_llm_multimodal_example_root,
     assert os.path.exists(
         multimodal_engine_dir), f"{multimodal_engine_dir} does not exists."
     return engine_dir, multimodal_engine_dir
->>>>>>> upstream/main

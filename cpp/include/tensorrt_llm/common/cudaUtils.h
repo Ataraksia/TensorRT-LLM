@@ -311,15 +311,12 @@ inline int getSMVersion()
     return sm;
 }
 
-<<<<<<< HEAD
-=======
 inline bool isSM100Family()
 {
     int const sm = getSMVersion();
     return sm == 100 || sm == 103; // To be continued...
 }
 
->>>>>>> upstream/main
 inline int getDevice()
 {
     int deviceID{0};

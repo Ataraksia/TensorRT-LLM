@@ -55,8 +55,6 @@ DecoderXQAImplJIT::DecoderXQAImplJIT(DecoderXQARunner* runner)
 {
 }
 
-<<<<<<< HEAD
-=======
 bool DecoderXQAImplJIT::needHMMASpecDec(XQAParams const& xqaParams, bool forConfigurePlugin) const
 {
 
@@ -65,7 +63,6 @@ bool DecoderXQAImplJIT::needHMMASpecDec(XQAParams const& xqaParams, bool forConf
         && !jit::supportConfigMLA(xqaParams, mSM, forConfigurePlugin);
 }
 
->>>>>>> upstream/main
 bool DecoderXQAImplJIT::supportConfig(XQAParams const& xqaParams, bool forConfigurePlugin) const
 {
 
@@ -140,11 +137,7 @@ jit::CubinObjKey DecoderXQAImplJIT::getCubinObjKeyFromXQAParams(XQAParams const&
     loadKey.data_type = xqaParams.data_type;
     loadKey.sm = mSM;
 
-<<<<<<< HEAD
-    XQAKernelRuntimeHashKey runtimeKey = getRuntimeHashKeyFromXQAParams(xqaParams, true);
-=======
     XQAKernelRuntimeHashKey runtimeKey = getRuntimeHashKeyFromXQAParams(xqaParams, true, mSM);
->>>>>>> upstream/main
     return {loadKey, runtimeKey};
 }
 
@@ -165,23 +158,16 @@ void DecoderXQAImplJIT::prepareForActualXQAParams(XQAParams const& xqaParams)
 
 void DecoderXQAImplJIT::prepare(XQAParams const& umbrellaXQAParams)
 {
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
     for (int beam_width = 1; beam_width <= umbrellaXQAParams.beam_width; ++beam_width)
     {
         XQAParams actualXQAParams = umbrellaXQAParams;
         actualXQAParams.beam_width = beam_width;
         prepareForActualXQAParams(actualXQAParams);
-<<<<<<< HEAD
-=======
         if (needHMMASpecDec(umbrellaXQAParams, true))
         {
             actualXQAParams.generation_input_length = 16; // a WAR to generate tileSize=32 JIT cubin
             prepareForActualXQAParams(actualXQAParams);
         }
->>>>>>> upstream/main
     }
 }
 
@@ -235,18 +221,11 @@ void DecoderXQAImplJIT::runImpl(XQAParams const& xqaParams, KVCacheBuffer const&
     jit::CubinObj const* const cubinObj = mResource->getCubinObjRegistry()->getCubin(key);
     TLLM_CHECK(cubinObj != nullptr && cubinObj->isInitialized());
     bool const isSpecDec = xqaParams.multi_query_tokens;
-<<<<<<< HEAD
-    bool const isGMMAKernel = (cubinObj->getKernelType() == XQAKernelType::kHOPPER_WARP_SPECIALIZED);
-    bool const isMLAKernel = (cubinObj->getKernelType() == XQAKernelType::kSM120_MLA);
-    TLLM_CHECK_WITH_INFO(
-        !isSpecDec || isGMMAKernel || (isMLAKernel && !xqaParams.spec_decoding_is_generation_length_variable),
-=======
     bool const isHMMAKernel = (cubinObj->getKernelType() == XQAKernelType::kAMPERE_WARP_SPECIALIZED);
     bool const isGMMAKernel = (cubinObj->getKernelType() == XQAKernelType::kHOPPER_WARP_SPECIALIZED);
     bool const isMLAKernel = (cubinObj->getKernelType() == XQAKernelType::kSM120_MLA);
     TLLM_CHECK_WITH_INFO(!isSpecDec || isGMMAKernel || isHMMAKernel
             || (isMLAKernel && !xqaParams.spec_decoding_is_generation_length_variable),
->>>>>>> upstream/main
         "speculative decoding is available for GMMA/MLA kernel only in JIT path for now. For MLA, the input sequence "
         "length must be uniform and draft tokens must be linear.");
     TLLM_CHECK_DEBUG(isGMMAKernel == jit::supportConfigQGMMA(xqaParams, mSM, false));
@@ -424,8 +403,6 @@ void DecoderXQAImplJIT::runImpl(XQAParams const& xqaParams, KVCacheBuffer const&
         dim3 const blockDim(128 * 3, 1, 1);
         cubinObj->launch(dimGrid, blockDim, stream, kernelParams);
     }
-<<<<<<< HEAD
-=======
     else if (isSpecDec && isHMMAKernel)
     {
         // MultiQueryTokens (generation_input_length > 1) need extra parameters (like qSeqLen, headGrpSize, and
@@ -479,7 +456,6 @@ void DecoderXQAImplJIT::runImpl(XQAParams const& xqaParams, KVCacheBuffer const&
 
         cubinObj->launch(gridDim, blockDim, stream, kernelParams);
     }
->>>>>>> upstream/main
     else
     {
         appendParam(&launchParams.num_k_heads);

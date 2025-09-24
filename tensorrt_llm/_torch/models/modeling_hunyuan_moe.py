@@ -57,11 +57,7 @@ class HunyuanMoE(nn.Module):
             routing_method=RenormalizeMoeRoutingMethod(top_k=self.top_k),
             hidden_size=self.hidden_dim,
             intermediate_size=self.moe_intermediate_size,
-<<<<<<< HEAD
-            aux_stream=aux_stream,
-=======
             aux_stream_dict={AuxStreamType.MoeChunkingOverlap: aux_stream},
->>>>>>> upstream/main
             dtype=config.torch_dtype,
             reduce_results=reduce_results,
             model_config=model_config)
@@ -178,10 +174,6 @@ class HunYuanAttention(Attention):
         attn_metadata: AttentionMetadata,
         attention_mask: PredefinedAttentionMask = PredefinedAttentionMask.
         CAUSAL,
-<<<<<<< HEAD
-        mrope_config: Optional[dict] = None,
-=======
->>>>>>> upstream/main
         all_reduce_params: Optional[AllReduceParams] = None,
         lora_params: Optional[dict] = None,
         **kwargs,
@@ -192,10 +184,6 @@ class HunYuanAttention(Attention):
             hidden_states=hidden_states,
             attn_metadata=attn_metadata,
             attention_mask=attention_mask,
-<<<<<<< HEAD
-            mrope_config=mrope_config,
-=======
->>>>>>> upstream/main
             all_reduce_params=all_reduce_params,
             lora_params=lora_params,
             **kwargs,

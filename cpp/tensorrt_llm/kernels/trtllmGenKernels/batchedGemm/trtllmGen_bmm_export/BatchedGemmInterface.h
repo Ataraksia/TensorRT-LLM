@@ -247,19 +247,11 @@ struct BatchedGemmData
         // The clamp limit for the accumulator before applying the activation.
         // Shape is [B].
         // Clamp is INF if nullptr.
-<<<<<<< HEAD
-=======
         // When the input is FP8 or NVFP4, the clamp has to be scaled by limit' = limit / dequantAb.
->>>>>>> upstream/main
         // If applied on SwiGlu, it will be:
         //
         //   x_glu    = x_glu.clamp(min=None, max=limit)
         //   x_linear = x_linear.clamp(min=-limit, max=limit)
-<<<<<<< HEAD
-        float const* mPtrClampLimit{nullptr};
-
-        // The alpha and beta for SwiGlu.
-=======
         //
         // The given clamp limit applies to the dequantized values, so the order of operations would
         // look something like this:
@@ -287,24 +279,15 @@ struct BatchedGemmData
         float const* mPtrClampLimit{nullptr};
 
         // The alpha and beta for SwiGlu or GeGlu.
->>>>>>> upstream/main
         // gatedActivation <- (x0 + beta) * activation(x1, alpha)
         // Shape is [B].
         // Alpha is 1.f if nullptr.
         // Beta is 0.f if nullptr.
-<<<<<<< HEAD
-        // The formula:
-        //
-        //   out_glu  = x_glu * torch.sigmoid(alpha * x_glu) + (x_linear + beta)
-        float const* mPtrSwiGluAlpha{nullptr};
-        float const* mPtrSwiGluBeta{nullptr};
-=======
         // The formula for SwiGlu (for GeGlu, replace sigmoid with phi):
         //
         //   out_glu  = x_glu * torch.sigmoid(alpha * x_glu) * (x_linear + beta)
         float const* mPtrGatedActAlpha{nullptr};
         float const* mPtrGatedActBeta{nullptr};
->>>>>>> upstream/main
 
         // Param is used when the kernel is configured with -routeAct true.
         // The inputs are not padded, but the outputs are padded to divUpMul(M[bi], tileM) for batchM or
@@ -474,12 +457,6 @@ public:
     // Returns the number of available cubin configurations
     size_t getNumBatchedGemmConfigs() const;
 
-<<<<<<< HEAD
-    // Returns the number of CTAs of the last launched kernel.
-    int32_t getNumCtas() const
-    {
-        return mNumCtas;
-=======
     // Returns the grid dimensions of the current kernel.
     std::tuple<int32_t, int32_t, int32_t> getGridDim(
         BatchedGemmOptions const& options, std::optional<int32_t> maxNumCtasInBatchDim = std::nullopt) const
@@ -522,7 +499,6 @@ public:
     {
         auto [numCtasBatch, numCtasTile, numCtasInner] = getGridDim(options, maxNumCtasInBatchDim);
         return numCtasBatch * numCtasTile * numCtasInner;
->>>>>>> upstream/main
     }
 
     // Returns true if the configuration of the cubin can be executed for the given params.
@@ -540,13 +516,6 @@ private:
 
     // Returns the size padded to the alignment
     size_t getSizePaddedToAlignment(size_t size, size_t alignment) const;
-<<<<<<< HEAD
-
-private:
-    // Number of the CTAs of the last launched kernel.
-    int32_t mNumCtas{0};
-=======
->>>>>>> upstream/main
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -608,11 +577,7 @@ bool BatchedGemmInterface::isValidConfig(BatchedGemmConfig const& config, Batche
     auto options = getOptionsFromConfigAndData(config, data);
 
     // Is Blackwell?
-<<<<<<< HEAD
-    bool isBlackwell = config.mSm == gemm::SmVersion::Sm100a;
-=======
     bool isBlackwell = gemm::isSmVersionBlackwell(config.mSm);
->>>>>>> upstream/main
 
     // Check options without modifications.
     return checkAndUpdateBatchedGemmOptions(options, isBlackwell,
@@ -723,53 +688,14 @@ int32_t BatchedGemmInterface::run(BatchedGemmConfig const& config, void* workspa
         }
     }
 
-<<<<<<< HEAD
-    int32_t numCtaXy{0};
-    if (options.mIsStaticBatch)
-    {
-        for (int32_t bi = 0; bi < options.mNumBatches; ++bi)
-        {
-            numCtaXy += batchM ? gemm::divUp(options.mBatchedM[bi], options.mTileM)
-                               : gemm::divUp(options.mBatchedN[bi], options.mTileN);
-        }
-    }
-
-    int32_t maxNumCtasInBatchDim{numCtaXy};
-    // For normal BMM, mNumTokens == 0 and the number of CTAs is known to host.
-    // For MoE, mNumTokens != 0 and the number of CTAs is known only at runtime.
-    // We launch maximally possible number of CTAs and use ptrNumNonExitingCtas to determine
-    // the actual number of CTAs to run.
-    if ((options.mEnablesEarlyExit || options.mEnablesDelayedEarlyExit) && options.mNumTokens != 0)
-    {
-        // Get maximum number of CTAs in batch dim.
-        maxNumCtasInBatchDim = batchedGemmData.mProblemDimensions.mMaxNumCtasInTokenDim;
-    }
-
-    auto const numCtaX = batchM ? maxNumCtasInBatchDim : gemm::divUp(options.mM, options.mTileM);
-    auto const numCtaY = batchM ? gemm::divUp(options.mN, options.mTileN) : maxNumCtasInBatchDim;
-    auto const numCtaZ = options.mNumSlicesForSplitK;
-    mNumCtas = numCtaX * numCtaY * numCtaZ;
-
-=======
     auto [numCtaBatch, numCtaTile, numCtaInner]
         = getGridDim(options, batchedGemmData.mProblemDimensions.mMaxNumCtasInTokenDim);
->>>>>>> upstream/main
     auto kernelParams = KernelParamsSetup::setKernelParams(options, batchM, batchedGemmData.mInputBuffers.mPtrA,
         batchedGemmData.mInputBuffers.mPtrB, batchedGemmData.mOutputBuffers.mPtrC,
         batchedGemmData.mInputBuffers.mPtrSfA, batchedGemmData.mInputBuffers.mPtrSfB,
         batchedGemmData.mInputBuffers.mPtrPerTokenSfA, batchedGemmData.mInputBuffers.mPtrPerTokenSfB,
         batchedGemmData.mInputBuffers.mPtrBias, batchedGemmData.mOutputBuffers.mPtrSfC,
         batchedGemmData.mInputBuffers.mPtrScaleC, batchedGemmData.mInputBuffers.mPtrScaleGate,
-<<<<<<< HEAD
-        batchedGemmData.mInputBuffers.mPtrClampLimit, batchedGemmData.mInputBuffers.mPtrSwiGluAlpha,
-        batchedGemmData.mInputBuffers.mPtrSwiGluBeta, batchedGemmData.mInputBuffers.mPtrRouteMap, dPtrRowMax,
-        dPtrRowMaxBars, batchedGemmData.mInputBuffers.mPtrNumNonExitingCtas,
-        batchedGemmData.mInputBuffers.mPtrTotalNumPaddedTokens, batchedGemmData.mInputBuffers.mPtrCtaIdxXyToBatchIdx,
-        batchedGemmData.mInputBuffers.mPtrCtaIdxXyToMnLimit, maxNumCtasInBatchDim);
-
-    // The size of the grid.
-    std::vector<int32_t> grid{numCtaX, numCtaY, numCtaZ};
-=======
         batchedGemmData.mInputBuffers.mPtrClampLimit, batchedGemmData.mInputBuffers.mPtrGatedActAlpha,
         batchedGemmData.mInputBuffers.mPtrGatedActBeta, batchedGemmData.mInputBuffers.mPtrRouteMap, dPtrRowMax,
         dPtrRowMaxBars, batchedGemmData.mInputBuffers.mPtrNumNonExitingCtas,
@@ -779,7 +705,6 @@ int32_t BatchedGemmInterface::run(BatchedGemmConfig const& config, void* workspa
     // The size of the grid.
     std::vector<int32_t> grid = batchM ? std::vector<int32_t>{numCtaBatch, numCtaTile, numCtaInner}
                                        : std::vector<int32_t>{numCtaTile, numCtaBatch, numCtaInner};
->>>>>>> upstream/main
 
 #ifdef TLLM_GEN_EXPORT_INTERFACE
     CUmodule cuModule;

@@ -23,23 +23,15 @@ namespace gmma
 {
 // cog template. Do code generation with: pip install cogapp; cog -r $filename
 
-<<<<<<< HEAD
-=======
 // clang-format off
->>>>>>> upstream/main
 /*[[[cog
 import cog
 reg_list = lambda beg,end: ", ".join([f"%{i}" for i in range(beg, end)])
 acc_placeholder = lambda n: "{%s}" % reg_list(0, n//2)
-<<<<<<< HEAD
-acc_registers = lambda n: "\n            , ".join([f'"+f"(acc[{i}][0][0]), "+f"(acc[{i}][0][1]), "+f"(acc[{i}][1][0]),
-"+f"(acc[{i}][1][1])' for i in range(n//8)]) ptx_eol = "\\n" n_list = [8, 16, 32, 64, 128, 256] for n in n_list:
-=======
 acc_registers = lambda n: "\n            , ".join([f'"+f"(acc[{i}][0][0]), "+f"(acc[{i}][0][1]), "+f"(acc[{i}][1][0]), "+f"(acc[{i}][1][1])' for i in range(n//8)])
 ptx_eol = "\\n"
 n_list = [8, 16, 24, 32, 64, 128, 256]
 for n in n_list:
->>>>>>> upstream/main
     cog.outl(f'''
 template<>
 __device__ inline void mma_async_shmA<__nv_fp8_e4m3, {n}, false, false>(float(&acc)[{n//8}][2][2], MatDesc::Raw descA,
@@ -150,10 +142,7 @@ const&>(descB)), "n"(false));
 }}
 ''')
 ]]]*/
-<<<<<<< HEAD
-=======
 // clang-format on
->>>>>>> upstream/main
 
 template <>
 __device__ inline void mma_async_shmA<__nv_fp8_e4m3, 8, false, false>(
@@ -276,8 +265,6 @@ __device__ inline void mma_async_regA<__nv_fp8_e4m3, 16, false, false>(
 }
 
 template <>
-<<<<<<< HEAD
-=======
 __device__ inline void mma_async_shmA<__nv_fp8_e4m3, 24, false, false>(
     float (&acc)[3][2][2], MatDesc::Raw descA, MatDesc::Raw descB, bool accHasVal)
 {
@@ -344,7 +331,6 @@ __device__ inline void mma_async_regA<__nv_fp8_e4m3, 24, false, false>(
 }
 
 template <>
->>>>>>> upstream/main
 __device__ inline void mma_async_shmA<__nv_fp8_e4m3, 32, false, false>(
     float (&acc)[4][2][2], MatDesc::Raw descA, MatDesc::Raw descB, bool accHasVal)
 {
@@ -1509,8 +1495,6 @@ __device__ inline void mma_async_shmA<__nv_bfloat16, 16, 1, 1>(
 }
 
 template <>
-<<<<<<< HEAD
-=======
 __device__ inline void mma_async_shmA<half, 24, 0, 0>(
     float (&acc)[3][2][2], MatDesc::Raw descA, MatDesc::Raw descB, bool accHasVal)
 {
@@ -1903,7 +1887,6 @@ __device__ inline void mma_async_shmA<__nv_bfloat16, 24, 1, 1>(
 }
 
 template <>
->>>>>>> upstream/main
 __device__ inline void mma_async_shmA<half, 32, 0, 0>(
     float (&acc)[4][2][2], MatDesc::Raw descA, MatDesc::Raw descB, bool accHasVal)
 {

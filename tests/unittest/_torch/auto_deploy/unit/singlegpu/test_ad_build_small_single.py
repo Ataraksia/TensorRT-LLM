@@ -3,11 +3,7 @@
 from typing import Dict
 
 import pytest
-<<<<<<< HEAD
-from _model_test_utils import get_small_model_config
-=======
 from _model_test_utils import get_small_model_config_pytest_param
->>>>>>> upstream/main
 from build_and_run_ad import ExperimentConfig, main
 
 from tensorrt_llm._torch.auto_deploy.llm_args import AutoDeployConfig, LlmArgs, _ParallelConfig
@@ -26,11 +22,7 @@ def _check_ad_config(experiment_config: ExperimentConfig, llm_args: LlmArgs):
 
     # check that llm_args and experiment_config have the same args
     expected_ad_config: AutoDeployConfig = experiment_config.args
-<<<<<<< HEAD
-    expected_llm_args: LlmArgs = expected_ad_config.to_llm_args()
-=======
     expected_llm_args: LlmArgs = LlmArgs(**expected_ad_config.to_llm_kwargs())
->>>>>>> upstream/main
     assert expected_llm_args == llm_args, f"Expected llm args {expected_llm_args}, got {llm_args}"
 
     # check expected parallel config
@@ -49,71 +41,35 @@ def _check_ad_config(experiment_config: ExperimentConfig, llm_args: LlmArgs):
     )
 
 
-<<<<<<< HEAD
-@pytest.mark.parametrize(
-    "experiment_config",
-    [
-        get_small_model_config(
-=======
 @pytest.mark.parametrize("mode", ["graph", "transformers"])
 @pytest.mark.parametrize(
     "experiment_config",
     [
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "meta-llama/Meta-Llama-3.1-8B-Instruct",
             attn_backend="flashinfer",
             compile_backend="torch-opt",
         ),
-<<<<<<< HEAD
-        get_small_model_config(
-=======
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "mistralai/Mixtral-8x7B-Instruct-v0.1",
             attn_backend="triton",
             compile_backend="torch-simple",
         ),
-<<<<<<< HEAD
-        get_small_model_config(
-=======
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "Qwen/Qwen3-30B-A3B",
             attn_backend="triton",
             compile_backend="torch-simple",
         ),
-<<<<<<< HEAD
-        get_small_model_config(
-=======
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "microsoft/Phi-3-mini-4k-instruct",
             attn_backend="triton",
             compile_backend="torch-simple",
         ),
-<<<<<<< HEAD
-        get_small_model_config(
-            "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-            attn_backend="flashinfer",
-            compile_backend="torch-opt",
-        ),
-        get_small_model_config(
-            "deepseek-ai/DeepSeek-V3",
-            attn_backend="triton",
-            compile_backend="torch-simple",
-        ),
-        get_small_model_config(
-=======
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "microsoft/Phi-3-mini-4k-instruct",
             attn_backend="torch",
             compile_backend="torch-simple",
         ),
-<<<<<<< HEAD
-        get_small_model_config(
-=======
         # disabled due to https://nvbugspro.nvidia.com/bug/5505835
         get_small_model_config_pytest_param(
             "meta-llama/Llama-4-Scout-17B-16E-Instruct",
@@ -129,20 +85,10 @@ def _check_ad_config(experiment_config: ExperimentConfig, llm_args: LlmArgs):
             compile_backend="torch-simple",
         ),
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "Qwen/Qwen2.5-3B-Instruct",
             attn_backend="triton",
             compile_backend="torch-compile",
         ),
-<<<<<<< HEAD
-    ],
-)
-def test_build_ad(experiment_config: Dict):
-    experiment_config["args"]["runtime"] = "demollm"  # Default runtime set to demollm
-    experiment_config["args"]["world_size"] = 0  # Default world_size set to 0
-    experiment_config = ExperimentConfig(**experiment_config)
-    print(f"Experiment Config: {experiment_config}")
-=======
         get_small_model_config_pytest_param(
             "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
             attn_backend="flashinfer",
@@ -162,7 +108,6 @@ def test_build_ad(experiment_config: Dict, mode: str):
     experiment_config["args"]["world_size"] = 0  # Default world_size set to 0
     experiment_config["args"]["mode"] = mode
     experiment_config = ExperimentConfig(**experiment_config)
->>>>>>> upstream/main
     original_init = InferenceOptimizer.__init__
 
     def check_and_original_init(self, factory, ad_config):

@@ -32,11 +32,7 @@ Triton backend tests validate the integration with NVIDIA Triton Inference Serve
 The following Python packages are required for running QA tests:
 
 ```bash
-<<<<<<< HEAD
-pip install mako oyaml rouge_score lm_eval
-=======
 pip3 install -r ${TensorRT-LLM_PATH}/requirements-dev.txt
->>>>>>> upstream/main
 ```
 
 ### Dependency Details
@@ -51,14 +47,6 @@ pip3 install -r ${TensorRT-LLM_PATH}/requirements-dev.txt
 This directory contains various test configuration files:
 
 ### Functional Test Lists
-<<<<<<< HEAD
-- `llm_function_full.txt` - Primary test list for single node multi-GPU scenarios (all new test cases should be added here)
-- `llm_function_sanity.txt` - Subset of examples for quick torch flow validation
-- `llm_function_nim.txt` - NIM-specific functional test cases
-- `llm_function_multinode.txt` - Multi-node functional test cases
-- `llm_function_gb20x.txt` - GB20X release test cases
-- `llm_function_rtx6kd.txt` - RTX 6000 Ada specific tests
-=======
 - `llm_function_core.txt` - Primary test list for single node multi-GPU scenarios (all new test cases should be added here)
 - `llm_function_core_sanity.txt` - Subset of examples for quick torch flow validation
 - `llm_function_nim.txt` - NIM-specific functional test cases
@@ -66,7 +54,6 @@ This directory contains various test configuration files:
 - `llm_function_gb20x.txt` - GB20X release test cases
 - `llm_function_rtx6k.txt` - RTX 6000 series specific tests
 - `llm_function_l20.txt` - L20 specific tests, only contains single gpu cases
->>>>>>> upstream/main
 
 ### Performance Test Files
 - `llm_perf_full.yml` - Main performance test configuration
@@ -89,15 +76,12 @@ QA tests are executed on a regular schedule:
 
 - **Weekly**: Automated regression testing
 - **Release**: Comprehensive validation before each release
-<<<<<<< HEAD
-=======
    - **Full Cycle Testing**:
         run all gpu with llm_function_core.txt + run NIM specific gpu with llm_function_nim.txt
     - **Sanity Cycle Testing**:
         run all gpu with llm_function_core_sanity.txt
     - **NIM Cycle Testing**:
         run all gpu with llm_function_core_sanity.txt + run NIM specific gpu with llm_function_nim.txt
->>>>>>> upstream/main
 - **On-demand**: Manual execution for specific validation needs
 
 ## Running Tests

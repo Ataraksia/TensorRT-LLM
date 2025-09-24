@@ -17,19 +17,12 @@ import os
 import re
 import subprocess
 import tempfile
-<<<<<<< HEAD
-
-import pytest
-import yaml
-from defs.conftest import llm_models_root, skip_arm, skip_no_hopper
-=======
 from typing import Callable
 
 import pytest
 import yaml
 from defs.conftest import (get_sm_version, llm_models_root, skip_arm,
                            skip_no_hopper)
->>>>>>> upstream/main
 from defs.trt_test_alternative import check_call, check_output, popen
 
 from tensorrt_llm.logger import logger
@@ -44,8 +37,6 @@ def cleanup_output_files():
             pass
 
 
-<<<<<<< HEAD
-=======
 def get_disagg_server_url_from_cfg(config_file: str) -> str:
     with open(config_file, 'r') as file:
         config = yaml.safe_load(file)
@@ -54,7 +45,6 @@ def get_disagg_server_url_from_cfg(config_file: str) -> str:
     return f"http://{server_host}:{server_port}"
 
 
->>>>>>> upstream/main
 def get_test_config(test_desc, example_dir, test_root):
     """Get test configuration based on test description."""
     test_configs_root = f"{test_root}/test_configs"
@@ -77,10 +67,7 @@ def get_test_config(test_desc, example_dir, test_root):
         (2, f"{test_configs_root}/disagg_config_cuda_graph_padding.yaml"),
         "mixed": (2, f"{test_configs_root}/disagg_config_mixed.yaml"),
         "overlap": (2, f"{test_configs_root}/disagg_config_overlap.yaml"),
-<<<<<<< HEAD
-=======
         "perf_metrics": (2, f"{test_configs_root}/disagg_config_metrics.yaml"),
->>>>>>> upstream/main
         "trtllm_sampler":
         (2, f"{test_configs_root}/disagg_config_trtllm_sampler.yaml"),
         "load_balance":
@@ -100,11 +87,8 @@ def get_test_config(test_desc, example_dir, test_root):
         (8, f"{test_configs_root}/disagg_config_ctxtp2pp2_gentp2pp2.yaml"),
         "ctxpp4_genpp4":
         (8, f"{test_configs_root}/disagg_config_ctxpp4_genpp4.yaml"),
-<<<<<<< HEAD
-=======
         "ctxpp4_gentp4":
         (8, f"{test_configs_root}/disagg_config_ctxpp4_gentp4.yaml"),
->>>>>>> upstream/main
         "deepseek_v3_lite_fp8_mpi":
         (4,
          f"{test_configs_root}/disagg_config_ctxtp2_gentp2_deepseek_v3_lite_mpi.yaml"
@@ -167,13 +151,10 @@ def get_test_config(test_desc, example_dir, test_root):
         (2,
          f"{test_configs_root}/disagg_config_ctxtp1_gentp1_deepseek_v3_lite_two_mtp.yaml"
          ),
-<<<<<<< HEAD
-=======
         "deepseek_v3_lite_fp8_ctxpp2_gentp2_one_mtp":
         (4,
          f"{test_configs_root}/disagg_config_ctxtp1_gentp1_deepseek_v3_lite_one_mtp_ctxpp2_gentp2.yaml"
          ),
->>>>>>> upstream/main
     }
 
     if test_desc not in config_map:
@@ -188,12 +169,8 @@ def run_disaggregated_test(example_dir,
                            num_iters=5,
                            env=None,
                            cwd=None,
-<<<<<<< HEAD
-                           prompt_file="prompts.json"):
-=======
                            prompt_file="prompts.json",
                            extra_endpoints_test: Callable[[str], None] = None):
->>>>>>> upstream/main
     """Run disaggregated test with given configuration."""
     cleanup_output_files()
     run_env = env.copy()
@@ -213,10 +190,7 @@ def run_disaggregated_test(example_dir,
         'trtllm-serve', 'disaggregated', '--server_start_timeout',
         str(server_start_timeout), '-c', config_file
     ]
-<<<<<<< HEAD
-=======
     server_url = get_disagg_server_url_from_cfg(config_file)
->>>>>>> upstream/main
 
     try:
         with (  # Start workers
@@ -277,12 +251,9 @@ def run_disaggregated_test(example_dir,
                 if prompt_file == "long_prompts.json":
                     continue
 
-<<<<<<< HEAD
-=======
                 if extra_endpoints_test is not None:
                     extra_endpoints_test(server_url)
 
->>>>>>> upstream/main
                 # Verify outputs
                 not_expected_strings = ["Berlin Berlin"]
 
@@ -564,8 +535,6 @@ def test_disaggregated_overlap(disaggregated_test_root, llm_venv,
 
 @pytest.mark.parametrize("llama_model_root", ['TinyLlama-1.1B-Chat-v1.0'],
                          indirect=True)
-<<<<<<< HEAD
-=======
 def test_disaggregated_perf_metrics(disaggregated_test_root, llm_venv,
                                     disaggregated_example_root,
                                     llama_model_root):
@@ -663,7 +632,6 @@ def test_disaggregated_kv_cache_time_output(disaggregated_test_root, llm_venv,
 
 @pytest.mark.parametrize("llama_model_root", ['TinyLlama-1.1B-Chat-v1.0'],
                          indirect=True)
->>>>>>> upstream/main
 def test_disaggregated_trtllm_sampler(disaggregated_test_root, llm_venv,
                                       disaggregated_example_root,
                                       llama_model_root):
@@ -860,8 +828,6 @@ def test_disaggregated_ctxpp4_genpp4(disaggregated_test_root, llm_venv,
                            cwd=llm_venv.get_working_directory())
 
 
-<<<<<<< HEAD
-=======
 #tiny llama pp4 will have uneven layer per pp. pp4
 @pytest.mark.skip_less_device(8)
 @pytest.mark.parametrize("llama_model_root", ['TinyLlama-1.1B-Chat-v1.0'],
@@ -883,7 +849,6 @@ def test_disaggregated_ctxpp4_gentp4(disaggregated_test_root, llm_venv,
                            cwd=llm_venv.get_working_directory())
 
 
->>>>>>> upstream/main
 @skip_no_hopper
 @pytest.mark.skip_less_device(4)
 @pytest.mark.parametrize("deepseek_v3_model_root", ['DeepSeek-V3-Lite-fp8'],
@@ -950,8 +915,6 @@ def test_disaggregated_deepseek_v3_lite_fp8_tp1_single_gpu_mtp(
                            cwd=llm_venv.get_working_directory())
 
 
-<<<<<<< HEAD
-=======
 @pytest.mark.skip_less_device(4)
 @skip_no_hopper
 @pytest.mark.parametrize("deepseek_v3_model_root", ['DeepSeek-V3-Lite-fp8'],
@@ -975,7 +938,6 @@ def test_disaggregated_deepseek_v3_lite_fp8_ctxpp2_gentp2_one_mtp(
                            cwd=llm_venv.get_working_directory())
 
 
->>>>>>> upstream/main
 @skip_no_hopper
 @skip_arm
 @pytest.mark.skip_less_device(4)
@@ -1471,12 +1433,9 @@ def get_config_for_benchmark(model_root, backend):
 def test_disaggregated_benchmark_on_diff_backends(
         disaggregated_test_root, disaggregated_example_root, llm_venv,
         benchmark_model_root, benchmark_root, shared_gpt_path):
-<<<<<<< HEAD
-=======
     if "DeepSeek-V3-Lite" in benchmark_model_root and "fp8" in benchmark_model_root and get_sm_version(
     ) != 90:
         pytest.skip("The test should only run on Hopper")
->>>>>>> upstream/main
     nixl_config = get_config_for_benchmark(benchmark_model_root, "NIXL")
     ucx_config = get_config_for_benchmark(benchmark_model_root, "UCX")
     temp_dir = tempfile.TemporaryDirectory()

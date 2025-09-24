@@ -33,10 +33,7 @@ extend_skip_glob = [
     "tensorrt_llm/top_model_mixin.py",
     "tests/unittest/_torch/modeling/test_modeling_mistral.py",
     "tests/unittest/_torch/modeling/test_modeling_pixtral.py",
-<<<<<<< HEAD
-=======
     "tests/unittest/_torch/models/checkpoints/hf/test_weight_loader.py",
->>>>>>> upstream/main
 ]
 
 [tool.yapf]
@@ -67,10 +64,7 @@ ignore_patterns = [
     "tensorrt_llm/top_model_mixin.py",
     "tests/unittest/_torch/modeling/test_modeling_mistral.py",
     "tests/unittest/_torch/modeling/test_modeling_pixtral.py",
-<<<<<<< HEAD
-=======
     "tests/unittest/_torch/models/checkpoints/hf/test_weight_loader.py",
->>>>>>> upstream/main
 ]
 
 [tool.codespell]
@@ -105,10 +99,7 @@ exclude = [
     "tensorrt_llm/top_model_mixin.py",
     "tests/unittest/_torch/modeling/test_modeling_mistral.py",
     "tests/unittest/_torch/modeling/test_modeling_pixtral.py",
-<<<<<<< HEAD
-=======
     "tests/unittest/_torch/models/checkpoints/hf/test_weight_loader.py",
->>>>>>> upstream/main
 ]
 
 
@@ -152,10 +143,7 @@ include = [
     "tensorrt_llm/top_model_mixin.py",
     "tests/unittest/_torch/modeling/test_modeling_mistral.py",
     "tests/unittest/_torch/modeling/test_modeling_pixtral.py",
-<<<<<<< HEAD
-=======
     "tests/unittest/_torch/models/checkpoints/hf/test_weight_loader.py",
->>>>>>> upstream/main
 ]
 exclude = [
     "**3rdparty/**",

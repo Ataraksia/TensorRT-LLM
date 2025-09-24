@@ -19,13 +19,8 @@ from PIL import Image
 from tensorrt_llm.inputs.multimodal import MultimodalParams
 
 from ...executor.request import LoRARequest
-<<<<<<< HEAD
-from ...inputs import (ExtraProcessedInputs, InputProcessor,
-                       MultimodalPlaceholderMetadata,
-=======
 from ...inputs import (BaseMultimodalInputProcessor, ExtraProcessedInputs,
                        InputProcessor, MultimodalPlaceholderMetadata,
->>>>>>> upstream/main
                        MultimodalPlaceholderPlacement, TextPrompt,
                        register_input_processor)
 from ...logger import logger
@@ -34,12 +29,8 @@ from ...sampling_params import SamplingParams
 from ..attention_backend import AttentionMetadata
 from ..model_config import ModelConfig
 from .modeling_auto import AutoModelForCausalLM
-<<<<<<< HEAD
-from .modeling_multimodal_utils import fuse_input_embeds
-=======
 from .modeling_multimodal_utils import (find_input_mm_embeds, fuse_input_embeds,
                                         get_multimodal_embeddings)
->>>>>>> upstream/main
 from .modeling_utils import register_auto_model
 
 # Special token ids from the original Phi-4-multimodal-instruct implementation
@@ -399,11 +390,7 @@ class HFPhi4MultimodalEncoder(transformers.PreTrainedModel,
             return self._encoding_batch_request(multimodal_params, mm_token_ids)
 
 
-<<<<<<< HEAD
-class Phi4MMInputProcessor(InputProcessor):
-=======
 class Phi4MMInputProcessor(BaseMultimodalInputProcessor, InputProcessor):
->>>>>>> upstream/main
 
     def __init__(self,
                  model_path: str,
@@ -429,8 +416,6 @@ class Phi4MMInputProcessor(BaseMultimodalInputProcessor, InputProcessor):
             trust_remote_code=trust_remote_code,
             use_fast=self.use_fast)
 
-<<<<<<< HEAD
-=======
     def get_mm_token_ids(self) -> Optional[torch.Tensor]:
         return torch.tensor([_IMAGE_SPECIAL_TOKEN_ID, _AUDIO_SPECIAL_TOKEN_ID],
                             dtype=torch.int32,
@@ -445,7 +430,6 @@ class Phi4MMInputProcessor(BaseMultimodalInputProcessor, InputProcessor):
         data = self.processor.image_processor.preprocess(image)
         return data["num_img_tokens"][0]
 
->>>>>>> upstream/main
     @torch.inference_mode()
     def __call__(
         self, inputs: TextPrompt, sampling_params: SamplingParams
@@ -610,18 +594,6 @@ class Phi4MMForCausalLM(transformers.PreTrainedModel):
         mm_embedding = []
         if len(multimodal_params) > 0:
             if not _is_disagg():
-<<<<<<< HEAD
-                # Forward the multimodal data to HFPhi4MultimodalEncoder in AGGREGATE mode.
-                mm_embedding = self.hf_phi4mm_model(multimodal_params,
-                                                    self.mm_token_ids)
-            else:
-                # Directly fetch the multimodal embedding for DISAGG mode.
-                # This path is not functional now. `multimodal_params` will be prepared in PyExecutor.
-                mm_embedding = [
-                    multimodal_param.multimodal_data["multimodal_embedding"]
-                    for multimodal_param in multimodal_params
-                ]
-=======
                 encoder_kwargs = {
                     "mm_token_ids": self.mm_token_ids,
                 }
@@ -638,16 +610,12 @@ class Phi4MMForCausalLM(transformers.PreTrainedModel):
             mm_embedding = find_input_mm_embeds(
                 mm_embedding, multimodal_params[:num_context_requests])
 
->>>>>>> upstream/main
         input_ids, input_embeds = fuse_input_embeds(
             self.llm.model.embed_tokens,
             input_ids,
             mm_embedding,
             mm_token_ids=self.mm_token_ids,
-<<<<<<< HEAD
-=======
             **kwargs,
->>>>>>> upstream/main
         )
 
         output_prob = self.llm.forward(
@@ -665,39 +633,21 @@ class Phi4MMForCausalLM(transformers.PreTrainedModel):
     @staticmethod
     def lora_config(model_dir: str):
         _lora_config = LoraConfig(
-<<<<<<< HEAD
-            lora_dir=[
-                f"{model_dir}/vision-lora",
-                f"{model_dir}/speech-lora",
-            ],
-            lora_target_modules=[
-                "attn_qkv",
-                "attn_dense",
-                "mlp_h_to_4h",
-=======
             lora_target_modules=[
                 "attn_qkv",
                 "attn_dense",
                 "mlp_gate_up",
->>>>>>> upstream/main
                 "mlp_4h_to_h",
             ],
             trtllm_modules_to_hf_modules={
                 "attn_qkv": "qkv_proj",
                 "attn_dense": "o_proj",
-<<<<<<< HEAD
-                "mlp_h_to_4h": "gate_up_proj",
-                "mlp_4h_to_h": "down_proj",
-            },
-            max_lora_rank=320,  # Max rank for Phi4MM.
-=======
                 "mlp_gate_up": "gate_up_proj",
                 "mlp_4h_to_h": "down_proj",
             },
             max_lora_rank=320,  # Max rank for Phi4MM.
             swap_gate_up_proj_lora_b_weight=
             False,  # Disable swap gate_up_proj.lora_B.weight for Phi4MM.
->>>>>>> upstream/main
         )
         return _lora_config
 

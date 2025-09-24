@@ -20,22 +20,14 @@
 namespace tensorrt_llm::kernels
 {
 
-<<<<<<< HEAD
-uint32_t getKernelMTileSize(uint32_t headGrpSize, bool isSpecDec, uint32_t qSeqLen, bool isXqaJit)
-=======
 uint32_t getKernelMTileSize(
     uint32_t headGrpSize, bool isSpecDec, uint32_t qSeqLen, bool isXqaJit, bool supportQGMMA, bool supportMLA)
->>>>>>> upstream/main
 {
     if (!isSpecDec)
     {
         return headGrpSize;
     }
-<<<<<<< HEAD
-    if (isXqaJit)
-=======
     if (isXqaJit && (supportQGMMA || supportMLA)) // HMMA (mha.cu) goes to the heuristic below
->>>>>>> upstream/main
     {
         return 64;
     }
@@ -43,11 +35,7 @@ uint32_t getKernelMTileSize(
     return gemmM < 16 ? 16 : 32;
 }
 
-<<<<<<< HEAD
-XQAKernelRuntimeHashKey getRuntimeHashKeyFromXQAParams(XQAParams const& xqaParams, bool isXqaJit)
-=======
 XQAKernelRuntimeHashKey getRuntimeHashKeyFromXQAParams(XQAParams const& xqaParams, bool isXqaJit, int SM)
->>>>>>> upstream/main
 {
     unsigned int head_size = xqaParams.head_size;
     unsigned int num_q_heads = xqaParams.num_q_heads;
@@ -56,16 +44,6 @@ XQAKernelRuntimeHashKey getRuntimeHashKeyFromXQAParams(XQAParams const& xqaParam
     unsigned int num_q_heads_over_kv = num_q_heads / num_kv_heads;
     unsigned int beam_width = xqaParams.beam_width;
 
-<<<<<<< HEAD
-    // Use mTileSize = 16 kernels when qSeqLen <= 16.
-    unsigned int qSeqLen = static_cast<unsigned int>(xqaParams.generation_input_length);
-    unsigned int mTileSize = qSeqLen <= 16 ? 16 : 32;
-    // MultiQueryToken kernels can support any num_q_heads_over_kv that is power of 2.
-    unsigned int kernel_num_q_heads_over_kv = xqaParams.multi_query_tokens ? 0 : num_q_heads_over_kv;
-    // MultiQueryToken kernels can handle either 16/32 for M direction per CTA.
-    unsigned int kernel_m_tilesize
-        = getKernelMTileSize(num_q_heads_over_kv, xqaParams.multi_query_tokens, qSeqLen, isXqaJit);
-=======
     unsigned int qSeqLen = static_cast<unsigned int>(xqaParams.generation_input_length);
     // MultiQueryToken kernels can support any num_q_heads_over_kv that is power of 2.
     unsigned int kernel_num_q_heads_over_kv = xqaParams.multi_query_tokens ? 0 : num_q_heads_over_kv;
@@ -73,7 +51,6 @@ XQAKernelRuntimeHashKey getRuntimeHashKeyFromXQAParams(XQAParams const& xqaParam
     bool supportMLA = jit::supportConfigMLA(xqaParams, SM, true);
     unsigned int kernel_m_tilesize = getKernelMTileSize(
         num_q_heads_over_kv, xqaParams.multi_query_tokens, qSeqLen, isXqaJit, supportQGMMA, supportMLA);
->>>>>>> upstream/main
 
     // precompiled XQA does not use is_fp8_output as hashing key
     return {xqaParams.kv_cache_data_type, head_size, beam_width, kernel_num_q_heads_over_kv, kernel_m_tilesize,

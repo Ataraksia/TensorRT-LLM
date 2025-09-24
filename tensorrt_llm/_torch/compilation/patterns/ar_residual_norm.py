@@ -1,8 +1,5 @@
 from operator import getitem
-<<<<<<< HEAD
-=======
 from typing import List, Optional
->>>>>>> upstream/main
 
 import torch
 from torch._inductor.pattern_matcher import (MULTIPLE, CallFunction, Ignored,
@@ -13,11 +10,7 @@ from torch._inductor.pattern_matcher import (MULTIPLE, CallFunction, Ignored,
 
 import tensorrt_llm
 
-<<<<<<< HEAD
-from ...distributed import AllReduceFusionOp
-=======
 from ...distributed import AllReduceFusionOp, AllReduceStrategy
->>>>>>> upstream/main
 
 aten = torch.ops.aten
 from tensorrt_llm.mapping import Mapping
@@ -31,21 +24,11 @@ def register_ar_residual_norm(custom_pass: PatternMatcherPass):
         rank=tensorrt_llm.mpi_rank(),
     )
     residual_key = KeywordArg("residual")
-<<<<<<< HEAD
-    trtllm_allreduce_default = CallFunction(torch.ops.trtllm.allreduce.default,
-                                            KeywordArg("input"), None, None,
-                                            None, None, KeywordArg("workspace"),
-                                            mapping.tp_group,
-                                            KeywordArg("strategy"),
-                                            int(AllReduceFusionOp.NONE),
-                                            Ignored())
-=======
     trtllm_allreduce_default = CallFunction(
         torch.ops.trtllm.allreduce.default, KeywordArg("input"), None, None,
         None, None, KeywordArg("workspace"), mapping.tp_group,
         KeywordArg("strategy"), int(AllReduceFusionOp.NONE), Ignored(),
         KeywordArg("trigger_completion_at_end"))
->>>>>>> upstream/main
     getitem_x = CallFunction(getitem, trtllm_allreduce_default, 0)
     add_Tensor = CallFunction(aten.add.Tensor,
                               getitem_x,
@@ -67,10 +50,7 @@ def register_ar_residual_norm(custom_pass: PatternMatcherPass):
         strategy: int,
         norm_weight: torch.nn.Parameter,
         eps: float,
-<<<<<<< HEAD
-=======
         trigger_completion_at_end: bool,
->>>>>>> upstream/main
     ):
         return
 
@@ -81,20 +61,13 @@ def register_ar_residual_norm(custom_pass: PatternMatcherPass):
         strategy: int,
         norm_weight: torch.nn.Parameter,
         eps: float,
-<<<<<<< HEAD
-=======
         trigger_completion_at_end: bool,
->>>>>>> upstream/main
     ):
         all_reduce_output = torch.ops.trtllm.allreduce(
             input, residual, norm_weight, None, None, workspace,
             mapping.tp_group, int(strategy),
-<<<<<<< HEAD
-            int(AllReduceFusionOp.RESIDUAL_RMS_NORM), float(eps))
-=======
             int(AllReduceFusionOp.RESIDUAL_RMS_NORM), float(eps),
             trigger_completion_at_end)
->>>>>>> upstream/main
         return all_reduce_output[0], all_reduce_output[1]
 
     def extra_check(match: Match) -> bool:
@@ -123,8 +96,6 @@ def register_ar_residual_norm(custom_pass: PatternMatcherPass):
         search_fn_pattern=ar_residual_norm_pattern,
         extra_check=extra_check,
     )
-<<<<<<< HEAD
-=======
 
 
 def check_f16_bf16_input(match, input_node) -> bool:
@@ -759,4 +730,3 @@ def register_ar_fusions(custom_passes: List[PatternMatcherPass],
 
     if enable_ub:
         register_ub_patterns(custom_passes)
->>>>>>> upstream/main

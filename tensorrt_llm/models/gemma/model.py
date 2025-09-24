@@ -28,11 +28,7 @@ from ...functional import (AllReduceFusionOp, AllReduceParams, LayerNormType,
 from ...layers import (Attention, AttentionMaskType, AttentionParams,
                        ColumnLinear, Embedding, GatedMLP, KeyValueCacheParams,
                        LoraParams, PositionEmbeddingType, RmsNorm)
-<<<<<<< HEAD
-from ...lora_manager import LoraConfig, use_lora
-=======
 from ...lora_helper import LoraConfig, use_lora
->>>>>>> upstream/main
 from ...mapping import Mapping
 from ...module import Module
 from ..modeling_utils import (DecoderLayerList, DecoderModelForCausalLM,
@@ -78,11 +74,7 @@ class GemmaDecoderLayer(Module):
                 gemma3_config.query_pre_attn_scalar) / math.sqrt(
                     config.head_size)
             is_sliding = bool(
-<<<<<<< HEAD
-                (layer_idx + 1) % gemma3_config.sliding_window_pattern)
-=======
                 (layer_idx + 1) % gemma3_config._sliding_window_pattern)
->>>>>>> upstream/main
             rotary_base_local = config.rope_local_base_freq
 
         self.attention = Attention(
@@ -165,12 +157,6 @@ class GemmaDecoderLayer(Module):
                 if default_net().plugin_config.reduce_fusion else
                 AllReduceFusionOp.NONE,
                 residual=residual,
-<<<<<<< HEAD
-                norm_weight=self.post_layernorm.weight.value,
-                norm_pre_residual_weight=self.pre_feedforward_layernorm.weight.
-                value if self.config.inter_layernorms else None,
-                eps=self.post_layernorm.eps))
-=======
                 norm_weight=self.pre_feedforward_layernorm.weight.value
                 if self.config.inter_layernorms else None,
                 norm_pre_residual_weight=self.post_layernorm.weight.value,
@@ -178,7 +164,6 @@ class GemmaDecoderLayer(Module):
                 if self.config.inter_layernorms else 1e-06,
             ),
         )
->>>>>>> upstream/main
 
         if use_cache:
             attention_output, presents = attention_output

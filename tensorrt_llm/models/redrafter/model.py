@@ -20,11 +20,7 @@ import tensorrt as trt
 from tensorrt_llm._common import default_net
 from tensorrt_llm.bindings import KVCacheType
 from tensorrt_llm.functional import Tensor, cast, categorical_sample
-<<<<<<< HEAD
-from tensorrt_llm.models import LLaMAForCausalLM
-=======
 from tensorrt_llm.models import LLaMAForCausalLM, QWenForCausalLM
->>>>>>> upstream/main
 from tensorrt_llm.models.generation_mixin import GenerationMixin
 
 from ..._utils import pad_vocab_size, str_dtype_to_trt
@@ -33,11 +29,7 @@ from .redrafter_helper import (_beam_search_candidates, _beams2tree,
                                _process_logits_and_hidden_states)
 
 
-<<<<<<< HEAD
-class ReDrafterForCausalLM(LLaMAForCausalLM):
-=======
 class ReDrafterMixin:
->>>>>>> upstream/main
 
     def __init__(self, config):
 
@@ -187,24 +179,15 @@ class ReDrafterMixin:
         bb_range = default_range(max_batch_size)
         bb0_range = default_range(max_batch_size, min_range=0, opt_offset=1)
         num_beam_tokens = self.num_beams * self.beam_length
-<<<<<<< HEAD
-        max_draft_tokens = num_beam_tokens - self.num_beams  # ignore the true token
-        max_gen_token_len = 1 + max_draft_tokens  # for the true token
-=======
         max_draft_len = num_beam_tokens - self.num_beams  # ignore the true token
         max_gen_token_len = 1 + max_draft_len  # for the true token
->>>>>>> upstream/main
         max_gen_token_len_range = default_range(max_gen_token_len)
         bb_max_gen_token_len_range = default_range(max_gen_token_len *
                                                    max_batch_size,
                                                    min_range=0)
 
         kwargs['speculative_decoding_draft_tokens_external'] = False
-<<<<<<< HEAD
-        kwargs['max_draft_len'] = max_draft_tokens
-=======
         kwargs['max_draft_len'] = max_draft_len
->>>>>>> upstream/main
         kwargs['spec_decoding_is_generation_length_variable'] = True
         inputs = super().prepare_inputs(*args, **kwargs)
         assert inputs['spec_decoding_params'] is not None
@@ -314,8 +297,6 @@ class ReDrafterMixin:
         inputs['rand_data_sample'] = rand_data_sample
         inputs['position_ids_base'] = position_ids_base
         return inputs
-<<<<<<< HEAD
-=======
 
 
 class ReDrafterForQWenLM(ReDrafterMixin, QWenForCausalLM):
@@ -334,4 +315,3 @@ class ReDrafterForLLaMALM(ReDrafterMixin, LLaMAForCausalLM):
     - Base LLaMA model functionality from LLaMAForCausalLM
     - Drafting/speculative decoding logic from ReDrafterMixin
     """
->>>>>>> upstream/main

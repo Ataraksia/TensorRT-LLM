@@ -1,24 +1,13 @@
-<<<<<<< HEAD
-import os
-from abc import ABC, abstractmethod
-from typing import Optional, ValuesView
-=======
 import math
 import os
 import pickle  # nosec B403
 from abc import ABC, abstractmethod
 from typing import Optional
->>>>>>> upstream/main
 
 import numpy as np
 import torch
 import torch.distributed as dist
 
-<<<<<<< HEAD
-from tensorrt_llm._utils import (mpi_allgather, mpi_barrier, mpi_broadcast,
-                                 mpi_comm, mpi_isend, mpi_recv, mpi_send,
-                                 torch_dtype_to_np)
-=======
 try:
     from mpi4py import MPI
 except Exception:
@@ -28,7 +17,6 @@ from tensorrt_llm._utils import (mpi_allgather, mpi_barrier, mpi_comm,
                                  mpi_isend, mpi_isend_object, mpi_recv,
                                  mpi_recv_object, mpi_send, mpi_send_object)
 from tensorrt_llm.bindings.BuildInfo import ENABLE_MULTI_DEVICE
->>>>>>> upstream/main
 from tensorrt_llm.mapping import Mapping
 
 
@@ -114,8 +102,6 @@ class Distributed(ABC):
         pass
 
 
-<<<<<<< HEAD
-=======
 def safe_broadcast(comm, obj, root=0, chunk_size: int = 4 * 1024 * 1024):
     """
     Safely broadcasts potentially large objects by splitting into fixed-size chunks,
@@ -336,23 +322,16 @@ def safe_gather(comm, obj, root=0, chunk_size: int = 4 * 1024 * 1024):
     return None
 
 
->>>>>>> upstream/main
 class MPIDist(Distributed):
 
     def __init__(self, mapping: Mapping):
         super().__init__(mapping)
         self.create_tp_comm()
-<<<<<<< HEAD
-
-    def broadcast(self, obj, root=0):
-        return mpi_broadcast(obj, root)
-=======
         self.create_pp_comm()
 
     def broadcast(self, obj, root=0, chunk_size: int = 4 * 1024 * 1024):
         comm = mpi_comm()
         return safe_broadcast(comm, obj, root=root, chunk_size=chunk_size)
->>>>>>> upstream/main
 
     def allgather(self, obj):
         return mpi_allgather(obj)
@@ -372,50 +351,6 @@ class MPIDist(Distributed):
         # in-place recv numpy buffer
         return mpi_recv(buf, src, tag)
 
-<<<<<<< HEAD
-    def isend_tensor(self, tensor: torch.Tensor, dest, tag=0):
-        return self.isend(tensor.numpy(), dest, tag)
-
-    def recv_tensor(self, tensor: torch.Tensor, src, tag=0):
-        return self.recv(tensor.numpy(), src, tag)
-
-    def isend_tensor_list(self,
-                          tensor_list: ValuesView[torch.Tensor],
-                          dest,
-                          tag=0):
-        if len(tensor_list) == 0:
-            return None
-        elif len(tensor_list) == 1:
-            return self.isend_tensor(next(iter(tensor_list)), dest, tag)
-
-        return self.isend(
-            np.concatenate([t.numpy().ravel() for t in tensor_list]), dest, tag)
-
-    def recv_tensor_list(self,
-                         tensor_list: ValuesView[torch.Tensor],
-                         src,
-                         tag=0):
-        if len(tensor_list) == 0:
-            return None
-        elif len(tensor_list) == 1:
-            return self.recv_tensor(next(iter(tensor_list)), src, tag)
-
-        # Use the first tensor's dtype to infer the buffer dtype
-        numpy_dtype = torch_dtype_to_np(next(iter(tensor_list)).dtype)
-        # Prepare buffer to receive tensor_list
-        recv_buffer = np.empty(sum([t.numel() for t in tensor_list]),
-                               dtype=numpy_dtype)
-        # Receive tensors
-        self.recv(recv_buffer, src, tag)
-        # Assign to tensor_list
-        offset = 0
-        for t in tensor_list:
-            t.copy_(
-                torch.from_numpy(recv_buffer[offset:offset +
-                                             t.numel()]).reshape(t.shape))
-            offset += t.numel()
-        return None
-=======
     def send_object(self, obj, dest, tag=0):
         mpi_send_object(obj, dest, tag)
 
@@ -424,22 +359,11 @@ class MPIDist(Distributed):
 
     def recv_object(self, src, tag=0):
         return mpi_recv_object(src, tag)
->>>>>>> upstream/main
 
     def create_tp_comm(self):
         new_group = mpi_comm().group.Incl(self.mapping.tp_group)
         self.tp_comm = mpi_comm().Create_group(new_group)
 
-<<<<<<< HEAD
-    def tp_allgather(self, obj):
-        return self.tp_comm.allgather(obj)
-
-    def tp_gather(self, obj):
-        return self.tp_comm.gather(obj)
-
-    def tp_broadcast(self, obj, root=0):
-        return self.tp_comm.bcast(obj, root)
-=======
     def create_pp_comm(self):
         new_group = mpi_comm().group.Incl(self.mapping.pp_group)
         self.pp_comm = mpi_comm().Create_group(new_group)
@@ -463,7 +387,6 @@ class MPIDist(Distributed):
 
     def pp_broadcast(self, obj, root=0):
         return self.pp_comm.bcast(obj, root)
->>>>>>> upstream/main
 
 
 class TorchDist(Distributed):

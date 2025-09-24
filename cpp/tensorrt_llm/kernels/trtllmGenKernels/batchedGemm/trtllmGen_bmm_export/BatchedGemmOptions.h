@@ -20,10 +20,7 @@
 #include "GemmGatedActOptions.h"
 #include "GemmOptions.h"
 
-<<<<<<< HEAD
-=======
 #include <cstdint>
->>>>>>> upstream/main
 #include <vector>
 
 #ifndef TLLM_GEN_EXPORT_INTERFACE
@@ -36,29 +33,19 @@
     if (!(cond))                                                                                                       \
     {                                                                                                                  \
         printArgs(__VA_ARGS__);                                                                                        \
-<<<<<<< HEAD
-=======
         printArgs("\n");                                                                                               \
->>>>>>> upstream/main
         return false;                                                                                                  \
     }
 
 #define TLLM_LOG_ERROR(...) TLLM_CHECK_ERROR(false, __VA_ARGS__)
 
-<<<<<<< HEAD
-#define TLLM_CHECK_ERROR_FMT(...) TLLM_CHECK_ERROR(false, __VA_ARGS__)
-=======
 #define TLLM_CHECK_ERROR_FMT(cond, ...) TLLM_CHECK_ERROR(cond, __VA_ARGS__)
->>>>>>> upstream/main
 
 #define TLLM_CHECK_WARNING(cond, ...)                                                                                  \
     if (!(cond))                                                                                                       \
     {                                                                                                                  \
         printArgs(__VA_ARGS__);                                                                                        \
-<<<<<<< HEAD
-=======
         printArgs("\n");                                                                                               \
->>>>>>> upstream/main
         return false;                                                                                                  \
     }
 
@@ -66,11 +53,7 @@
 
 #define TLLM_LOG_INFO(...) TLLM_CHECK_WARNING(false, __VA_ARGS__)
 
-<<<<<<< HEAD
-#endif
-=======
 #endif // TLLM_GEN_EXPORT_INTERFACE
->>>>>>> upstream/main
 
 namespace batchedGemm
 {
@@ -115,20 +98,12 @@ struct BatchedGemmOptions : public gemmGatedAct::GemmGatedActOptions
         bool useShuffledMatrixA, bool sliceK, gemm::SplitK splitK, bool transposeMmaOutput, int tileM, int tileN,
         int tileK, bool useUnrollLoop2xForMma, bool useCustomMmaSchedule, bool useHoistTryWaitForCustomMmaSchedule,
         bool useDeepSeekFp8, bool usePerTokenSfA, bool usePerTokenSfB, bool useTmaStore, bool useTwoTmaLoadWarps,
-<<<<<<< HEAD
-        bool useTwoMmaWarps, tg::SfLayout sfLayoutA, tg::SfLayout sfLayoutB, tg::SfLayout sfLayoutC,
-        int32_t sfReshapeFactor, gemm::TileScheduler tileScheduler, gemmGatedAct::ActType actType, bool clampBeforeAct,
-        std::vector<int> batchedM, std::vector<int> batchedN, BatchMode batchMode, int numBatches, bool isStaticBatch,
-        int numTokens, RouteImpl routeImpl, bool gridWaitForPrimaryRouting, bool fusedAct,
-        int numRegsPerThreadNonEpilogueWarp, int numRegsPerThreadEpilogueWarp, int numRegsCastAWarps)
-=======
         bool useTwoMmaWarps, std::optional<int32_t> sfBlockSizeA, tg::SfLayout sfLayoutA, tg::SfLayout sfLayoutB,
         tg::SfLayout sfLayoutC, int32_t sfReshapeFactor, gemm::TileScheduler tileScheduler,
         gemmGatedAct::ActType actType, bool clampBeforeAct, std::vector<int> batchedM, std::vector<int> batchedN,
         BatchMode batchMode, int numBatches, bool isStaticBatch, int numTokens, RouteImpl routeImpl,
         bool gridWaitForPrimaryRouting, bool fusedAct, int numRegsPerThreadNonEpilogueWarp,
         int numRegsPerThreadEpilogueWarp, int numRegsCastAWarps, bool useTmaOobOpt)
->>>>>>> upstream/main
         : gemmGatedAct::GemmGatedActOptions(
             gemm::GemmOptions(allReduceAlgo, biasType, blockK, clusterDimX, clusterDimY, clusterDimZ, dtypeAcc, dtypeA,
                 dtypeB, dtypeC, dtypeMmaA, dtypeMmaB, enablesEarlyExit, enablesDelayedEarlyExit, enablesGlobalPtxKnobs,
@@ -139,28 +114,12 @@ struct BatchedGemmOptions : public gemmGatedAct::GemmGatedActOptions
                 numStagesMmaWithinWorkTile, numStagesMmaAcrossWorkTile, numStagesWorkId, outputDebugTensors, patchF2fp,
                 useShuffledMatrixA, sliceK, splitK, transposeMmaOutput, tileM, tileN, tileK, useUnrollLoop2xForMma,
                 useCustomMmaSchedule, useHoistTryWaitForCustomMmaSchedule, useDeepSeekFp8, usePerTokenSfA,
-<<<<<<< HEAD
-                usePerTokenSfB, useTmaStore, useTwoTmaLoadWarps, useTwoMmaWarps, sfLayoutA, sfLayoutB, sfLayoutC,
-                sfReshapeFactor, tileScheduler),
-=======
                 usePerTokenSfB, useTmaStore, useTwoTmaLoadWarps, useTwoMmaWarps, sfBlockSizeA, sfLayoutA, sfLayoutB,
                 sfLayoutC, sfReshapeFactor, tileScheduler),
->>>>>>> upstream/main
             actType, clampBeforeAct)
         , mBatchedM(batchedM)
         , mBatchedN(batchedN)
         , mBatchMode(BatchMode(batchMode))
-<<<<<<< HEAD
-        , mNumBatches(numBatches)
-        , mIsStaticBatch(isStaticBatch)
-        , mNumTokens(numTokens)
-        , mRouteImpl(routeImpl)
-        , mGridWaitForPrimaryRouting(gridWaitForPrimaryRouting)
-        , mFusedAct(fusedAct)
-        , mNumRegsPerThreadNonEpilogueWarp(numRegsPerThreadNonEpilogueWarp)
-        , mNumRegsPerThreadEpilogueWarp(numRegsPerThreadEpilogueWarp)
-        , mNumRegsCastAWarps(numRegsCastAWarps)
-=======
         , mFusedAct(fusedAct)
         , mGridWaitForPrimaryRouting(gridWaitForPrimaryRouting)
         , mIsStaticBatch(isStaticBatch)
@@ -171,7 +130,6 @@ struct BatchedGemmOptions : public gemmGatedAct::GemmGatedActOptions
         , mNumTokens(numTokens)
         , mRouteImpl(routeImpl)
         , mUseTmaOobOpt(useTmaOobOpt)
->>>>>>> upstream/main
     {
     }
 
@@ -181,24 +139,6 @@ struct BatchedGemmOptions : public gemmGatedAct::GemmGatedActOptions
     std::vector<int> mBatchedN;
     // Whether batching M or N.
     BatchMode mBatchMode{BatchMode::BatchM};
-<<<<<<< HEAD
-    // Number of Gemm batches.
-    int mNumBatches;
-
-    // Whether the batch size is static (i.e. known at kernel launch time).
-    bool mIsStaticBatch{true};
-    // Total number of tokens.
-    int mNumTokens{32};
-    // Whether load the input tokens and do routing.
-    RouteImpl mRouteImpl{RouteImpl::NoRoute};
-    // Whether the loads that load from ptrRouteMap, ptrTotalNumPaddedTokens,
-    // ptrCtaIdxXyToBatchIdx, etc.. should wait on a grid dependency.
-    bool mGridWaitForPrimaryRouting{true};
-
-    // Whether to perform a fused gated activation.
-    bool mFusedAct{false};
-
-=======
     // Whether to perform a fused gated activation.
     bool mFusedAct{false};
     // Whether the loads that load from ptrRouteMap, ptrTotalNumPaddedTokens,
@@ -208,15 +148,12 @@ struct BatchedGemmOptions : public gemmGatedAct::GemmGatedActOptions
     bool mIsStaticBatch{true};
     // Number of Gemm batches.
     int mNumBatches;
->>>>>>> upstream/main
     // Number of registers per thread for non-epilogue warps
     int mNumRegsPerThreadNonEpilogueWarp{0};
     // Number of registers per thread for epilogue warps
     int mNumRegsPerThreadEpilogueWarp{0};
     // Number of registers for the cast A warps.
     int mNumRegsCastAWarps{0};
-<<<<<<< HEAD
-=======
     // Total number of tokens.
     int mNumTokens{32};
     // Whether load the input tokens and do routing.
@@ -224,7 +161,6 @@ struct BatchedGemmOptions : public gemmGatedAct::GemmGatedActOptions
     // Whether to use TMA out-of-bounds optimization to reduce wasted traffic. See details in
     // BatchedGemm/KernelParamsDecl.h.
     bool mUseTmaOobOpt{false};
->>>>>>> upstream/main
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -234,8 +170,6 @@ bool checkAndUpdateBatchedGemmOptions(BatchedGemmOptions& options, bool isBlackw
 {
 
     bool isValid = true;
-<<<<<<< HEAD
-=======
     if (options.mUseTmaOobOpt && !options.mUseTwoTmaLoadWarps)
     {
         if (updateOptions)
@@ -250,7 +184,6 @@ bool checkAndUpdateBatchedGemmOptions(BatchedGemmOptions& options, bool isBlackw
             return false;
         }
     }
->>>>>>> upstream/main
     if (options.mFusedAct)
     {
         // ensure that we check the fused options as well
@@ -284,24 +217,6 @@ bool checkAndUpdateBatchedGemmOptions(BatchedGemmOptions& options, bool isBlackw
         }
     }
 
-<<<<<<< HEAD
-    for (int b = 0; b < options.mNumBatches; b++)
-    {
-        if (batchM)
-        {
-            TLLM_CHECK_ERROR(options.mN > 0 && options.mK > 0, "N and K must be larger than 0");
-            TLLM_CHECK_ERROR(options.mN >= options.mTileN, "N must be equal or larger than TileN.");
-            TLLM_CHECK_ERROR(options.mN % options.mTileN == 0, "N must be divisible by TileN.");
-            TLLM_CHECK_ERROR(!options.mTransposeMmaOutput, "When batchM the MMA output has to be in row-major.");
-        }
-        else
-        {
-            TLLM_CHECK_ERROR(options.mM > 0 && options.mK > 0, "M and K must be larger than 0");
-            TLLM_CHECK_ERROR(options.mM >= options.mTileM, "N must be equal or larger than tileN.");
-            TLLM_CHECK_ERROR(options.mM % options.mTileM == 0, "M must be divisible by TileM.");
-            TLLM_CHECK_ERROR(options.mTransposeMmaOutput, "When batchN the MMA output has to be in column-major.");
-        }
-=======
     if (batchM)
     {
         TLLM_CHECK_ERROR(options.mN > 0 && options.mK > 0, "N and K must be larger than 0");
@@ -315,7 +230,6 @@ bool checkAndUpdateBatchedGemmOptions(BatchedGemmOptions& options, bool isBlackw
         TLLM_CHECK_ERROR(options.mM >= options.mTileM, "M must be equal or larger than TileM.");
         TLLM_CHECK_ERROR(options.mM % options.mTileM == 0, "M must be divisible by TileM.");
         TLLM_CHECK_ERROR(options.mTransposeMmaOutput, "When batchN the MMA output has to be in column-major.");
->>>>>>> upstream/main
     }
 
     if (options.mUseDeepSeekFp8)
@@ -469,12 +383,8 @@ inline std::string dumpOptions(BatchedGemmOptions const& options)
     ss << "mFusedAct=" << options.mFusedAct << "," << std::endl;
     ss << "mNumRegsPerThreadNonEpilogueWarp=" << options.mNumRegsPerThreadNonEpilogueWarp << "," << std::endl;
     ss << "mNumRegsPerThreadEpilogueWarp=" << options.mNumRegsPerThreadEpilogueWarp << "," << std::endl;
-<<<<<<< HEAD
-    ss << "mNumRegsCastAWarps=" << options.mNumRegsCastAWarps << std::endl;
-=======
     ss << "mNumRegsCastAWarps=" << options.mNumRegsCastAWarps << "," << std::endl;
     ss << "mUseTmaOobOpt=" << options.mUseTmaOobOpt << std::endl;
->>>>>>> upstream/main
     return ss.str();
 }
 

@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-from typing import Any, Dict, List, Optional, Protocol, Tuple, Type, TypeVar
-
-from torch import nn
-
-from ..sampling_params import SamplingParams
-from .data import TextPrompt
-=======
 import enum
 from dataclasses import dataclass, field
 from typing import (Any, Callable, Dict, List, Optional, Protocol, Tuple, Type,
@@ -21,7 +13,6 @@ from .data import TextPrompt
 from .multimodal import (MultimodalInput, apply_mm_hashes, default_hasher,
                          find_mm_token_lengths, find_mm_token_positions,
                          hexdigest_to_int32, validate_mm_inputs)
->>>>>>> upstream/main
 
 N = TypeVar("N", bound=Type[nn.Module])
 
@@ -43,10 +34,7 @@ class InputProcessor(Protocol):
     model_path: any
     model_config: any
     tokenizer: any
-<<<<<<< HEAD
-=======
     multimodal_hashing_supported: Optional[bool] = None
->>>>>>> upstream/main
 
     def __call__(
         self, inputs: TextPrompt, sampling_params: SamplingParams
@@ -54,15 +42,6 @@ class InputProcessor(Protocol):
         ...
 
 
-<<<<<<< HEAD
-class DefaultInputProcessor(InputProcessor):
-    """Preprocess the inputs to the model."""
-
-    def __init__(self, model_path, model_config, tokenizer) -> None:
-        self.tokenizer = tokenizer
-        self.model_config = model_config
-        self.model_path = model_path
-=======
 class BaseMultimodalInputProcessor:
     """
     Base class for multimodal input processors with default implementations
@@ -211,7 +190,6 @@ class DefaultInputProcessor(InputProcessor):
         self.model_config = model_config
         self.model_path = model_path
         self.multimodal_hashing_supported = None
->>>>>>> upstream/main
 
     def __call__(
         self, inputs: TextPrompt, sampling_params: SamplingParams
@@ -223,19 +201,6 @@ class DefaultInputProcessor(InputProcessor):
         if sampling_params.truncate_prompt_tokens is not None:
             kwargs = dict(truncation=True,
                           max_length=sampling_params.truncate_prompt_tokens)
-<<<<<<< HEAD
-
-        token_ids = self.tokenizer.encode(
-            inputs["prompt"],
-            add_special_tokens=sampling_params.add_special_tokens,
-            **kwargs)
-
-        if "query" in inputs:
-            query_token_ids = self.tokenizer.encode(
-                inputs["query"],
-                add_special_tokens=sampling_params.add_special_tokens,
-                **kwargs)
-=======
         toktoken_special_tokens = {
             "<|startoftext|>",
             "<|endoftext|>",
@@ -278,14 +243,11 @@ class DefaultInputProcessor(InputProcessor):
                         inputs["query"],
                         allowed_special=toktoken_special_tokens)
 
->>>>>>> upstream/main
             return token_ids, {"query_token_ids": query_token_ids}
 
         return token_ids, None
 
 
-<<<<<<< HEAD
-=======
 class MultimodalPlaceholderPlacement(enum.Enum):
     """
     The placement of the multimodal placeholder in the prompt. Valid values are:
@@ -407,7 +369,6 @@ class MultimodalPlaceholderRegistry:
 MULTIMODAL_PLACEHOLDER_REGISTRY = MultimodalPlaceholderRegistry()
 
 
->>>>>>> upstream/main
 class InputProcessorRegistry:
 
     def __init__(self) -> None:
@@ -418,11 +379,6 @@ class InputProcessorRegistry:
 INPUT_PROCESSOR_REGISTRY = InputProcessorRegistry()
 
 
-<<<<<<< HEAD
-def register_input_processor(processor_cls: Type[InputProcessor]):
-    """
-    Register an input processor to a model class.
-=======
 def support_multimodal_disaggregated(model_cls: Type[nn.Module]):
     """
     Model-class decorator to declare support for multimodal disaggregated inputs.
@@ -464,14 +420,11 @@ def register_input_processor(
            the model type only for that.
         2. If this is used for other models in the future, this logic needs to be
            updated e.g. adding another version of this API without the model_type.
->>>>>>> upstream/main
     """
 
     def wrapper(model_cls: N) -> N:
         INPUT_PROCESSOR_REGISTRY._input_processors_cls_by_model_type[
             model_cls] = processor_cls
-<<<<<<< HEAD
-=======
         if placeholder_metadata is None:
             raise ValueError(
                 f"A valid placeholder_metadata must be provided but got {placeholder_metadata}"
@@ -479,7 +432,6 @@ def register_input_processor(
 
         MULTIMODAL_PLACEHOLDER_REGISTRY.set_placeholder_metadata(
             model_type, placeholder_metadata)
->>>>>>> upstream/main
 
         return model_cls
 
@@ -507,14 +459,6 @@ def create_input_processor(model_path_or_dir: str, tokenizer):
             input_processor_cls = INPUT_PROCESSOR_REGISTRY._input_processors_cls_by_model_type \
                 .get(model_cls)
         except RuntimeError:  # unregistered model
-<<<<<<< HEAD
-            input_processor_cls = None
-        if input_processor_cls is not None:
-            return input_processor_cls(model_path_or_dir, model_config,
-                                       tokenizer)
-
-    return DefaultInputProcessor(None, None, tokenizer)
-=======
             logger.info("Unregistered model, using DefaultInputProcessor")
             input_processor_cls = None
         if input_processor_cls is not None:
@@ -643,4 +587,3 @@ def create_input_processor_with_hash(
                 raise e
 
     return input_processor_wrapper
->>>>>>> upstream/main

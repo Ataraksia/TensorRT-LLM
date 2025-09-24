@@ -42,10 +42,7 @@
 
 namespace tr = tensorrt_llm::runtime;
 namespace tk = tensorrt_llm::kernels;
-<<<<<<< HEAD
-=======
 namespace kvc = tensorrt_llm::executor::kv_cache;
->>>>>>> upstream/main
 
 namespace tensorrt_llm::batch_manager::kv_cache_manager
 {
@@ -90,13 +87,6 @@ static bool fileToGpuPosix(tr::ITensor::SharedPtr const& dstPtr, std::string con
     return true;
 }
 
-<<<<<<< HEAD
-KVCacheTransferManager::KVCacheTransferManager(tr::BufferManager const& bufferManager)
-    : mBufferManager{bufferManager}
-    , mOnboardManager(std::make_shared<tr::CudaStream>())
-    , mOffloadManager(std::make_shared<tr::CudaStream>())
-{
-=======
 KVCacheTransferManager::KVCacheTransferManager(
     tr::BufferManager const& bufferManager, std::shared_ptr<kvc::BaseLoopbackAgent> loopbackAgent)
     : mBufferManager{bufferManager}
@@ -106,7 +96,6 @@ KVCacheTransferManager::KVCacheTransferManager(
 {
     TLLM_CUDA_CHECK(cudaGetDevice(&mDeviceId));
     TLLM_CHECK(mDeviceId != -1);
->>>>>>> upstream/main
 }
 
 tr::ITensor::SharedPtr KVCacheTransferManager::computeBlockPointer(
@@ -122,11 +111,7 @@ tr::ITensor::SharedPtr KVCacheTransferManager::computeBlockPointer(
 
 void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
     std::vector<KVCacheBlockPool> const& pools, bool isOffload, int numTokensToCopy, executor::KvCacheTransferMode mode,
-<<<<<<< HEAD
-    std::optional<std::string> directory)
-=======
     std::string const& directory)
->>>>>>> upstream/main
 {
     TLLM_LOG_DEBUG("copyBlock entered: srcId=%d, dstId=%d, isOffload=%s, mode=%d", src->getBlockId(), dst->getBlockId(),
         (isOffload ? "true" : "false"), static_cast<int>(mode));
@@ -179,22 +164,6 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
         return;
     }
 
-<<<<<<< HEAD
-    for (size_t poolIdx = 0; poolIdx < pools.size(); ++poolIdx)
-    {
-        auto srcPtr = computeBlockPointer(src, pools, poolIdx);
-        auto dstPtr = computeBlockPointer(dst, pools, poolIdx);
-
-        TLLM_CHECK_WITH_INFO(
-            directory.has_value(), "Expected a directory path for KVCache offload, but none was provided.");
-
-        int size = std::snprintf(
-            nullptr, 0, "%s/block_%d_pool_%zu.bin", directory.value().c_str(), src->getBlockId(), poolIdx);
-
-        std::string filename(size + 1, '\0');
-        std::snprintf(filename.data(), filename.size(), "%s/block_%d_pool_%zu.bin", directory.value().c_str(),
-            src->getBlockId(), poolIdx);
-=======
     std::vector<kvc::FileDesc> fileBlobs;
     std::vector<kvc::MemoryDesc> memoryBlobs;
 
@@ -211,103 +180,12 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
         filename.resize(size + 1);
         std::snprintf(
             filename.data(), filename.size(), "%s/block_%d_pool_%zu.bin", directory.c_str(), block_id, poolIdx);
->>>>>>> upstream/main
 
         if (mode == executor::KvCacheTransferMode::POSIX_DEBUG_FALLBACK)
         {
             TLLM_LOG_INFO("Forcing POSIX fallback for file: %s", filename.c_str());
             if (isOffload)
             {
-<<<<<<< HEAD
-                gpuToFilePosix(srcPtr, filename);
-            }
-            else
-            {
-                fileToGpuPosix(dstPtr, filename);
-            }
-            continue;
-        }
-
-        int openFlags = isOffload ? (O_CREAT | O_WRONLY) : O_RDONLY;
-        int fd = ::open(filename.c_str(), openFlags, 0664);
-        if (fd < 0)
-        {
-            TLLM_LOG_ERROR(
-                "Failed to open '%s' for %s; fallback POSIX", filename.c_str(), (isOffload ? "writing" : "reading"));
-
-            if (isOffload)
-            {
-                gpuToFilePosix(srcPtr, filename);
-            }
-            else
-            {
-                fileToGpuPosix(dstPtr, filename);
-            }
-            continue;
-        }
-
-#ifdef ENABLE_CUFILE
-        CUfileDescr_t cufileDesc = {};
-        cufileDesc.type = CU_FILE_HANDLE_TYPE_OPAQUE_FD;
-        cufileDesc.handle.fd = fd;
-
-        CUfileHandle_t cufileHandle;
-        CUfileError_t status = cuFileHandleRegister(&cufileHandle, &cufileDesc);
-        if (status.err != CU_FILE_SUCCESS)
-        {
-            // Fallback to POSIX
-            TLLM_LOG_WARN(
-                "cuFileHandleRegister failed (err=%d). Falling back to POSIX for '%s'", status.err, filename.c_str());
-            ::close(fd);
-            if (isOffload)
-                gpuToFilePosix(srcPtr, filename);
-            else
-                fileToGpuPosix(dstPtr, filename);
-            continue;
-        }
-
-        ssize_t numBytes = static_cast<ssize_t>(srcPtr->getSizeInBytes());
-        if (isOffload)
-        {
-            ssize_t written = cuFileWrite(cufileHandle, srcPtr->data(), numBytes, 0, 0);
-            if (written < 0)
-            {
-                TLLM_LOG_ERROR("cuFileWrite error=%zd. Fallback to POSIX", written);
-                cuFileHandleDeregister(cufileHandle);
-                ::close(fd);
-                gpuToFilePosix(srcPtr, filename);
-                continue;
-            }
-        }
-        else
-        {
-            ssize_t readCount = cuFileRead(cufileHandle, dstPtr->data(), numBytes, 0, 0);
-            if (readCount < 0)
-            {
-                TLLM_LOG_ERROR("cuFileRead error=%zd. Fallback to POSIX", readCount);
-                cuFileHandleDeregister(cufileHandle);
-                ::close(fd);
-                fileToGpuPosix(dstPtr, filename);
-                continue;
-            }
-        }
-
-        cuFileHandleDeregister(cufileHandle);
-        ::close(fd);
-#else
-        // If GDS isn't enabled, fallback to POSIX automatically
-        TLLM_LOG_DEBUG("ENABLE_CUFILE=OFF, so fallback to POSIX for %s", filename.c_str());
-        ::close(fd); // close the file opened for GDS
-        if (isOffload)
-        {
-            gpuToFilePosix(srcPtr, filename);
-        }
-        else
-        {
-            fileToGpuPosix(dstPtr, filename);
-        }
-#endif
-=======
                 gpuToFilePosix(ptr, filename);
             }
             else
@@ -338,17 +216,12 @@ void KVCacheTransferManager::copyBlock(BlockPtr const& src, BlockPtr const& dst,
         kvc::MemoryDescs memoryDescs(kvc::MemoryType::kVRAM, memoryBlobs);
 
         mLoopbackAgent->executeLoopbackRequest(memoryDescs, fileDescs, isOffload);
->>>>>>> upstream/main
     }
 }
 
 void KVCacheTransferManager::onboard(BlockPtr const& offloadBlock, BlockPtr const& block,
     std::vector<KVCacheBlockPool> const& pools, int numTokensToCopy, executor::KvCacheTransferMode mode,
-<<<<<<< HEAD
-    std::optional<std::string> directory)
-=======
     std::string const& directory)
->>>>>>> upstream/main
 {
     if (mode != executor::KvCacheTransferMode::DRAM
         && mPendingOffloads.find(offloadBlock->getBlockId()) == mPendingOffloads.end())
@@ -367,11 +240,7 @@ void KVCacheTransferManager::onboard(BlockPtr const& offloadBlock, BlockPtr cons
 
 void KVCacheTransferManager::offload(BlockPtr const& block, BlockPtr const& offloadBlock,
     std::vector<KVCacheBlockPool> const& pools, int numTokensToCopy, executor::KvCacheTransferMode mode,
-<<<<<<< HEAD
-    std::optional<std::string> directory)
-=======
     std::string const& directory)
->>>>>>> upstream/main
 {
     mPendingOffloads[block->getBlockId()] = tr::CudaEvent();
     copyBlock(block, offloadBlock, pools, true, numTokensToCopy, mode, directory);

@@ -62,19 +62,12 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <math.h>
-<<<<<<< HEAD
-#include <sstream>
-
-namespace tensorrt_llm::kernels::cutlass_kernels
-{
-=======
 #include <mutex>
 #include <sstream>
 
 namespace tensorrt_llm::kernels::cutlass_kernels_oss
 {
 using tensorrt_llm::kernels::cutlass_kernels::TmaWarpSpecializedGroupedGemmInput;
->>>>>>> upstream/main
 using EpilogueFusion = TmaWarpSpecializedGroupedGemmInput::EpilogueFusion;
 
 template <typename Arch, typename T, typename WeightType, typename OutputType, typename EpilogueTag,
@@ -86,18 +79,6 @@ auto getDispatchFunctionForSM100(
     {
         auto select_dynamic_cga = [epilogue_schedule](auto dynamic_cga_t)
         {
-<<<<<<< HEAD
-            if constexpr (!std::is_same_v<T, __nv_fp4_e2m1> && !std::is_same_v<WeightType, __nv_fp4_e2m1>
-                && FUSION != EpilogueFusion::FINALIZE)
-            {
-                auto func_map = std::array{
-                    &kernels::cutlass_kernels::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T, WeightType,
-                        OutputType, cutlass::epilogue::PtrArrayNoSmemWarpSpecialized, EpilogueTag, FUSION, TileShape,
-                        ClusterShape, is_wfp4afp8, decltype(dynamic_cga_t)::value, false, decltype(swap_ab_t)::value>,
-                    &kernels::cutlass_kernels::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T, WeightType,
-                        OutputType, cutlass::epilogue::PtrArrayTmaWarpSpecialized, EpilogueTag, FUSION, TileShape,
-                        ClusterShape, is_wfp4afp8, decltype(dynamic_cga_t)::value, false, decltype(swap_ab_t)::value>
-=======
             constexpr bool is_block_scaled
                 = std::is_same_v<T, __nv_fp4_e2m1> || std::is_same_v<WeightType, __nv_fp4_e2m1>;
             if constexpr ((!is_block_scaled || Arch::kMinComputeCapability == 103)
@@ -112,7 +93,6 @@ auto getDispatchFunctionForSM100(
                         WeightType, OutputType, cutlass::epilogue::PtrArrayTmaWarpSpecialized, EpilogueTag, FUSION,
                         TileShape, ClusterShape, is_wfp4afp8, decltype(dynamic_cga_t)::value, false,
                         decltype(swap_ab_t)::value>
->>>>>>> upstream/main
 
                 };
                 bool const tma_epilogue = epilogue_schedule == cutlass_extensions::EpilogueScheduleType::TMA;
@@ -120,17 +100,11 @@ auto getDispatchFunctionForSM100(
             }
             else
             {
-<<<<<<< HEAD
-                TLLM_CHECK_WITH_INFO(epilogue_schedule == cutlass_extensions::EpilogueScheduleType::TMA,
-                    "No Smem epilogue schedule is not supported for block scaled types or finalize fusion");
-                return &kernels::cutlass_kernels::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T,
-=======
                 static_assert(FUSION == EpilogueFusion::FINALIZE || Arch::kMinComputeCapability != 103,
                     "SM103 should support both epilogue schedules");
                 TLLM_CHECK_WITH_INFO(epilogue_schedule == cutlass_extensions::EpilogueScheduleType::TMA,
                     "No Smem epilogue schedule is not supported for block scaled types or finalize fusion");
                 return &kernels::cutlass_kernels_oss::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T,
->>>>>>> upstream/main
                     WeightType, OutputType, cutlass::epilogue::PtrArrayTmaWarpSpecialized, EpilogueTag, FUSION,
                     TileShape, ClusterShape, is_wfp4afp8, decltype(dynamic_cga_t)::value, false,
                     decltype(swap_ab_t)::value>;
@@ -168,15 +142,12 @@ void dispatchMoeGemmFinalDispatchTmaWarpSpecialized(TmaWarpSpecializedGroupedGem
         TLLM_THROW("Please recompile with support for hopper by passing 90-real as an arch to build_wheel.py.");
     }
 #endif
-<<<<<<< HEAD
-=======
 #ifndef COMPILE_BLACKWELL_SM103_TMA_GROUPED_GEMMS
     else if constexpr (Arch::kMinComputeCapability == 103)
     {
         TLLM_THROW("Please recompile with support for blackwell by passing 103-real as an arch to build_wheel.py.");
     }
 #endif
->>>>>>> upstream/main
 #ifndef COMPILE_BLACKWELL_TMA_GROUPED_GEMMS
     else if constexpr (Arch::kMinComputeCapability >= 100 && Arch::kMinComputeCapability < 120)
     {
@@ -227,19 +198,11 @@ void dispatchMoeGemmFinalDispatchTmaWarpSpecialized(TmaWarpSpecializedGroupedGem
             using EpilogueSchedule = void; // These are hardcoded in the launcher
             constexpr bool dynamic_cga = false;
             auto selected_func = hopper_input.swap_ab
-<<<<<<< HEAD
-                ? kernels::cutlass_kernels::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T, WeightType,
-                    OutputType, EpilogueSchedule, EpilogueTag, FUSION, TileShape, ClusterShape, is_wfp4afp8,
-                    dynamic_cga, false, true>
-                : kernels::cutlass_kernels::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T, WeightType,
-                    OutputType, EpilogueSchedule, EpilogueTag, FUSION, TileShape, ClusterShape, is_wfp4afp8,
-=======
                 ? kernels::cutlass_kernels_oss::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T,
                     WeightType, OutputType, EpilogueSchedule, EpilogueTag, FUSION, TileShape, ClusterShape, is_wfp4afp8,
                     dynamic_cga, false, true>
                 : kernels::cutlass_kernels_oss::tma_warp_specialized_generic_moe_gemm_kernelLauncher<Arch, T,
                     WeightType, OutputType, EpilogueSchedule, EpilogueTag, FUSION, TileShape, ClusterShape, is_wfp4afp8,
->>>>>>> upstream/main
                     dynamic_cga, false, false>;
 
             selected_func(hopper_input, num_experts, multi_processor_count, stream, occupancy, workspace_size, {}, {});
@@ -247,11 +210,7 @@ void dispatchMoeGemmFinalDispatchTmaWarpSpecialized(TmaWarpSpecializedGroupedGem
     }
 }
 
-<<<<<<< HEAD
-template <typename CtaShape, typename ClusterShape, typename DataType, typename WeightType>
-=======
 template <typename Arch, typename CtaShape, typename ClusterShape, typename DataType, typename WeightType>
->>>>>>> upstream/main
 constexpr bool are_tile_shapes_supported_sm100()
 {
     // We use a runtime cluster shape for SM100, so we only support 1x1x1 and 2x1x1 cluster shapes.
@@ -265,15 +224,12 @@ constexpr bool are_tile_shapes_supported_sm100()
     constexpr auto TileM = size<0>(CtaShape{});
     constexpr auto TileN = size<1>(CtaShape{});
 
-<<<<<<< HEAD
-=======
     if constexpr (Arch::kMinComputeCapability == 103)
     {
         return std::is_same_v<DataType, __nv_fp4_e2m1> && std::is_same_v<WeightType, __nv_fp4_e2m1> && TileM == 128
             && (TileN == 128 || TileN == 256);
     }
 
->>>>>>> upstream/main
     if constexpr (TileM != 64 && TileM != 128)
     {
         return false;
@@ -350,11 +306,7 @@ constexpr bool are_tile_shapes_supported()
 {
     if constexpr (Arch::kMinComputeCapability >= 100 && Arch::kMinComputeCapability < 120)
     {
-<<<<<<< HEAD
-        return are_tile_shapes_supported_sm100<CTAShape, ClusterShape, DataType, WeightType>();
-=======
         return are_tile_shapes_supported_sm100<Arch, CTAShape, ClusterShape, DataType, WeightType>();
->>>>>>> upstream/main
     }
     else if constexpr (Arch::kMinComputeCapability == 120 || Arch::kMinComputeCapability == 121)
     {
@@ -480,8 +432,6 @@ void dispatchMoeGemmSelectTileShapeTmaWarpSpecialized(TmaWarpSpecializedGroupedG
             TLLM_THROW("Unsupported SM90 configuration requested");
         }
     }
-<<<<<<< HEAD
-=======
 #if defined(ENABLE_FP4) && defined(COMPILE_BLACKWELL_SM103_TMA_GROUPED_GEMMS)
     // Check this before SM100 because we fall back to SM100 if not NVFP4
     else if (gemm_config.sm_version == 103
@@ -503,7 +453,6 @@ void dispatchMoeGemmSelectTileShapeTmaWarpSpecialized(TmaWarpSpecializedGroupedG
         }
     }
 #endif
->>>>>>> upstream/main
     else if (gemm_config.sm_version >= 100 && gemm_config.sm_version < 120)
     {
         if constexpr (kernels::cutlass_kernels::isValidBlackwellMOESpecialisation<T, WeightType, EpilogueTag, FUSION>())
@@ -562,8 +511,4 @@ size_t calcMaxWorkspaceSizeTmaWarpSpecialized(int num_experts, cutlass_extension
     return count;
 }
 
-<<<<<<< HEAD
-} // namespace tensorrt_llm::kernels::cutlass_kernels
-=======
 } // namespace tensorrt_llm::kernels::cutlass_kernels_oss
->>>>>>> upstream/main

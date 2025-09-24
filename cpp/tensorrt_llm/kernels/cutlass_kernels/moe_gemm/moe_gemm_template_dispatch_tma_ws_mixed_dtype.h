@@ -57,17 +57,11 @@
 #include <math.h>
 #include <sstream>
 
-<<<<<<< HEAD
-namespace tensorrt_llm::kernels::cutlass_kernels
-{
-
-=======
 namespace tensorrt_llm::kernels::cutlass_kernels_oss
 {
 
 using tensorrt_llm::kernels::cutlass_kernels::GroupedGemmInput;
 using tensorrt_llm::kernels::cutlass_kernels::TmaWarpSpecializedGroupedGemmInput;
->>>>>>> upstream/main
 namespace tk = tensorrt_llm::common;
 namespace tkc = tensorrt_llm::cutlass_extensions;
 
@@ -250,8 +244,4 @@ size_t calcMaxWorkspaceSizeTmaWarpSpecializedMixedInput(int num_experts, int sm_
     return count;
 }
 
-<<<<<<< HEAD
-} // namespace tensorrt_llm::kernels::cutlass_kernels
-=======
 } // namespace tensorrt_llm::kernels::cutlass_kernels_oss
->>>>>>> upstream/main

@@ -3,43 +3,26 @@
 from typing import Dict
 
 import pytest
-<<<<<<< HEAD
-from _model_test_utils import get_small_model_config
-=======
 from _model_test_utils import get_small_model_config_pytest_param
->>>>>>> upstream/main
 from build_and_run_ad import ExperimentConfig, main
 
 
 @pytest.mark.parametrize("world_size", [1, 2])
-<<<<<<< HEAD
-@pytest.mark.parametrize(
-    "experiment_config",
-    [
-        get_small_model_config(
-=======
 @pytest.mark.parametrize("mode", ["graph", "transformers"])
 @pytest.mark.parametrize(
     "experiment_config",
     [
         get_small_model_config_pytest_param(
->>>>>>> upstream/main
             "meta-llama/Meta-Llama-3.1-8B-Instruct",
             attn_backend="flashinfer",
             compile_backend="torch-opt",
         ),
     ],
 )
-<<<<<<< HEAD
-def test_build_ad(world_size: int, experiment_config: Dict):
-    experiment_config["args"]["world_size"] = world_size
-    experiment_config["args"]["runtime"] = "trtllm"  # Default runtime set to trtllm
-=======
 def test_build_ad(world_size: int, experiment_config: Dict, mode: str):
     experiment_config["args"]["world_size"] = world_size
     experiment_config["args"]["runtime"] = "trtllm"  # Default runtime set to trtllm
     experiment_config["args"]["mode"] = mode
->>>>>>> upstream/main
     experiment_config = ExperimentConfig(**experiment_config)
     print(f"Experiment Config: {experiment_config}")
     main(experiment_config)

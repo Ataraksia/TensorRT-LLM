@@ -4,16 +4,6 @@ from .modeling_auto import AutoModelForCausalLM
 from .modeling_bert import BertForSequenceClassification
 from .modeling_clip import CLIPVisionModel
 from .modeling_deepseekv3 import DeepseekV3ForCausalLM
-<<<<<<< HEAD
-from .modeling_gemma3 import Gemma3ForCausalLM
-from .modeling_llama import LlamaForCausalLM
-from .modeling_llava_next import LlavaNextModel
-from .modeling_mistral import MistralForCausalLM
-from .modeling_mixtral import MixtralForCausalLM
-from .modeling_nemotron import NemotronForCausalLM
-from .modeling_nemotron_h import NemotronHForCausalLM
-from .modeling_nemotron_nas import NemotronNASForCausalLM
-=======
 from .modeling_exaone4 import Exaone4ForCausalLM
 from .modeling_gemma3 import Gemma3ForCausalLM
 from .modeling_gemma3vl import Gemma3VLM
@@ -31,7 +21,6 @@ from .modeling_nemotron_h import NemotronHForCausalLM
 from .modeling_nemotron_nas import NemotronNASForCausalLM
 from .modeling_phi3 import Phi3ForCausalLM
 from .modeling_phi4mm import Phi4MMForCausalLM
->>>>>>> upstream/main
 from .modeling_qwen import (Qwen2ForCausalLM, Qwen2ForProcessRewardModel,
                             Qwen2ForRewardModel)
 from .modeling_qwen2vl import Qwen2_5_VLModel, Qwen2VLModel
@@ -48,16 +37,6 @@ __all__ = [
     "BertForSequenceClassification",
     "CLIPVisionModel",
     "DeepseekV3ForCausalLM",
-<<<<<<< HEAD
-    "Gemma3ForCausalLM",
-    "LlamaForCausalLM",
-    "LlavaNextModel",
-    "MistralForCausalLM",
-    "MixtralForCausalLM",
-    "NemotronForCausalLM",
-    "NemotronHForCausalLM",
-    "NemotronNASForCausalLM",
-=======
     "Exaone4ForCausalLM",
     "Gemma3ForCausalLM",
     "Gemma3VLM",
@@ -75,7 +54,6 @@ __all__ = [
     "NemotronNASForCausalLM",
     "Phi3ForCausalLM",
     "Phi4MMForCausalLM",
->>>>>>> upstream/main
     "Qwen2ForCausalLM",
     "Qwen2ForProcessRewardModel",
     "Qwen2ForRewardModel",
@@ -87,10 +65,7 @@ __all__ = [
     "Qwen2_5_VLModel",
     "Qwen3ForCausalLM",
     "Qwen3MoeForCausalLM",
-<<<<<<< HEAD
-=======
     "GptOssForCausalLM",
->>>>>>> upstream/main
 ]
 
 if transformers.__version__ >= "4.45.1":

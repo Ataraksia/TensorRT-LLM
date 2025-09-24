@@ -18,14 +18,9 @@ import click
 import datasets
 import evaluate
 
-<<<<<<< HEAD
-from .._torch import LLM as PyTorchLLM
-from ..llmapi import LLM, RequestOutput
-=======
 from .. import LLM as PyTorchLLM
 from .._tensorrt_engine import LLM
 from ..llmapi import RequestOutput
->>>>>>> upstream/main
 from ..logger import logger
 from ..sampling_params import SamplingParams
 from .interface import Evaluator
@@ -34,27 +29,17 @@ from .interface import Evaluator
 class CnnDailymail(Evaluator):
 
     def __init__(self,
-<<<<<<< HEAD
-                 dataset_path: str = "ccdv/cnn_dailymail",
-                 num_samples: Optional[int] = None,
-                 random_seed: int = 0,
-                 rouge_path: str = "rouge",
-=======
                  dataset_path: Optional[str] = None,
                  num_samples: Optional[int] = None,
                  random_seed: int = 0,
                  rouge_path: Optional[str] = None,
->>>>>>> upstream/main
                  apply_chat_template: bool = False,
                  system_prompt: Optional[str] = None):
         super().__init__(random_seed=random_seed,
                          apply_chat_template=apply_chat_template,
                          system_prompt=system_prompt)
-<<<<<<< HEAD
-=======
         if dataset_path is None:
             dataset_path = "ccdv/cnn_dailymail"
->>>>>>> upstream/main
         self.data = datasets.load_dataset(dataset_path,
                                           "3.0.0",
                                           split="test",
@@ -64,11 +49,8 @@ class CnnDailymail(Evaluator):
             self.num_samples = self.data.num_rows
         else:
             self.num_samples = min(num_samples, self.data.num_rows)
-<<<<<<< HEAD
-=======
         if rouge_path is None:
             rouge_path = "rouge"
->>>>>>> upstream/main
         self.rouge = evaluate.load(rouge_path)
 
     def generate_samples(self) -> Iterable[tuple]:
@@ -77,11 +59,7 @@ class CnnDailymail(Evaluator):
                 break
             prompt = sample["article"] + " TL;DR:"
             prompt = prompt.strip().replace(" n't", "n't")
-<<<<<<< HEAD
-            yield prompt, sample["highlights"]
-=======
             yield prompt, None, sample["highlights"]
->>>>>>> upstream/main
 
     def compute_score(self, outputs: List[RequestOutput],
                       references: List[str]) -> float:
@@ -99,11 +77,7 @@ class CnnDailymail(Evaluator):
     @click.command("cnn_dailymail")
     @click.option("--dataset_path",
                   type=str,
-<<<<<<< HEAD
-                  default="ccdv/cnn_dailymail",
-=======
                   default=None,
->>>>>>> upstream/main
                   help="The path to CNN Dailymail dataset. "
                   "If unspecified, the dataset is downloaded from HF hub.")
     @click.option(
@@ -118,11 +92,7 @@ class CnnDailymail(Evaluator):
                   help="Random seed for dataset processing.")
     @click.option("--rouge_path",
                   type=str,
-<<<<<<< HEAD
-                  default="rouge",
-=======
                   default=None,
->>>>>>> upstream/main
                   help="The path to rouge repository."
                   "If unspecified, the repository is downloaded from HF hub.")
     @click.option("--apply_chat_template",
@@ -130,11 +100,7 @@ class CnnDailymail(Evaluator):
                   default=False,
                   help="Whether to apply chat template.")
     @click.option("--system_prompt",
-<<<<<<< HEAD
-                  type=Optional[str],
-=======
                   type=str,
->>>>>>> upstream/main
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -147,17 +113,10 @@ class CnnDailymail(Evaluator):
                   help="Maximum generation length.")
     @click.pass_context
     @staticmethod
-<<<<<<< HEAD
-    def command(ctx, dataset_path: str, num_samples: int, random_seed: int,
-                rouge_path: str, apply_chat_template: bool,
-                system_prompt: Optional[str], max_input_length: int,
-                max_output_length: int) -> None:
-=======
     def command(ctx, dataset_path: Optional[str], num_samples: int,
                 random_seed: int, rouge_path: Optional[str],
                 apply_chat_template: bool, system_prompt: Optional[str],
                 max_input_length: int, max_output_length: int) -> None:
->>>>>>> upstream/main
         llm: Union[LLM, PyTorchLLM] = ctx.obj
         sampling_params = SamplingParams(
             max_tokens=max_output_length,

@@ -8,11 +8,7 @@ from tensorrt_llm._torch.auto_deploy.utils.quantization_utils import fp4_global_
 
 torch.manual_seed(0)
 
-<<<<<<< HEAD
-scaling_vector_size = 16
-=======
 SCALING_VECTOR_SIZE = 16  # NVFP4 block size along K
->>>>>>> upstream/main
 
 
 @pytest.mark.parametrize("bias", [torch.rand(32).to("cuda") * 10, None])
@@ -51,17 +47,10 @@ def test_fp4_linear():
     weight_scale_2 = fp4_global_scale(weight)
 
     weight_fp4, weight_scale = torch.ops.trtllm.fp4_quantize(
-<<<<<<< HEAD
-        weight, weight_scale_2, scaling_vector_size, False
-    )
-
-    output_fp4_gemm = torch.ops.auto_deploy.torch_quant_fp4_linear(
-=======
         weight, weight_scale_2, SCALING_VECTOR_SIZE, False
     )
 
     output_fp4_gemm = torch.ops.auto_deploy.torch_quant_nvfp4_linear(
->>>>>>> upstream/main
         input,
         weight_fp4,
         bias=None,
@@ -116,8 +105,6 @@ def test_fp8_bmm(input_dtype, mat2_dtype):
     )
     assert cos_sim > 0.99
     assert cos_sim_unquantized > 0.99
-<<<<<<< HEAD
-=======
 
 
 @pytest.mark.parametrize("bias", [torch.rand(32, device="cuda") * 10, None])
@@ -207,4 +194,3 @@ def test_quant_linear_nvfp4_matches_fused_op(bias):
 
     assert out_unified.shape == out_fused.shape
     torch.testing.assert_close(out_unified, out_fused, rtol=1e-3, atol=5e-3)
->>>>>>> upstream/main

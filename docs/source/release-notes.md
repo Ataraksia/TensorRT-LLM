@@ -4,8 +4,6 @@
 
 All published functionality in the Release Notes has been fully tested and verified with known limitations documented. To share feedback about this release, access our [NVIDIA Developer Forum](https://forums.developer.nvidia.com/).
 
-<<<<<<< HEAD
-=======
 ## TensorRT-LLM Release 1.0
 
 TensorRT LLM 1.0 brings 2 major changes: the PyTorch-based architecture is now stable and the default experience, and the LLM API is now stable. For more details on new developments in 1.0, please see below.
@@ -181,7 +179,6 @@ TensorRT LLM 1.0 brings 2 major changes: the PyTorch-based architecture is now s
 - When using disaggregated serving with pipeline parallelism and KV cache reuse, a hang can occur. This will be fixed in a future release. In the meantime, disabling KV cache reuse will fix this issue.
 - Running multi-node cases where each node has just a single GPU is known to fail. This will be addressed in a future release. 
 
->>>>>>> upstream/main
 ## TensorRT-LLM Release 0.21.0
 
 ### Key Features and Enhancements

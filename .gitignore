@@ -7,10 +7,7 @@ __pycache__/
 *.npy
 .VSCodeCounter
 cpp/build*
-<<<<<<< HEAD
-=======
 cpp/Release
->>>>>>> upstream/main
 build
 !tensorrt_llm/bench/build
 !builders/
@@ -32,10 +29,6 @@ dump*/
 *.log
 *.pkl
 *.hdf5
-<<<<<<< HEAD
-*.lock
-=======
->>>>>>> upstream/main
 config.json
 /*.svg
 cpp/cmake-build-*
@@ -73,10 +66,7 @@ llm-test-workspace/
 # Generated files
 cpp/include/tensorrt_llm/executor/version.h
 cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/fmha_v2_cu/
-<<<<<<< HEAD
-=======
 cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/cubin/fmha_cubin.h
->>>>>>> upstream/main
 .devcontainer/.env
 
 # User config files
@@ -86,64 +76,15 @@ compile_commands.json
 .dir-locals.el
 .devcontainer/devcontainer.env.user
 .devcontainer/docker-compose.override.yml
-<<<<<<< HEAD
-higgs_audio/**
-
-# Logs
-logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-dev-debug.log
-# Dependency directories
-node_modules/
-# Environment variables
-.env
-# Editor directories and files
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-# OS specific
-.DS_Store
-
-.taskmaster
-AussieGirl.wav
-.gitignore
-
-# Task files
-# tasks.json
-# tasks/
-higgs-audio-v2-generation-3B-base*/**
-log*.txt
-lp_debug.txt
-token_hist.txt
-*.wav
-.roo/mcp.json
-.kilocode/mcp.json
-audio_ids_out.txt
-1.txt
-2.txt
-4.txt
-3.txt
-import_graph.png
-audio_ids_in.txt
-.kilocode/system-prompt-architect
-.kilocode/system-prompt-code
-.kilocode/system-prompt-debug
-.kilocode/system-prompt-orchestrator
-5.txt
-.kilocode/rules-code/system-prompt-architect
-.kilocode/rules-code/system-prompt-code
-.kilocode/rules-code/system-prompt-debug
-.kilocode/rules-code/system-prompt-orchestrator
-allout.txt
-debug_audio_tokens.txt
-debug_ids.txt
-=======
 
 # Enroot sqsh files
 enroot/tensorrt_llm.devel.sqsh
->>>>>>> upstream/main
+*.wav
+*.png
+higgs-audio-v2-generation-3B-base-tokenizer/
+higgs-audio-v2-generation-3B-base/
+.roo/
+.kilocode/mcp.json
+*.env
+*.txt
+.kilocode/

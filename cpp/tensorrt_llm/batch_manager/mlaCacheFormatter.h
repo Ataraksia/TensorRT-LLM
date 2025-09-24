@@ -22,8 +22,6 @@
 namespace tensorrt_llm::batch_manager::kv_cache_manager
 {
 
-<<<<<<< HEAD
-=======
 /**
  * @brief Calculate the number of blocks allocated to a specific Context Parallelism (CP) rank.
  *
@@ -42,7 +40,6 @@ namespace tensorrt_llm::batch_manager::kv_cache_manager
  */
 int getBlockNumAccountingForCP(int cpRank, int cpSize, int numTotalBlocks, bool strict);
 
->>>>>>> upstream/main
 // Simple cache block copy. Because it does not involve data splitting or merging, it performs best when the
 // parallel topology is completely identical, making it the preferred method.
 class MLACacheFormatter final : public BaseCacheFormatter
@@ -56,15 +53,9 @@ public:
         TLLM_CHECK(mCacheTransBufferManager);
     }
 
-<<<<<<< HEAD
-    void format(TransferSession& session) override;
-
-    void unformat(TransferSession& session) override;
-=======
     void format(tensorrt_llm::batch_manager::TransferSession& session) override;
 
     void unformat(tensorrt_llm::batch_manager::TransferSession& session) override;
->>>>>>> upstream/main
 
     [[nodiscard]] bool inquireSupport(CacheState const& selfConfig, CacheState const& destConfig) const override;
 

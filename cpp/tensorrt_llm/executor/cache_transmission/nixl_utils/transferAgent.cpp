@@ -223,8 +223,6 @@ uint16_t getIncrmentPort(uint16_t basePort)
     return list;
 }
 
-<<<<<<< HEAD
-=======
 [[nodiscard]] nixl_reg_dlist_t NixlHelper::convertRegDlist(FileDescs const& descs)
 {
     nixl_reg_dlist_t list(FILE_SEG);
@@ -235,7 +233,6 @@ uint16_t getIncrmentPort(uint16_t basePort)
     return list;
 }
 
->>>>>>> upstream/main
 [[nodiscard]] nixl_xfer_op_t NixlHelper::convert(TransferOp const& op)
 {
     switch (op)
@@ -256,8 +253,6 @@ uint16_t getIncrmentPort(uint16_t basePort)
     return list;
 }
 
-<<<<<<< HEAD
-=======
 [[nodiscard]] nixl_xfer_dlist_t NixlHelper::convertXferDist(FileDescs const& descs)
 {
     nixl_xfer_dlist_t list{FILE_SEG};
@@ -314,7 +309,6 @@ void NixlHelper::posixFileToGpuFallback(MemoryDescs const& memoryDescs, FileDesc
     }
 }
 
->>>>>>> upstream/main
 NixlTransferStatus::NixlTransferStatus(nixlAgent* agent, nixlXferReqH* handle)
     : mRawAgent{agent}
     , mHandle{handle}
@@ -529,8 +523,6 @@ NixlTransferAgent::~NixlTransferAgent()
     TLLM_LOG_DEBUG("NixlTransferAgent::~NixlTransferAgent");
 }
 
-<<<<<<< HEAD
-=======
 NixlLoopbackAgent::NixlLoopbackAgent(BaseAgentConfig const& config)
     : mName{config.mName}
 {
@@ -657,7 +649,6 @@ void NixlLoopbackAgent::executeLoopbackRequest(
     this->deregisterFiles(fileDescs);
 }
 
->>>>>>> upstream/main
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
@@ -672,8 +663,6 @@ extern "C"
     }
 }
 
-<<<<<<< HEAD
-=======
 extern "C"
 {
     std::shared_ptr<BaseLoopbackAgent> createNixlLoopbackAgent(BaseAgentConfig const* config)
@@ -683,7 +672,6 @@ extern "C"
     }
 }
 
->>>>>>> upstream/main
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif

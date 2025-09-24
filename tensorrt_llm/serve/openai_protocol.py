@@ -5,21 +5,13 @@ import time
 import uuid
 from typing import Any, Dict, List, Literal, Optional, Union
 
-<<<<<<< HEAD
-=======
 import torch
 import xgrammar
 from openai.types.chat import ChatCompletionAssistantMessageParam
->>>>>>> upstream/main
 from openai.types.chat import \
     ChatCompletionContentPartParam as OpenAIChatCompletionContentPartParam
 from openai.types.chat import \
     ChatCompletionMessageParam as OpenAIChatCompletionMessageParam
-<<<<<<< HEAD
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Annotated, Required, TypedDict
-
-=======
 from openai.types.responses import (ResponseFunctionToolCall,
                                     ResponseInputItemParam, ResponseOutputItem,
                                     ResponsePrompt, ResponseReasoningItem,
@@ -33,13 +25,10 @@ from pydantic import (BaseModel, ConfigDict, Field, field_validator,
 from typing_extensions import Annotated, Required, TypeAlias, TypedDict
 
 from tensorrt_llm.executor.request import LoRARequest
->>>>>>> upstream/main
 from tensorrt_llm.llmapi import DisaggregatedParams as LlmDisaggregatedParams
 from tensorrt_llm.llmapi import GuidedDecodingParams, SamplingParams
 
 
-<<<<<<< HEAD
-=======
 def _logit_bias_to_embedding_bias(logit_bias: Optional[Dict[str, float]],
                                   vocab_size: int) -> Optional[torch.Tensor]:
     """Convert OpenAI logit_bias dict to embedding_bias tensor for sampling."""
@@ -69,7 +58,6 @@ def _logit_bias_to_embedding_bias(logit_bias: Optional[Dict[str, float]],
     return embedding_bias
 
 
->>>>>>> upstream/main
 class OpenAIBaseModel(BaseModel):
     # OpenAI API does not allow extra fields & allow to initialize by both alias and field name
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -98,25 +86,11 @@ class ModelList(OpenAIBaseModel):
     data: List[ModelCard] = Field(default_factory=list)
 
 
-<<<<<<< HEAD
-class StructuralTag(OpenAIBaseModel):
-    begin: str
-    schema_: Optional[dict[str, Any]] = Field(alias="schema")
-    end: str
-
-
-class ResponseFormat(OpenAIBaseModel):
-    # type must be "json_object" or "text" or "structural_tag"
-    type: Literal["text", "json_object", "structural_tag"]
-    structures: Optional[List[StructuralTag]] = None
-    triggers: Optional[List[str]] = None
-=======
 class ResponseFormat(OpenAIBaseModel):
     # type must be one of "text", "json", "json_object", or "structural_tag"
     type: Literal["text", "json", "json_object", "structural_tag"]
     schema: Optional[dict] = None
     format: Optional[xgrammar.structural_tag.Format] = None
->>>>>>> upstream/main
 
 
 class DisaggregatedParams(OpenAIBaseModel):
@@ -145,10 +119,7 @@ class CompletionLogProbs(OpenAIBaseModel):
 class CompletionResponseChoice(OpenAIBaseModel):
     index: int
     text: str
-<<<<<<< HEAD
-=======
     token_ids: Optional[List[int]] = None
->>>>>>> upstream/main
     logprobs: Optional[CompletionLogProbs] = None
     context_logits: Optional[Union[List[float], List[List[
         float]]]] = None  # For reward models, the output is score logits instead of text.
@@ -161,10 +132,7 @@ class CompletionResponseChoice(OpenAIBaseModel):
             "including encountering the EOS token"),
     )
     disaggregated_params: Optional[DisaggregatedParams] = Field(default=None)
-<<<<<<< HEAD
-=======
     avg_decoded_tokens_per_iter: Optional[float] = Field(default=None)
->>>>>>> upstream/main
 
 
 class CompletionResponse(OpenAIBaseModel):
@@ -174,21 +142,15 @@ class CompletionResponse(OpenAIBaseModel):
     model: str
     choices: List[CompletionResponseChoice]
     usage: UsageInfo
-<<<<<<< HEAD
-=======
     # Add prompt_tokens_ids to the response to remove the tokenization
     # in the generation server in disaggreated serving
     prompt_token_ids: Optional[Union[List[List[int]], List[int]]] = None
->>>>>>> upstream/main
 
 
 class CompletionResponseStreamChoice(OpenAIBaseModel):
     index: int
     text: str
-<<<<<<< HEAD
-=======
     token_ids: Optional[List[int]] = None
->>>>>>> upstream/main
     logprobs: Optional[CompletionLogProbs] = None
     finish_reason: Optional[str] = None
     stop_reason: Optional[Union[int, str]] = Field(
@@ -198,10 +160,7 @@ class CompletionResponseStreamChoice(OpenAIBaseModel):
             "to stop, None if the completion finished for some other reason "
             "including encountering the EOS token"),
     )
-<<<<<<< HEAD
-=======
     avg_decoded_tokens_per_iter: Optional[float] = Field(default=None)
->>>>>>> upstream/main
 
 
 class CompletionStreamResponse(OpenAIBaseModel):
@@ -220,15 +179,12 @@ def _response_format_to_guided_decoding_params(
         return None
     elif response_format.type == "text":
         return None
-<<<<<<< HEAD
-=======
     elif response_format.type == "json":
         if response_format.schema is None:
             raise ValueError(
                 "The 'schema' field is required when response_format.type is 'json'."
             )
         return GuidedDecodingParams(json=response_format.schema)
->>>>>>> upstream/main
     elif response_format.type == "json_object":
         return GuidedDecodingParams(json_object=True)
     elif response_format.type == "structural_tag":
@@ -260,10 +216,7 @@ class CompletionRequest(OpenAIBaseModel):
     temperature: Optional[float] = 1.0
     top_p: Optional[float] = 1.0
     user: Optional[str] = None
-<<<<<<< HEAD
-=======
     lora_request: Optional[LoRARequest] = None
->>>>>>> upstream/main
 
     # doc: begin-completion-sampling-params
     use_beam_search: bool = False
@@ -281,10 +234,7 @@ class CompletionRequest(OpenAIBaseModel):
     spaces_between_special_tokens: bool = True
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
     return_context_logits: bool = False
-<<<<<<< HEAD
-=======
     detokenize: bool = True
->>>>>>> upstream/main
     # doc: end-completion-sampling-params
 
     # doc: begin-completion-extra-params
@@ -298,11 +248,7 @@ class CompletionRequest(OpenAIBaseModel):
         default=None,
         description=
         ("Similar to chat completion, this parameter specifies the format of "
-<<<<<<< HEAD
-         "output. {'type': 'json_object'}, {'type': 'text' }, {'type': 'structural_tag'} are "
-=======
          "output. {'type': 'json_object'}, {'type': 'text' }, {'type': 'structural_tag'}, {'type': 'json'} are "
->>>>>>> upstream/main
          "supported."),
     )
 
@@ -313,11 +259,7 @@ class CompletionRequest(OpenAIBaseModel):
 
     # doc: end-completion-extra-params
 
-<<<<<<< HEAD
-    def to_sampling_params(self) -> SamplingParams:
-=======
     def to_sampling_params(self, vocab_size: int = 32000) -> SamplingParams:
->>>>>>> upstream/main
         sampling_params = SamplingParams(
             best_of=self.best_of,
             frequency_penalty=self.frequency_penalty,
@@ -347,41 +289,20 @@ class CompletionRequest(OpenAIBaseModel):
             return_context_logits=self.return_context_logits,
             guided_decoding=_response_format_to_guided_decoding_params(
                 self.response_format),
-<<<<<<< HEAD
-=======
             detokenize=self.detokenize,
 
             # logits_bias
             embedding_bias=_logit_bias_to_embedding_bias(
                 self.logit_bias, vocab_size),
->>>>>>> upstream/main
 
             # completion-extra-params
             add_special_tokens=self.add_special_tokens,
 
             # TODO: migrate to use logprobs and prompt_logprobs
-<<<<<<< HEAD
-            _return_log_probs=self.logprobs,
-        )
-        return sampling_params
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.best_of is None:
-            self.best_of = self.n
-
-    @model_validator(mode="after")
-    def check_beam_search(self):
-        if (self.n > 1 or self.best_of > 1) and not self.use_beam_search:
-            raise ValueError(
-                "Only support one response per prompt without beam search")
-        return self
-
-=======
             _return_log_probs=bool(self.logprobs),
         )
         return sampling_params
 
->>>>>>> upstream/main
     @model_validator(mode="before")
     @classmethod
     def check_logprobs(cls, data):
@@ -399,18 +320,6 @@ class CompletionRequest(OpenAIBaseModel):
 
     @model_validator(mode="before")
     @classmethod
-<<<<<<< HEAD
-    def verify_multi_responses(cls, data):
-        best_of = data.get("best_of")
-        n = data.get("n")
-        if best_of and n and best_of < n:
-            raise ValueError("best_of should not be smaller than n")
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-=======
->>>>>>> upstream/main
     def check_suffix(cls, data):
         if data.get("suffix"):
             raise ValueError("suffix is not supported")
@@ -422,14 +331,11 @@ class FunctionCall(OpenAIBaseModel):
     arguments: str
 
 
-<<<<<<< HEAD
-=======
 class DeltaFunctionCall(OpenAIBaseModel):
     name: Optional[str] = None
     arguments: Optional[str] = None
 
 
->>>>>>> upstream/main
 class ToolCall(OpenAIBaseModel):
     id: str = Field(
         default_factory=lambda: f"chatcmpl-tool-{str(uuid.uuid4().hex)}")
@@ -437,12 +343,6 @@ class ToolCall(OpenAIBaseModel):
     function: FunctionCall
 
 
-<<<<<<< HEAD
-class ChatMessage(OpenAIBaseModel):
-    role: str
-    content: str
-    reasoning_content: Optional[str] = None
-=======
 class DeltaToolCall(OpenAIBaseModel):
     id: Optional[str] = None
     type: Optional[Literal["function"]] = None
@@ -455,7 +355,6 @@ class ChatMessage(OpenAIBaseModel):
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
     reasoning: Optional[str] = None
->>>>>>> upstream/main
     tool_calls: List[ToolCall] = Field(default_factory=list)
 
 
@@ -496,10 +395,6 @@ class CustomChatCompletionMessageParam(TypedDict, total=False):
     """
 
 
-<<<<<<< HEAD
-ChatCompletionMessageParam = Union[OpenAIChatCompletionMessageParam,
-                                   CustomChatCompletionMessageParam]
-=======
 class ReasoningAssistantMessage(ChatCompletionAssistantMessageParam):
     """Assistant message that includes reasoning tokens."""
     reasoning: Optional[str]
@@ -508,7 +403,6 @@ class ReasoningAssistantMessage(ChatCompletionAssistantMessageParam):
 ChatCompletionMessageParam = Union[OpenAIChatCompletionMessageParam,
                                    CustomChatCompletionMessageParam,
                                    ReasoningAssistantMessage]
->>>>>>> upstream/main
 
 
 class ChatCompletionLogProbs(OpenAIBaseModel):
@@ -521,17 +415,12 @@ class ChatCompletionResponseChoice(OpenAIBaseModel):
     logprobs: Optional[ChatCompletionLogProbs] = None
     finish_reason: Optional[str] = None
     stop_reason: Optional[Union[int, str]] = None
-<<<<<<< HEAD
-
-    disaggregated_params: Optional[DisaggregatedParams] = Field(default=None)
-=======
     # TODO: progressivly add more info like input_ids, specific_token_ids, mrope, mm_hashes, etc
     # TODO: and use a JSON-safe handle to refer to the server-side output
     mm_embedding_handle: Optional[Dict[str, Any]] = None
 
     disaggregated_params: Optional[DisaggregatedParams] = Field(default=None)
     avg_decoded_tokens_per_iter: Optional[float] = Field(default=None)
->>>>>>> upstream/main
 
 
 class ChatCompletionResponse(OpenAIBaseModel):
@@ -541,25 +430,18 @@ class ChatCompletionResponse(OpenAIBaseModel):
     model: str
     choices: List[ChatCompletionResponseChoice]
     usage: UsageInfo
-<<<<<<< HEAD
-=======
     # Add prompt_tokens_ids to the response to remove the tokenization
     # in the generation server in disaggreated serving
     prompt_token_ids: Optional[List[int]] = None
->>>>>>> upstream/main
 
 
 class DeltaMessage(OpenAIBaseModel):
     role: Optional[str] = None
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
-<<<<<<< HEAD
-    tool_calls: List[ToolCall] = Field(default_factory=list)
-=======
     # For GPT-OSS style reasoning
     reasoning: Optional[str] = None
     tool_calls: Optional[List[DeltaToolCall]] = None
->>>>>>> upstream/main
 
 
 class ChatCompletionResponseStreamChoice(OpenAIBaseModel):
@@ -568,10 +450,7 @@ class ChatCompletionResponseStreamChoice(OpenAIBaseModel):
     logprobs: Optional[ChatCompletionLogProbs] = None
     finish_reason: Optional[str] = None
     stop_reason: Optional[Union[int, str]] = None
-<<<<<<< HEAD
-=======
     avg_decoded_tokens_per_iter: Optional[float] = Field(default=None)
->>>>>>> upstream/main
 
 
 class ChatCompletionStreamResponse(OpenAIBaseModel):
@@ -607,16 +486,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
     # Ordered by official OpenAI API documentation
     # https://platform.openai.com/docs/api-reference/chat/create
     messages: List[ChatCompletionMessageParam]
-<<<<<<< HEAD
-    model: str
-    frequency_penalty: Optional[float] = 0.0
-    logit_bias: Optional[Dict[str, float]] = None
-    logprobs: Optional[int] = None
-    top_logprobs: Optional[int] = 0
-    max_completion_tokens: int = Field(default=None,
-                                       validation_alias='max_tokens')
-    n: Optional[int] = 1
-=======
     # Add prompt_tokens_ids to the request to remove the tokenization
     # in the generation server in disaggreated serving
     prompt_token_ids: Optional[List[int]] = None
@@ -628,7 +497,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
     max_completion_tokens: Optional[int] = Field(default=None,
                                                  validation_alias='max_tokens')
     n: int = 1
->>>>>>> upstream/main
     presence_penalty: Optional[float] = 0.0
     response_format: Optional[ResponseFormat] = None
     seed: Optional[int] = Field(None)
@@ -638,11 +506,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
     temperature: Optional[float] = 1.0
     top_p: Optional[float] = 1.0
     tools: Optional[List[ChatCompletionToolsParam]] = None
-<<<<<<< HEAD
-    tool_choice: Optional[Union[Literal["none"],
-                                ChatCompletionNamedToolChoiceParam]] = "none"
-    user: Optional[str] = None
-=======
     tool_choice: Optional[Union[Literal["none", "auto"],
                                 ChatCompletionNamedToolChoiceParam]] = "none"
     user: Optional[str] = None
@@ -654,7 +517,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
                 "reasoning is shown in the model's response. Options: "
                 "'low', 'medium', 'high'."),
         )
->>>>>>> upstream/main
 
     # doc: begin-chat-completion-sampling-params
     best_of: Optional[int] = None
@@ -672,10 +534,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
     skip_special_tokens: bool = True
     spaces_between_special_tokens: bool = True
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
-<<<<<<< HEAD
-=======
     lora_request: Optional[LoRARequest] = None
->>>>>>> upstream/main
     # doc: end-chat-completion-sampling-params
 
     # doc: begin-chat-completion-extra-params
@@ -728,12 +587,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
         description=("Parameters for disaggregated serving"),
     )
 
-<<<<<<< HEAD
-    # doc: end-chat-completion-extra-params
-
-    def to_sampling_params(self) -> SamplingParams:
-
-=======
     cache_salt: Optional[str] = Field(
         default=None,
         description=
@@ -747,7 +600,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
                            vocab_size: int = 32000,
                            gather_generation_logits: bool = False,
                            backend: Optional[str] = None) -> SamplingParams:
->>>>>>> upstream/main
         sampling_params = SamplingParams(
             frequency_penalty=self.frequency_penalty,
             max_tokens=self.max_completion_tokens,
@@ -777,27 +629,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
             guided_decoding=_response_format_to_guided_decoding_params(
                 self.response_format),
 
-<<<<<<< HEAD
-            # chat-completion-extra-params
-            add_special_tokens=self.add_special_tokens,
-
-            # TODO: migrate to use logprobs and prompt_logprobs
-            _return_log_probs=self.logprobs,
-        )
-        return sampling_params
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.best_of is None:
-            self.best_of = self.n
-
-    @model_validator(mode="after")
-    def check_beam_search(self):
-        if (self.n > 1 or self.best_of > 1) and not self.use_beam_search:
-            raise ValueError(
-                "Only support one response per prompt without beam search")
-        return self
-
-=======
             # logits_bias
             embedding_bias=_logit_bias_to_embedding_bias(
                 self.logit_bias, vocab_size),
@@ -820,7 +651,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
                     sampling_params._return_log_probs = True
         return sampling_params
 
->>>>>>> upstream/main
     @model_validator(mode='before')
     @classmethod
     def validate_stream_options(cls, values):
@@ -832,15 +662,9 @@ class ChatCompletionRequest(OpenAIBaseModel):
     @model_validator(mode="before")
     @classmethod
     def check_tool_choice(cls, data):
-<<<<<<< HEAD
-        if "tool_choice" in data and data["tool_choice"] != "none":
-            if not isinstance(data["tool_choice"], dict):
-                raise ValueError("Currently only named tools are supported.")
-=======
         if "tool_choice" not in data and data.get("tools"):
             data["tool_choice"] = "auto"
         if "tool_choice" in data and data["tool_choice"] != "none":
->>>>>>> upstream/main
             if "tools" not in data or data["tools"] is None:
                 raise ValueError(
                     "When using `tool_choice`, `tools` must be set.")
@@ -849,33 +673,12 @@ class ChatCompletionRequest(OpenAIBaseModel):
     @model_validator(mode="before")
     @classmethod
     def check_logprobs(cls, data):
-<<<<<<< HEAD
-        top_logprobs = data.get("top_logprobs")
-        if top_logprobs is not None and top_logprobs > 0:
-            raise ValueError("top_logprobs is not supported")
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def verify_multi_responses(cls, data):
-        best_of, n = data.get("best_of"), data.get("n")
-        if best_of and n and best_of < n:
-            raise ValueError("best_of should not be smaller than n")
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def verify_logit_processor(cls, data):
-        if data.get("logit_bias"):
-            raise ValueError("logit bias is not supported")
-=======
         if (top_logprobs := data.get("top_logprobs")) is not None:
             if top_logprobs < 0:
                 raise ValueError("top_logprobs must be positive or zero")
             if not data.get("logprobs"):
                 raise ValueError(
                     "logprobs must be true when using top_logprobs")
->>>>>>> upstream/main
         return data
 
     @model_validator(mode="before")
@@ -885,8 +688,6 @@ class ChatCompletionRequest(OpenAIBaseModel):
             raise ValueError("suffix is not supported")
         return data
 
-<<<<<<< HEAD
-=======
     @field_validator("cache_salt")
     @classmethod
     def check_cache_salt_support(cls, v):
@@ -1099,7 +900,6 @@ class ResponsesStreamResponse(OpenAIBaseModel):
                   "response.completed", "response.failed",
                   "response.incomplete"]
 
->>>>>>> upstream/main
 
 def encode_opaque_state(opaque_state: Optional[bytes]) -> Optional[str]:
     if opaque_state is None:

@@ -22,11 +22,7 @@
 #include <cutlass_extensions/gemm/kernel/moe_cute_util.cuh>
 #include <cutlass_extensions/gemm/kernel/moe_problem_visitor.h>
 
-<<<<<<< HEAD
-namespace fused_moe
-=======
 namespace fused_moe_oss
->>>>>>> upstream/main
 {
 template <typename ElementInput, typename ElementWeight, typename ElementOutput>
 struct Routine_Arguments
@@ -216,8 +212,4 @@ struct Fused_Moe_Kernel_traits_sm80
 
     // #endif
 };
-<<<<<<< HEAD
-} // namespace fused_moe
-=======
 } // namespace fused_moe_oss
->>>>>>> upstream/main

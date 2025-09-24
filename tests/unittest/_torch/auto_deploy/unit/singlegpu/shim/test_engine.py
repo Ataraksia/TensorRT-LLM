@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-from typing import Type
-=======
 from typing import Type, Union
->>>>>>> upstream/main
 
 import pytest
 import torch
@@ -12,10 +8,7 @@ from tensorrt_llm import SamplingParams
 from tensorrt_llm._torch.auto_deploy.custom_ops.attention_interface import SequenceInfo
 from tensorrt_llm._torch.auto_deploy.shim.ad_executor import ADEngine
 from tensorrt_llm._torch.auto_deploy.shim.demollm import DemoEngine
-<<<<<<< HEAD
-=======
 from tensorrt_llm._torch.auto_deploy.shim.interface import CachedSequenceInterface
->>>>>>> upstream/main
 
 
 class TransformerLikeModelwithFakeCachePool(nn.Module):
@@ -30,15 +23,11 @@ class TransformerLikeModelwithFakeCachePool(nn.Module):
         )
         self.output_projection = nn.Linear(embed_dim, vocab_size)
 
-<<<<<<< HEAD
-    def forward(self, input_ids, *cache_args):
-=======
     def forward(self, cm_or_input_ids: Union[CachedSequenceInterface, torch.Tensor]):
         if isinstance(cm_or_input_ids, CachedSequenceInterface):
             input_ids = cm_or_input_ids.args[0]
         else:
             input_ids = cm_or_input_ids
->>>>>>> upstream/main
         embeddings = self.embedding(input_ids)
         hidden_states = self.mlp(embeddings)
         logits = self.output_projection(hidden_states)
@@ -87,10 +76,6 @@ def test_engine(engine_cls: Type[ADEngine], attn_backend: str, attn_page_size: i
         input_ids = [torch.tensor([0, 1, 2], device=device)]
         sequence_info.reset()
         sequence_info.nest_sequences(input_ids)
-<<<<<<< HEAD
-        engine.cache_seq_interface.info.sync(sequence_info)
-=======
->>>>>>> upstream/main
         logits = engine._compute_logits()
         logits = torch.stack(logits)
         assert logits is not None, "Logits are None"
@@ -125,10 +110,6 @@ def test_demo_engine_sampling(attn_page_size: int):
         input_ids = [torch.tensor([1, 2, 3, 4], device=device)]
         sequence_info.reset()
         sequence_info.nest_sequences(input_ids)
-<<<<<<< HEAD
-        engine.cache_seq_interface.info.sync(sequence_info)
-=======
->>>>>>> upstream/main
         logits = engine._compute_logits()
         logits = torch.stack(logits)
 

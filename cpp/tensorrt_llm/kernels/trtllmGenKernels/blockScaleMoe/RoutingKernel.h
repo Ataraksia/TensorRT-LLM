@@ -58,11 +58,6 @@ struct DataBase
     // Note: this array (mPtrPermutedIdxToTokenIdx) is uninitialized
     // Any out-of-bounds values are undefined.
     int32_t* mPtrPermutedIdxToTokenIdx{nullptr};
-<<<<<<< HEAD
-    // optional: if `nullptr`, it is not filled
-    // dim: [mNumTokens, mTopK]
-    void* mPtrExpertWeights{nullptr};
-=======
 
     // optional: if `nullptr`, it is not filled
     // dim: [mNumTokens, mTopK]
@@ -75,20 +70,14 @@ struct DataBase
     // Together with mPtrTopKWeights, they form the top-k experts for each token
     int32_t* mPtrTopKIds{nullptr};
 
->>>>>>> upstream/main
     // optional: if `nullptr`, scores are used directly as input.
     // If it is given, it must represent a packed value s.t. the most significant
     // 16/32 bits represent the score without sigmoid activation and
     // the least significant 16 bits represent the index of the chosen expert (unsigned).
     // note: this is required if the number of tokens is large.
     // dim: [mNumTokens, mTopK]
-<<<<<<< HEAD
-    void* mPtrExpertIdx{nullptr};
-    // optional: if `nullptr`, `mPtrExpertIdx` must be provided.
-=======
     void* mPtrTopKPacked{nullptr};
     // optional: if `nullptr`, `mPtrTopKPacked` must be provided.
->>>>>>> upstream/main
     // If it is given, it represents the scores without sigmoid activation for
     // each token and expert.
     // note: if it is provided, we always re-compute the top1 scores
@@ -131,12 +120,8 @@ struct KernelParamsBase
     int32_t* mPtrCtaIdxXyToBatchIdx = nullptr;
     int32_t* mPtrCtaIdxXyToMnLimit = nullptr;
     int32_t* mPtrNumNonExitingCtas = nullptr;
-<<<<<<< HEAD
-    OutputT* mPtrExpertWeights = nullptr;
-=======
     OutputT* mPtrTopKWeights = nullptr;
     int32_t* mPtrTopKIds = nullptr;
->>>>>>> upstream/main
     InputT const* mPtrScores = nullptr;
 
     // Public scalar members
@@ -159,12 +144,8 @@ struct KernelParamsBase
         mPtrCtaIdxXyToBatchIdx = data.mPtrCtaIdxXyToBatchIdx;
         mPtrCtaIdxXyToMnLimit = data.mPtrCtaIdxXyToMnLimit;
         mPtrNumNonExitingCtas = data.mPtrNumNonExitingCtas;
-<<<<<<< HEAD
-        mPtrExpertWeights = static_cast<OutputT*>(data.mPtrExpertWeights);
-=======
         mPtrTopKWeights = static_cast<OutputT*>(data.mPtrTopKWeights);
         mPtrTopKIds = static_cast<int32_t*>(data.mPtrTopKIds);
->>>>>>> upstream/main
         mPtrScores = (InputT const*) data.mPtrScores;
 
         mNumTokens = data.mNumTokens;
@@ -206,17 +187,10 @@ struct KernelParams : public KernelParamsBase<InputT_, OutputT_, UsePdl_>
 
     static constexpr bool UseGroups = UseGroups_;
 
-<<<<<<< HEAD
-    PackedScoreIdx<OutputT>* mPtrExpertIdx = nullptr;
-
-    // OutputT* mPtrExpertWeightsFull = nullptr;
-    // Note: this variable(mPtrExpertWeightsFull) might need to be added back for the low-latency kernels for MoE in
-=======
     PackedScoreIdx<OutputT>* mPtrTopKPacked = nullptr;
 
     // OutputT* mPtrTopKWeightsFull = nullptr;
     // Note: this variable(mPtrTopKWeightsFull) might need to be added back for the low-latency kernels for MoE in
->>>>>>> upstream/main
     // tllm-gen in the future
 
     OutputT const* mPtrRoutingBias = nullptr;
@@ -233,15 +207,9 @@ struct KernelParams : public KernelParamsBase<InputT_, OutputT_, UsePdl_>
         KernelParams params;
         params.setBaseParams(data);
 
-<<<<<<< HEAD
-        params.mPtrExpertIdx = (PackedScoreIdx<OutputT>*) data.mPtrExpertIdx;
-
-        // params.mPtrExpertWeightsFull = static_cast<OutputT*>(data.mPtrExpertWeightsFull);
-=======
         params.mPtrTopKPacked = (PackedScoreIdx<OutputT>*) data.mPtrTopKPacked;
 
         // params.mPtrTopKWeightsFull = static_cast<OutputT*>(data.mPtrTopKWeightsFull);
->>>>>>> upstream/main
         params.mPtrRoutingBias = static_cast<OutputT const*>(data.mPtrRoutingBias);
 
         params.mNumExpertGroups = data.mNumExpertGroups;
@@ -276,11 +244,7 @@ struct KernelParams : public KernelParamsBase<InputT_, OutputT_, UsePdl_>
     using InputT = InputT_;
     using OutputT = OutputT_;
 
-<<<<<<< HEAD
-    PackedScoreIdx<OutputT>* mPtrExpertIdx = nullptr;
-=======
     PackedScoreIdx<OutputT>* mPtrTopKPacked = nullptr;
->>>>>>> upstream/main
 
     int32_t mTopK;
 
@@ -289,11 +253,7 @@ struct KernelParams : public KernelParamsBase<InputT_, OutputT_, UsePdl_>
         KernelParams params;
         params.setBaseParams(data);
 
-<<<<<<< HEAD
-        params.mPtrExpertIdx = (PackedScoreIdx<OutputT>*) data.mPtrExpertIdx;
-=======
         params.mPtrTopKPacked = (PackedScoreIdx<OutputT>*) data.mPtrTopKPacked;
->>>>>>> upstream/main
         params.mTopK = data.mTopK;
         return params;
     }
@@ -327,11 +287,7 @@ struct KernelParams : public KernelParamsBase<InputT_, OutputT_, UsePdl_>
 
     static constexpr bool DoSoftmaxBeforeTopK = DoSoftmaxBeforeTopK_;
 
-<<<<<<< HEAD
-    PackedScoreIdx<OutputT>* mPtrExpertIdx = nullptr;
-=======
     PackedScoreIdx<OutputT>* mPtrTopKPacked = nullptr;
->>>>>>> upstream/main
 
     int32_t mTopK = 0;
 
@@ -342,11 +298,7 @@ struct KernelParams : public KernelParamsBase<InputT_, OutputT_, UsePdl_>
         KernelParams params;
         params.setBaseParams(data);
 
-<<<<<<< HEAD
-        params.mPtrExpertIdx = (PackedScoreIdx<OutputT>*) data.mPtrExpertIdx;
-=======
         params.mPtrTopKPacked = (PackedScoreIdx<OutputT>*) data.mPtrTopKPacked;
->>>>>>> upstream/main
         params.mNormTopkProb = data.mNormTopkProb;
         params.mTopK = data.mTopK;
         return params;

@@ -1749,8 +1749,6 @@ struct Tile_o_normalizer<Ada_qmma_e4m3_fp32_traits, Cta_tile>
 
     // Default ctor
     Tile_o_normalizer() = default;
-<<<<<<< HEAD
-=======
 
     // The fragment accumulator.
     using Fragment_accu = Fragment_accumulator<Traits>;
@@ -1843,7 +1841,6 @@ struct Tile_o_normalizer<Ada_qmma_e4m3_fp32_traits, Cta_tile>
             }
         }
     }
->>>>>>> upstream/main
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

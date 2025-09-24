@@ -298,12 +298,8 @@ class KvCacheEventWorkerTester(BasicWorkerTester):
 
         if check_match_count:
             assert ctx_match_count > 0
-<<<<<<< HEAD
-            assert gen_match_count >= ctx_match_count
-=======
             assert gen_match_count > 0
             assert gen_match_count >= ctx_match_count or gen_evicted
->>>>>>> upstream/main
         return request["prompt"]
 
     async def test_multi_round_request(self,
@@ -315,11 +311,8 @@ class KvCacheEventWorkerTester(BasicWorkerTester):
                 for prompt in init_prompts
             ]
             prompts = await asyncio.gather(*chat_threads)
-<<<<<<< HEAD
-=======
             # send a request to flush events
             await self.multi_round_request(session, init_prompts[0], 1, False)
->>>>>>> upstream/main
             await asyncio.gather(*[
                 self.multi_round_request(session, prompt, 1, True)
                 for prompt in prompts

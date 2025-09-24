@@ -3,10 +3,7 @@ import collections
 import hashlib
 import io
 import os
-<<<<<<< HEAD
-=======
 import re
->>>>>>> upstream/main
 import sys
 import tempfile
 import threading
@@ -497,11 +494,7 @@ def generate_api_docs_as_docstring(model: Type[BaseModel],
     for field_name, field_info in schema['properties'].items():
         if field_name.startswith("_"):  # skip private fields
             continue
-<<<<<<< HEAD
-        if field_info.get("deprecated", False):
-=======
         if field_info.get("status", None) == "deprecated":
->>>>>>> upstream/main
             continue
 
         field_type = field_info.get('type', None)
@@ -515,27 +508,21 @@ def generate_api_docs_as_docstring(model: Type[BaseModel],
         elif field_name in type_hints:
             type_str = str(type_hints[field_name])
             type_str = type_str.replace("typing.", "")
-<<<<<<< HEAD
-=======
             # Extract just the class name from full class path
             for regex in [r"<class '([^']+)'>", r"<enum '([^']+)'>"]:
                 if (match := re.match(regex, type_str)) is not None:
                     type_str = match.group(1)
                     break
->>>>>>> upstream/main
         else:
             type_str = field_type or 'Any'
 
         # Format the argument documentation with 12 spaces indent for args
         arg_line = f"{indent}    {field_name} ({type_str}): "
-<<<<<<< HEAD
-=======
         if status := field_info.get("status", None):
             arg_line += f":tag:`{status}` "
         elif LABEL_STABLE_APIS:
             arg_line += f":tag:`stable` "
 
->>>>>>> upstream/main
         if field_description:
             arg_line += field_description.split('\n')[0]  # First line with type
 
@@ -567,8 +554,6 @@ def get_type_repr(cls):
     if module_name == 'builtins':  # Special case for built-in types
         return cls.__qualname__
     return f"{module_name}.{cls.__qualname__}"
-<<<<<<< HEAD
-=======
 
 
 LABEL_STABLE_APIS: bool = True
@@ -662,4 +647,3 @@ class ApiStatusRegistry:
 
 set_api_status = ApiStatusRegistry().set_api_status
 get_api_status = ApiStatusRegistry().get_api_status
->>>>>>> upstream/main

@@ -20,11 +20,7 @@ methods:
         annotation: Optional[torch.Tensor]
         default: null
       logprobs:
-<<<<<<< HEAD
-        annotation: Optional[list[dict[int, tensorrt_llm.executor.result.Logprob]]]
-=======
         annotation: Optional[list[dict[int, tensorrt_llm.executor.result.Logprob]] | List[float]]
->>>>>>> upstream/main
         default: null
       prompt_logprobs:
         annotation: Optional[list[dict[int, tensorrt_llm.executor.result.Logprob]]]

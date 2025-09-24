@@ -289,11 +289,7 @@ target_link_libraries(
 FetchContent_Declare(
   json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
-<<<<<<< HEAD
-  GIT_TAG v3.11.2)
-=======
   GIT_TAG v3.12.0)
->>>>>>> upstream/main
 
 FetchContent_MakeAvailable(json)
 

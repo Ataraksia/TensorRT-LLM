@@ -2,21 +2,12 @@
 
 import os
 from pathlib import Path
-<<<<<<< HEAD
-from typing import Any, Dict, List, Union
-
-from omegaconf import DictConfig, OmegaConf
-from pydantic import Field
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, YamlConfigSettingsSource
-from pydantic_settings.sources.types import PathType
-=======
 from typing import Any, Dict, List, Optional, Union
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, YamlConfigSettingsSource
 from pydantic_settings.sources.types import DEFAULT_PATH, PathType
->>>>>>> upstream/main
 
 
 def deep_merge_dicts(*confs: Union[Dict, DictConfig]) -> Dict:
@@ -42,8 +33,6 @@ class DynamicYamlWithDeepMergeSettingsSource(YamlConfigSettingsSource):
     We utilize the omegaconf library for deep merging.
     """
 
-<<<<<<< HEAD
-=======
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.yaml_file_path not in [DEFAULT_PATH, None]:
@@ -52,7 +41,6 @@ class DynamicYamlWithDeepMergeSettingsSource(YamlConfigSettingsSource):
                 "specify the `yaml_default` field in your pydantic model instead."
             )
 
->>>>>>> upstream/main
     def _read_files(self, files: PathType | None) -> dict[str, Any]:
         if files is None:
             return {}
@@ -64,22 +52,12 @@ class DynamicYamlWithDeepMergeSettingsSource(YamlConfigSettingsSource):
             file_path = Path(file).expanduser()
             if file_path.is_file():
                 confs.append(OmegaConf.load(file_path))
-<<<<<<< HEAD
-=======
             else:
                 raise ValueError(f"File {file} does not exist")
->>>>>>> upstream/main
 
         return deep_merge_dicts(*confs)
 
     def __call__(self):
-<<<<<<< HEAD
-        """Call additional config files based on current state."""
-        yaml_data = self.yaml_data  # this points to the default yaml data now
-        additional_files_data = self._read_files(self.current_state.get("yaml_configs", []))
-
-        return deep_merge_dicts(yaml_data, additional_files_data)
-=======
         """Call additional config files based on current state.
 
         This function also takes care of identifying the correct default yaml file based on the
@@ -116,23 +94,15 @@ class DynamicYamlWithDeepMergeSettingsSource(YamlConfigSettingsSource):
 
         merged_data = self._read_files(config_files)
         return merged_data
->>>>>>> upstream/main
 
 
 class DynamicYamlMixInForSettings:
     """Mix-in class for settings providing dynamic yaml loading as lowest priority source.
 
-<<<<<<< HEAD
-    NOTE: This class must come FIRST in the MRO such that `yaml_configs` can be processed before
-    since otherwise we cannot load default values from the `yaml_configs` first.
-
-    This mix-in enforces the following precedence order:
-=======
     NOTE: This class must come FIRST in the MRO such that `yaml_extra` can be processed before
     since otherwise we cannot load default values from the `yaml_extra` first.
 
     This mix-in enforces the following precedence order (highest -> lowest priority):
->>>>>>> upstream/main
     - init settings
     - env settings
     - dotenv settings
@@ -159,22 +129,6 @@ class DynamicYamlMixInForSettings:
 
 
     You can also provide multiple yaml config files to load. In this case, the files are deep merged
-<<<<<<< HEAD
-    together in the order they are provided. Hence, the following order (decreasing precedence) for
-    multiple yaml config files is:
-        - default yaml provided as ``yaml_file`` argument in the ``model_config`` (``ConfigDict``)
-        - argument 0 of ``yaml_configs``
-        - argument 1 of ``yaml_configs``
-        - ...
-        - last argument of ``yaml_configs``
-    """
-
-    yaml_configs: List[PathType] = Field(
-        default_factory=list,
-        description="Additional yaml config files to load.",
-    )
-
-=======
     together in the order they are provided. Hence, the following order (lowest -> highest priority)
     for multiple yaml config files is:
         - default yaml provided as ``yaml_default`` field (or yaml retrieved from the mode)
@@ -242,7 +196,6 @@ class DynamicYamlMixInForSettings:
 
         return self
 
->>>>>>> upstream/main
     @classmethod
     def settings_customise_sources(
         cls,

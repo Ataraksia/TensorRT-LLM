@@ -18,10 +18,6 @@ l0_a30:
   - unittest/_torch/modeling -k "modeling_phi3"
   - unittest/_torch/modeling -k "modeling_qwen"
   - unittest/_torch/modeling -k "modeling_qwen_moe"
-<<<<<<< HEAD
-  - unittest/_torch/auto_deploy/unit/singlegpu -k "not test_trtllm_bench_backend_comparison"
-  - unittest/_torch/test_beam_search.py
-=======
   - unittest/_torch/modeling -k "modeling_out_of_tree"
   - unittest/_torch/auto_deploy/unit/singlegpu -k "not test_trtllm_bench_backend_comparison"
   - unittest/_torch/sampler/test_beam_search.py
@@ -31,7 +27,6 @@ l0_a30:
   - test_e2e.py::test_openai_chat_with_logit_bias[trtllm_sampler]
   - test_e2e.py::test_ptp_quickstart_bert[VANILLA-BertForSequenceClassification-bert/bert-base-uncased-yelp-polarity]
   - test_e2e.py::test_ptp_quickstart_bert[TRTLLM-BertForSequenceClassification-bert/bert-base-uncased-yelp-polarity]
->>>>>>> upstream/main
 - condition:
     ranges:
       system_gpu_count:
@@ -50,15 +45,6 @@ l0_a30:
   - cpp/test_unit_tests.py::test_unit_tests[common-80]
   - cpp/test_unit_tests.py::test_unit_tests[executor-80]
   - cpp/test_unit_tests.py::test_unit_tests[kernels-80]
-<<<<<<< HEAD
-  - cpp/test_unit_tests.py::test_unit_tests[layers-80] TIMEOUT (90)
-  - cpp/test_unit_tests.py::test_unit_tests[runtime-80]
-  - cpp/test_unit_tests.py::test_unit_tests[thop-80]
-  - cpp/test_unit_tests.py::test_unit_tests[utils-80]
-  - cpp/test_e2e.py::test_model[-gpt-80] TIMEOUT (90)
-  - cpp/test_e2e.py::test_model[-gpt_executor-80] TIMEOUT (90)
-  - cpp/test_e2e.py::test_model[-gpt_tests-80]
-=======
   - cpp/test_unit_tests.py::test_unit_tests[layers-80]
   - cpp/test_unit_tests.py::test_unit_tests[runtime-80]
   - cpp/test_unit_tests.py::test_unit_tests[thop-80]
@@ -66,7 +52,6 @@ l0_a30:
   - cpp/test_e2e.py::test_model[-gpt_executor-80]
   - cpp/test_e2e.py::test_model[-gpt_tests-80]
   - cpp/test_e2e.py::test_model[-gpt-80]
->>>>>>> upstream/main
 - condition:
     ranges:
       system_gpu_count:

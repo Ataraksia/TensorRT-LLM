@@ -22,10 +22,7 @@ import sys
 from typing import Dict, List, NamedTuple
 
 import pytest
-<<<<<<< HEAD
-=======
 import yaml
->>>>>>> upstream/main
 from defs.common import convert_weights, get_cpp_benchmark, quantize_data
 from defs.trt_test_alternative import (is_linux, is_windows, print_info,
                                        print_warning)
@@ -33,12 +30,8 @@ from defs.trt_test_alternative import (is_linux, is_windows, print_info,
 from ..conftest import get_llm_root, llm_models_root, trt_environment
 from .pytorch_model_config import get_model_yaml_config
 from .utils import (AbstractPerfScriptTestClass, PerfBenchScriptTestCmds,
-<<<<<<< HEAD
-                    PerfMetricType, PerfScriptTestCmds, generate_test_nodes)
-=======
                     PerfDisaggScriptTestCmds, PerfMetricType,
                     PerfScriptTestCmds, generate_test_nodes)
->>>>>>> upstream/main
 
 if not hasattr(re, "Pattern"):
     re.Pattern = type(re.compile(""))
@@ -137,10 +130,7 @@ MODEL_PATH_DICT = {
     "bielik_11b_v2.2_instruct": "Bielik-11B-v2.2-Instruct",
     "bielik_11b_v2.2_instruct_fp8": "Bielik-11B-v2.2-Instruct-FP8",
     "mistral_small_v3.1_24b": "Mistral-Small-3.1-24B-Instruct-2503",
-<<<<<<< HEAD
-=======
     "gpt_oss_120b_fp4": "gpt_oss/gpt-oss-120b",
->>>>>>> upstream/main
 }
 # Model PATH of HuggingFace
 HF_MODEL_PATH = {
@@ -265,13 +255,10 @@ PERF_METRIC_LOG_QUERIES = {
     re.compile(r".*Allocated ([\d\.]+) MiB for execution context memory.*"),
     PerfMetricType.KV_CACHE_SIZE:
     re.compile(r".*Allocated ([\d\.]+) GiB for max tokens in paged KV cache.*"),
-<<<<<<< HEAD
-=======
     PerfMetricType.DISAGG_SERVER_E2EL:
     re.compile(r"Median E2EL \(ms\):\s*(\d+\.?\d*)"),
     PerfMetricType.DISAGG_SERVER_TTFT:
     re.compile(r"Median TTFT \(ms\):\s*(\d+\.?\d*)"),
->>>>>>> upstream/main
 }
 BENCH_PERF_METRIC_LOG_QUERIES = {
     PerfMetricType.BUILD_TIME:
@@ -286,8 +273,6 @@ BENCH_PERF_METRIC_LOG_QUERIES = {
     re.compile(r"Average time-to-first-token \[TTFT\] \(ms\):\s+([\d\.]+)"),
     PerfMetricType.OUTPUT_TOKEN_TIME:
     re.compile(r"Average time-per-output-token \[TPOT\] \(ms\):\s+([\d\.]+)"),
-<<<<<<< HEAD
-=======
     PerfMetricType.KV_CACHE_SIZE:
     re.compile(r".*Allocated ([\d\.]+) GiB for max tokens in paged KV cache.*"),
 }
@@ -296,7 +281,6 @@ DISAGG_SERVER_METRICS_LOG_QUERIES = {
     re.compile(r"Median E2EL \(ms\):\s*(\d+\.?\d*)"),
     PerfMetricType.DISAGG_SERVER_TTFT:
     re.compile(r"Median TTFT \(ms\):\s*(\d+\.?\d*)"),
->>>>>>> upstream/main
 }
 # (Relative threshold, Absolute threshold) for all metric types
 PERF_METRIC_THRESHOLD = {
@@ -325,13 +309,10 @@ PERF_METRIC_THRESHOLD = {
     PerfMetricType.CONTEXT_GPU_MEMORY:
     (0.1, 50),  # Ignore context GPU memory < 50MiB
     PerfMetricType.KV_CACHE_SIZE: (-0.1, 50),  # Ignore value < 50MiB
-<<<<<<< HEAD
-=======
     PerfMetricType.DISAGG_SERVER_E2EL: (0.1,
                                         50),  # Ignore E2EL regression < 50ms
     PerfMetricType.DISAGG_SERVER_TTFT: (0.1,
                                         50),  # Ignore TTFT regression < 50ms
->>>>>>> upstream/main
 }
 
 BUILDER_METRICS = [
@@ -363,15 +344,12 @@ BENCH_INFERENCE_METRICS = [
     PerfMetricType.INFERENCE_TIME,
     PerfMetricType.TOKEN_THROUGHPUT,
     PerfMetricType.SEQ_THROUGHPUT,
-<<<<<<< HEAD
-=======
     PerfMetricType.KV_CACHE_SIZE,
 ]
 
 DISAGG_SERVER_METRICS = [
     PerfMetricType.DISAGG_SERVER_E2EL,
     PerfMetricType.DISAGG_SERVER_TTFT,
->>>>>>> upstream/main
 ]
 
 
@@ -486,8 +464,6 @@ class PerfTestConfig:
         # Just build engines
         self.build_only = False
 
-<<<<<<< HEAD
-=======
         # Whether to run disaggregated server perf test.
         self.is_disagg_server = False
         self.ctx_server_workers = 0
@@ -509,7 +485,6 @@ class PerfTestConfig:
             entries.append(f"gen_pp:{self.gen_pp_size}")
         return "-".join(entries)
 
->>>>>>> upstream/main
     def to_string(self,
                   custom_bs: int = None,
                   custom_input_len: int = None,
@@ -534,12 +509,9 @@ class PerfTestConfig:
                 entries.append(f"pytorch")
             if self.streaming == "streaming":
                 entries.append(f"streaming")
-<<<<<<< HEAD
-=======
         elif self.runtime == "disagg_server":  # trtllm-serve
             entries.append(f"disagg_server")
             return self._to_string_disagg(entries)
->>>>>>> upstream/main
 
         # Add mode and dtype.
         if self.runtime != "bench":
@@ -638,8 +610,6 @@ class PerfTestConfig:
     def __str__(self) -> str:
         return self.to_string()
 
-<<<<<<< HEAD
-=======
     def _load_from_str_disagg(self, labels: List[str]) -> None:
         self.ctx_tp_size = 1
         self.ctx_dp_size = 1
@@ -671,7 +641,6 @@ class PerfTestConfig:
 
         self.validate()
 
->>>>>>> upstream/main
     def load_from_str(self, test_param_labels) -> None:
         """
         Populate the config properties given the test param string.
@@ -681,11 +650,6 @@ class PerfTestConfig:
         labels = test_param_labels.split("-")
 
         self.model_name = labels.pop(0)
-<<<<<<< HEAD
-        assert labels[0] in ["cpp", "cppmanager", "bench"], \
-            f"Invalid runtime {labels[0]}!"
-        self.runtime = labels.pop(0)
-=======
         assert labels[0] in ["cpp", "cppmanager", "bench", "disagg_server"], \
             f"Invalid runtime {labels[0]}!"
         self.runtime = labels.pop(0)
@@ -693,7 +657,6 @@ class PerfTestConfig:
         if self.runtime == "disagg_server":
             return self._load_from_str_disagg(labels)
 
->>>>>>> upstream/main
         self.api = labels.pop(0) if labels[0] == "exe" else ""
         self.backend = labels.pop(0) if labels[0] == "pytorch" else ""
         self.streaming = labels.pop(0) if labels[0] == "streaming" else ""
@@ -798,10 +761,6 @@ class PerfTestConfig:
         """
         Validate if the config makes sense.
         """
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
         # Validate model name.
         assert len(self.model_name) > 0, "model_name must not be empty!"
         assert "-" not in self.model_name, "model_name must not contain '-' character!"
@@ -812,11 +771,6 @@ class PerfTestConfig:
             assert self.model_name in allowed_models, f"model_name {self.model_name} is not in allowed_models!"
 
         # Validate runtime type.
-<<<<<<< HEAD
-        VALID_RUNTIMES = ["cpp", "cppmanager", "bench"]
-        assert self.runtime in VALID_RUNTIMES, f"Invalid runtime {self.runtime}!"
-
-=======
         VALID_RUNTIMES = ["cpp", "cppmanager", "bench", "disagg_server"]
         assert self.runtime in VALID_RUNTIMES, f"Invalid runtime {self.runtime}!"
 
@@ -824,7 +778,6 @@ class PerfTestConfig:
             # TODO: validate disaggregated server config
             return
 
->>>>>>> upstream/main
         # Validate plugin mode.
         VALID_MODES = ["plugin", "ootb", "ootb_except_mha"]
         if self.runtime == "cppmanager":
@@ -1009,11 +962,8 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
                                                  llm_root)
         elif self._config.runtime == "bench":
             benchmark_script = "trtllm-bench"
-<<<<<<< HEAD
-=======
         elif self._config.runtime == "disagg_server":
             benchmark_script = None
->>>>>>> upstream/main
         else:
             raise RuntimeError(f"Invalid runtime {self._config.runtime}.")
         allowed_configs = import_allowed_perf_config()
@@ -1501,8 +1451,6 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
         # Whether this is python or cpp runtime perf test.
         is_python = self._config.runtime == "python"
         num_gpus = self._config.num_gpus
-<<<<<<< HEAD
-=======
         is_disagg = self._config.runtime == "disagg_server"
 
         if is_disagg:
@@ -1514,7 +1462,6 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
             return PerfDisaggScriptTestCmds(ctx_cmd, gen_cmd, server_cmd,
                                             client_cmd, benchmark_cmd)
 
->>>>>>> upstream/main
         if is_python and num_gpus > 1:
             # TODO: Fix https://nvbugs/4449875
             pytest.skip(
@@ -1623,10 +1570,7 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
             metric.metric_regex.search(line)
             for line in outputs[cmd_idx].split("\n")
         ]
-<<<<<<< HEAD
-=======
         print_info(outputs[cmd_idx].split("\n"))
->>>>>>> upstream/main
         metric_values = [
             float(match.group(1)) for match in regex_matches if match
         ]
@@ -1806,8 +1750,6 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
         """
 
         metrics = []
-<<<<<<< HEAD
-=======
         if self._config.runtime == "disagg_server":
             for metric_type in DISAGG_SERVER_METRICS:
                 metrics.append(
@@ -1823,7 +1765,6 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
                         cmd_idx=0,
                     ))
             return metrics
->>>>>>> upstream/main
 
         # Build command is the first command.
         cmd_idx = 0 if self._config.runtime != "bench" else 1
@@ -1958,8 +1899,6 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
 
         return PERF_METRIC_THRESHOLD[metric_type][1]
 
-<<<<<<< HEAD
-=======
     def _gen_disagg_worker_config(self):
         ctx_config = {
             'max_batch_size': 32,
@@ -2112,7 +2051,6 @@ class MultiMetricPerfTest(AbstractPerfScriptTestClass):
         ]
         return benchmark_cmd
 
->>>>>>> upstream/main
 
 def run_perf_test(perf_case_name, trt_performance_cache_fpath,
                   trt_gpu_clock_lock, llm_session_data_writer, output_dir,

@@ -1,15 +1,4 @@
 import copy
-<<<<<<< HEAD
-from typing import Any, Dict, List, Optional, Tuple
-
-import torch
-from transformers import (AutoProcessor, AutoTokenizer, PretrainedConfig,
-                          PreTrainedModel, Qwen2_5_VLForConditionalGeneration,
-                          Qwen2VLForConditionalGeneration)
-
-from ...functional import RopeEmbeddingUtils, RotaryScalingType
-from ...inputs import (ExtraProcessedInputs, InputProcessor, TextPrompt,
-=======
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -39,40 +28,10 @@ from ..._utils import nvtx_range, nvtx_range_debug
 from ...inputs import (BaseMultimodalInputProcessor, ExtraProcessedInputs,
                        InputProcessor, MultimodalPlaceholderMetadata,
                        MultimodalPlaceholderPlacement, TextPrompt,
->>>>>>> upstream/main
                        register_input_processor)
 from ...logger import logger
 from ...sampling_params import SamplingParams
 from ..attention_backend import AttentionMetadata
-<<<<<<< HEAD
-from ..model_config import ModelConfig
-from .modeling_auto import AutoModelForCausalLM
-from .modeling_multimodal_utils import fuse_input_embeds
-from .modeling_utils import register_auto_model
-
-
-class Qwen2VLInputProcessorBase(InputProcessor):
-
-    def __init__(self, model_path: str, model_config: PretrainedConfig,
-                 tokenizer: AutoTokenizer):
-        self.model_config = model_config
-        self.tokenizer = tokenizer
-        self.processor = AutoProcessor.from_pretrained(model_path,
-                                                       use_fast=False)
-
-        # NOTE: Using attn_implementation='flash_attention_2' to avoid the issue of vision model's GPU OOM.
-        model = self.get_model_class().from_pretrained(
-            model_path,
-            torch_dtype=model_config.torch_dtype,
-            attn_implementation='flash_attention_2')
-        self.device = 'cuda'
-        self.visual = model.visual.to(self.device)
-        self._post_init_()
-
-    @classmethod
-    def get_model_class(cls) -> type[PreTrainedModel]:
-        raise NotImplementedError()
-=======
 from ..attention_backend.interface import PositionalEmbeddingParams, RopeParams
 from ..attention_backend.utils import get_attention_backend
 from ..modules.rotary_embedding import MRotaryEmbedding
@@ -143,17 +102,12 @@ class Qwen2VLInputProcessorBase(BaseMultimodalInputProcessor, InputProcessor):
         # temporal patch size for video frames
         self.temporal_patch_size = getattr(model_config.vision_config,
                                            'temporal_patch_size', 1)
->>>>>>> upstream/main
 
     @classmethod
     def get_rope_index(
         cls,
         model_config: PretrainedConfig,
-<<<<<<< HEAD
-        input_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         image_grid_thw: Optional[torch.LongTensor] = None,
         video_grid_thw: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -284,11 +238,8 @@ class Qwen2VLInputProcessorBase(BaseMultimodalInputProcessor, InputProcessor):
                 # Calculate temporal position IDs based on model type
                 if hasattr(model_config.vision_config, 'tokens_per_second'):
                     # Qwen2_5_VL style temporal position calculation
-<<<<<<< HEAD
-=======
                     if isinstance(second_per_grid_t, torch.Tensor):
                         second_per_grid_t = second_per_grid_t.item()
->>>>>>> upstream/main
                     range_tensor = torch.arange(llm_grid_t).view(-1, 1)
                     expanded_range = range_tensor.expand(
                         -1, llm_grid_h * llm_grid_w)
@@ -326,61 +277,6 @@ class Qwen2VLInputProcessorBase(BaseMultimodalInputProcessor, InputProcessor):
             mrope_position_deltas, device=input_ids.device).unsqueeze(1)
         return position_ids, mrope_position_deltas
 
-<<<<<<< HEAD
-    def _post_init_(self):
-        _, rotary_cos_sin = RopeEmbeddingUtils.create_sinusoidal_positions_for_attention_plugin(
-            num_pos=self.model_config.max_position_embeddings,
-            dim=int(self.model_config.hidden_size /
-                    self.model_config.num_attention_heads),
-            theta=float(self.model_config.rope_theta),
-            scale_type=RotaryScalingType.mrope)
-        self.rotary_cos_sin = torch.from_numpy(rotary_cos_sin).to(self.device)
-        self.rotary_cos_sin = self.rotary_cos_sin.reshape(
-            self.model_config.max_position_embeddings,
-            int(self.model_config.hidden_size /
-                self.model_config.num_attention_heads / 2), 2)
-
-        self.cos_ori = self.rotary_cos_sin[:, :, 0]
-        self.sin_ori = self.rotary_cos_sin[:, :, 1]
-
-    def _preprocess(self, text: dict[str, any], mm_data: dict[str, any],
-                    mm_processor_kwargs: Dict[str, Any]):
-        return self.processor(text=[text],
-                              images=mm_data.get("image", None),
-                              videos=mm_data.get("video", None),
-                              padding=True,
-                              return_tensors='pt',
-                              **mm_processor_kwargs)
-
-    def _process(self, pixel_values: torch.Tensor,
-                 pixel_values_videos: torch.Tensor,
-                 image_grid_thw: torch.Tensor,
-                 video_grid_thw: torch.Tensor) -> torch.Tensor:
-        embeds = []
-
-        if pixel_values is not None:
-            pixel_values = pixel_values.to(self.visual.dtype)
-            embeds.append(self.visual(pixel_values, grid_thw=image_grid_thw))
-
-        if pixel_values_videos is not None:
-            pixel_values_videos = pixel_values_videos.to(self.visual.dtype)
-            embeds.append(
-                self.visual(pixel_values_videos, grid_thw=video_grid_thw))
-
-        if embeds:
-            return torch.cat(embeds, dim=1)
-        return None
-
-    def _postprocess(self, input_ids: torch.LongTensor) -> torch.LongTensor:
-        # NOTE: Qwen2-VL's input processor is doing all the work for fusing input_ids with mm_tokens. So, we just replace mm_tokens with expanded out-of-vocab ids
-
-        masks = (input_ids == self.model_config.image_token_id) | (
-            input_ids == self.model_config.vision_token_id) | (
-                input_ids == self.model_config.video_token_id)
-        cumulative_counts = masks.cumsum(dim=-1)
-        values = (self.model_config.vocab_size - 1) + cumulative_counts
-        input_ids[masks] = values[masks]
-=======
     def _preprocess(self, text: dict[str, any], mm_data: dict[str, any],
                     mm_processor_kwargs: Dict[str, Any]):
         images = mm_data.get("image")
@@ -405,53 +301,15 @@ class Qwen2VLInputProcessorBase(BaseMultimodalInputProcessor, InputProcessor):
             input_ids == self.model_config.vision_token_id) | (
                 input_ids == self.model_config.video_token_id)
         input_ids[masks] = self.tllm_multimodal_token_id
->>>>>>> upstream/main
         return input_ids
 
     def get_mrope_config(
             self,
-<<<<<<< HEAD
-            input_ids: torch.LongTensor,
-=======
             input_ids: torch.IntTensor,
->>>>>>> upstream/main
             image_grid_thw: torch.LongTensor,
             video_grid_thw: torch.LongTensor,
             attention_mask: torch.Tensor,
             second_per_grid_ts: torch.Tensor = None) -> dict[str, torch.Tensor]:
-<<<<<<< HEAD
-        mrope_position_ids, mrope_position_deltas = self.__class__.get_rope_index(
-            self.model_config, input_ids, image_grid_thw, video_grid_thw,
-            attention_mask, second_per_grid_ts)
-
-        mrope_position_ids = mrope_position_ids.transpose(1, 0)
-        mrope_position_ids_padding = torch.zeros(
-            mrope_position_ids.shape[:-1] +
-            (self.model_config.max_position_embeddings, ),
-            dtype=torch.int32,
-            device=input_ids.device)
-        mrope_position_ids_padding[:, :, :mrope_position_ids.
-                                   shape[-1]] = mrope_position_ids
-        cos = self.cos_ori[mrope_position_ids_padding]
-        sin = self.sin_ori[mrope_position_ids_padding]
-
-        mrope_section = [16, 24, 24]
-        cos = torch.cat([
-            m[:, i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))
-        ],
-                        dim=-1).unsqueeze(-1)
-        sin = torch.cat([
-            m[:, i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))
-        ],
-                        dim=-1).unsqueeze(-1)
-        concat_cos_sin = torch.concatenate((cos, sin), axis=-1)
-        concat_cos_sin = concat_cos_sin.reshape(concat_cos_sin.shape[0], -1)
-        mrope_config = {}
-        mrope_config['mrope_rotary_cos_sin'] = concat_cos_sin
-        mrope_config['mrope_position_deltas'] = mrope_position_deltas
-        return mrope_config
-
-=======
         mrope_position_ids, mrope_position_deltas = Qwen2VLInputProcessorBase.get_rope_index(
             self.model_config, input_ids, image_grid_thw, video_grid_thw,
             attention_mask, second_per_grid_ts)
@@ -464,7 +322,6 @@ class Qwen2VLInputProcessorBase(BaseMultimodalInputProcessor, InputProcessor):
         return mrope_config
 
     @nvtx_range("Qwen2VLInputProcessorBase forward()")
->>>>>>> upstream/main
     @torch.inference_mode()
     def __call__(
         self,
@@ -473,50 +330,6 @@ class Qwen2VLInputProcessorBase(BaseMultimodalInputProcessor, InputProcessor):
     ) -> Tuple[List[int], Optional[ExtraProcessedInputs]]:
         text_prompt, mm_data, mm_processor_kwargs = inputs.get("prompt"), \
                         inputs.get("multi_modal_data", {}), inputs.get("mm_processor_kwargs", {})
-<<<<<<< HEAD
-
-        # NOTE: Since we are passed in Tensor images, we don't need to rescale them.
-        mm_processor_kwargs['do_rescale'] = False
-        processed_inputs = self._preprocess(text_prompt, mm_data,
-                                            mm_processor_kwargs).to(self.device)
-        if mm_data:
-            mm_features = self._process(
-                processed_inputs.get('pixel_values', None),
-                processed_inputs.get('pixel_values_videos', None),
-                processed_inputs.get('image_grid_thw', None),
-                processed_inputs.get('video_grid_thw', None))
-        else:
-            mm_features = None
-
-        input_ids = processed_inputs['input_ids']
-
-        mrope_config = self.get_mrope_config(
-            input_ids, processed_inputs.get('image_grid_thw', None),
-            processed_inputs.get('video_grid_thw', None),
-            processed_inputs.get('attention_mask', None),
-            processed_inputs.get('second_per_grid_ts', None))
-
-        fused_input_ids = self._postprocess(input_ids[0])
-
-        return fused_input_ids.to(torch.int32).tolist(), {
-            "mm_embedding": mm_features,
-            "mrope_config": mrope_config
-        }
-
-
-class Qwen2VLInputProcessor(Qwen2VLInputProcessorBase):
-
-    @classmethod
-    def get_model_class(cls):
-        return Qwen2VLForConditionalGeneration
-
-
-class Qwen2_5_VLInputProcessor(Qwen2VLInputProcessorBase):
-
-    @classmethod
-    def get_model_class(cls):
-        return Qwen2_5_VLForConditionalGeneration
-=======
         with nvtx_range_debug("transformers input preprocess"):
             processed_inputs = self._preprocess(text_prompt, mm_data,
                                                 mm_processor_kwargs)
@@ -966,7 +779,6 @@ class Qwen2_5_VisionModel(torch.nn.Module):
         hidden_states = hidden_states[reverse_indices, :]
 
         return hidden_states
->>>>>>> upstream/main
 
 
 class Qwen2VLModelBase(PreTrainedModel):
@@ -978,12 +790,6 @@ class Qwen2VLModelBase(PreTrainedModel):
         **kwargs,
     ) -> None:
         model_config.pretrained_config.rope_scaling['type'] = 'mrope'
-<<<<<<< HEAD
-        config = model_config.pretrained_config
-
-        assert model_config.attn_backend == 'TRTLLM', "Qwen2VL only supports TRTLLM backend now"
-        super().__init__(config)
-=======
 
         # NOTE: Setting disable_fuse_rope to True to do mrope fusion in the model engine by pre-computing rotary_cos_sin in the model engine
         disabble_fuse_rope = kwargs.get('disable_fuse_rope', False)
@@ -994,19 +800,11 @@ class Qwen2VLModelBase(PreTrainedModel):
         super().__init__(config)
         if not disabble_fuse_rope:
             self.init_mrope_embedding(model_config)
->>>>>>> upstream/main
 
         self.model_config = model_config
         if hasattr(self, "llm"):
             return
 
-<<<<<<< HEAD
-        llm_model_config = copy.deepcopy(model_config)
-        llm_model_config.pretrained_config.architectures = ["Qwen2ForCausalLM"]
-        self.llm = AutoModelForCausalLM.from_config(llm_model_config)
-        self.vocab_size = config.vocab_size
-        self.model_dtype = getattr(config, "torch_dtype", torch.float16)
-=======
         if not DISAGG:
             self.mm_encoder = Qwen2VisionModelBase(
                 model_config, kwargs.get('vision_model_class', None)).eval()
@@ -1017,15 +815,10 @@ class Qwen2VLModelBase(PreTrainedModel):
 
         self.llm = AutoModelForCausalLM.from_config(llm_model_config)
         self.model_dtype = getattr(config, "torch_dtype", torch.bfloat16)
->>>>>>> upstream/main
         logger.info(f"{self.dtype=} {self.model_dtype=}")
         self.post_config()
         self.is_loaded = True
 
-<<<<<<< HEAD
-    def load_weights(self, weights):
-        self.llm.load_weights(weights)
-=======
     def init_mrope_embedding(self, model_config: ModelConfig[PretrainedConfig]):
         config = model_config.pretrained_config
         pos_embd_params = PositionalEmbeddingParams(
@@ -1048,7 +841,6 @@ class Qwen2VLModelBase(PreTrainedModel):
 
     def load_weights(self, weights, weight_mapper: BaseWeightMapper):
         pass
->>>>>>> upstream/main
 
     def infer_max_seq_len(self) -> int:
         return self.llm.infer_max_seq_len()
@@ -1058,8 +850,6 @@ class Qwen2VLModelBase(PreTrainedModel):
         self.config = self.llm.config
         self.model_config.pretrained_config = self.llm.config
 
-<<<<<<< HEAD
-=======
     @nvtx_range("Qwen2.5-VL prepare_mrope_config")
     def prepare_mrope_config(self, multimodal_params: List[MultimodalParams],
                              num_context_requests: int):
@@ -1108,18 +898,12 @@ class Qwen2VLModelBase(PreTrainedModel):
 
         return mrope_config
 
->>>>>>> upstream/main
     @torch.inference_mode()
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: Optional[torch.LongTensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: Optional[torch.IntTensor] = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         input_embeds: Optional[torch.Tensor] = None,
         return_context_logits: bool = False,
         **kwargs,
@@ -1132,28 +916,6 @@ class Qwen2VLModelBase(PreTrainedModel):
             f"num_context_requests: {num_context_requests}, num_generation_requests: {num_generation_requests}"
         )
 
-<<<<<<< HEAD
-        mm_embed = kwargs.get("multi_modal_data", [])
-
-        error_msg = "Number of multimodal features (if provided) should be equal to number of context requests"
-        assert mm_embed == [] or len(
-            mm_embed) == num_context_requests, error_msg
-
-        input_ids, input_embeds = fuse_input_embeds(self.llm.model.embed_tokens,
-                                                    input_ids, mm_embed)
-
-        mrope_config = kwargs.get("mrope_config", {})
-        if mrope_config:
-            if mrope_rotary_cos_sin := mrope_config.get('mrope_rotary_cos_sin'):
-                mrope_config['mrope_rotary_cos_sin'] = torch.cat(
-                    mrope_rotary_cos_sin, dim=0)
-
-            if mrope_position_deltas := mrope_config.get(
-                    'mrope_position_deltas'):
-                mrope_config['mrope_position_deltas'] = torch.cat(
-                    mrope_position_deltas, dim=0)
-
-=======
         multimodal_params = kwargs.get("multimodal_params", [])
         mm_embeds = []
         mrope_config = {}
@@ -1179,7 +941,6 @@ class Qwen2VLModelBase(PreTrainedModel):
         input_ids, input_embeds = fuse_input_embeds(self.llm.model.embed_tokens,
                                                     input_ids, mm_embeds,
                                                     **kwargs)
->>>>>>> upstream/main
         output_prob = self.llm.forward(
             attn_metadata=attn_metadata,
             input_ids=input_ids,
@@ -1187,26 +948,11 @@ class Qwen2VLModelBase(PreTrainedModel):
             inputs_embeds=input_embeds,
             return_context_logits=return_context_logits,
             mrope_config=mrope_config)
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/main
         logger.debug(f'output shape: {output_prob.shape}')
         return output_prob
 
 
-<<<<<<< HEAD
-@register_auto_model("Qwen2VLForConditionalGeneration")
-@register_input_processor(Qwen2VLInputProcessor)
-class Qwen2VLModel(Qwen2VLModelBase):
-    pass
-
-
-@register_auto_model("Qwen2_5_VLForConditionalGeneration")
-@register_input_processor(Qwen2_5_VLInputProcessor)
-class Qwen2_5_VLModel(Qwen2VLModelBase):
-    pass
-=======
 @register_vision_encoder(Qwen2VisionModelBase,
                          vlm_base_model=Qwen2VisionTransformerPretrainedModel)
 @register_auto_model("Qwen2VLForConditionalGeneration")
@@ -1311,4 +1057,3 @@ class Qwen2_5_VLModel(Qwen2VLModelBase):
             self.mm_encoder.load_state_dict(vision_weights, strict=True)
 
         self.llm.load_weights(weights, weight_mapper)
->>>>>>> upstream/main

@@ -1,19 +1,11 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-<<<<<<< HEAD
-from itertools import chain
-=======
->>>>>>> upstream/main
 from typing import Optional
 
 from tensorrt_llm.bindings import executor as tb_executor
 from tensorrt_llm.bindings import internal as tb_internal
 
-<<<<<<< HEAD
-from .llm_request import LlmRequest, LlmRequestState
-=======
 from .llm_request import LlmRequest, LlmRequestState, get_draft_token_length
->>>>>>> upstream/main
 
 RequestList = list[LlmRequest]
 
@@ -43,14 +35,8 @@ class ScheduledRequests:
     def batch_size(self) -> int:
         return len(self.context_requests) + len(self.generation_requests)
 
-<<<<<<< HEAD
-    @property
-    def all_requests(self) -> chain[LlmRequest]:
-        return chain(self.context_requests, self.generation_requests)
-=======
     def all_requests(self) -> list[LlmRequest]:
         return self.context_requests + self.generation_requests
->>>>>>> upstream/main
 
 
 class RequestScheduler(ABC):
@@ -87,20 +73,14 @@ class BindCapacityScheduler(CapacityScheduler):
         self,
         max_num_requests: int,
         kv_cache_manager,
-<<<<<<< HEAD
-=======
         peft_cache_manager: tb_internal.batch_manager.PeftCacheManager | None,
->>>>>>> upstream/main
         scheduler_policy: tb_executor.CapacitySchedulerPolicy = tb_executor.
         CapacitySchedulerPolicy.GUARANTEED_NO_EVICT,
         two_step_lookahead: bool = False,
     ):
         super(BindCapacityScheduler, self).__init__()
         self.kv_cache_manager = kv_cache_manager
-<<<<<<< HEAD
-=======
         self.peft_cache_manager = peft_cache_manager
->>>>>>> upstream/main
 
         self.impl = tb_internal.algorithms.CapacityScheduler(
             max_num_requests=max_num_requests,
@@ -113,12 +93,8 @@ class BindCapacityScheduler(CapacityScheduler):
     def schedule_request(
         self, active_requests: RequestList
     ) -> tuple[list[LlmRequest], list[LlmRequest], list[LlmRequest]]:
-<<<<<<< HEAD
-        return self.impl(active_requests, self.kv_cache_manager)
-=======
         return self.impl(active_requests, self.kv_cache_manager,
                          self.peft_cache_manager)
->>>>>>> upstream/main
 
 
 class GuaranteedNoEvictScheduler(CapacityScheduler):
@@ -209,11 +185,7 @@ class BindMicroBatchScheduler(MicroBatchScheduler):
         self, active_requests: RequestList, inflight_request_ids: set[int]
     ) -> tuple[list[LlmRequest], list[LlmRequest]]:
         for request in active_requests:
-<<<<<<< HEAD
-            if len(request.py_draft_tokens) > 0:
-=======
             if get_draft_token_length(request) > 0:
->>>>>>> upstream/main
                 request.draft_tokens = request.py_draft_tokens
         return self.impl(active_requests, inflight_request_ids,
                          self.max_batch_size, self.max_num_tokens)

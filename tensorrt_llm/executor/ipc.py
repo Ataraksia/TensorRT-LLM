@@ -24,11 +24,8 @@ class ZeroMqQueue:
         zmq.PAIR: "PAIR",
         zmq.PULL: "PULL",
         zmq.PUSH: "PUSH",
-<<<<<<< HEAD
-=======
         zmq.ROUTER: "ROUTER",
         zmq.DEALER: "DEALER",
->>>>>>> upstream/main
     }
 
     def __init__(self,
@@ -61,12 +58,9 @@ class ZeroMqQueue:
         self.name = name
         self.socket = self.context.socket(socket_type)
 
-<<<<<<< HEAD
-=======
         # For ROUTER sockets, track the last identity to enable replies. For now we assume there is only one client in our case.
         self._last_identity = None
 
->>>>>>> upstream/main
         self.hmac_key = address[1] if address is not None else None
         self.use_hmac_encryption = use_hmac_encryption
 
@@ -79,13 +73,8 @@ class ZeroMqQueue:
                 "Server and client should not receive HMAC key when encryption is disabled"
             )
 
-<<<<<<< HEAD
-        if (socket_type == zmq.PAIR
-                and self.is_server) or socket_type == zmq.PULL:
-=======
         if (socket_type == zmq.PAIR and self.is_server
             ) or socket_type == zmq.PULL or socket_type == zmq.ROUTER:
->>>>>>> upstream/main
             self.socket.bind(
                 self.address_endpoint
             )  # Binds to the address and occupy a port immediately
@@ -132,27 +121,6 @@ class ZeroMqQueue:
     def put(self, obj: Any):
         self.setup_lazily()
         with nvtx_range_debug("send", color="blue", category="IPC"):
-<<<<<<< HEAD
-            if self.use_hmac_encryption:
-                # Send pickled data with HMAC appended
-                data = pickle.dumps(obj)  # nosec B301
-                signed_data = self._sign_data(data)
-                self.socket.send(signed_data)
-            else:
-                # Send data without HMAC
-                self.socket.send_pyobj(obj)
-
-    async def put_async(self, obj: Any):
-        self.setup_lazily()
-        try:
-            if self.use_hmac_encryption:
-                # Send pickled data with HMAC appended
-                data = pickle.dumps(obj)  # nosec B301
-                signed_data = self._sign_data(data)
-                await self.socket.send(signed_data)
-            else:
-                # Send data without HMAC
-=======
             if self.use_hmac_encryption or self.socket_type == zmq.ROUTER:
                 # Need manual serialization for encryption or ROUTER multipart
                 data = self._prepare_data(obj)
@@ -200,7 +168,6 @@ class ZeroMqQueue:
                 await self._send_data_async(data)
             else:
                 # Standard socket without encryption
->>>>>>> upstream/main
                 await self.socket.send_pyobj(obj)
         except TypeError as e:
             logger.error(f"Cannot pickle {obj}")
@@ -214,53 +181,11 @@ class ZeroMqQueue:
 
     def get(self) -> Any:
         self.setup_lazily()
-<<<<<<< HEAD
-
-        if self.use_hmac_encryption:
-            # Receive signed data with HMAC
-            signed_data = self.socket.recv()
-
-            # Split data and HMAC
-            data = signed_data[:-32]
-            actual_hmac = signed_data[-32:]
-
-            # Verify HMAC
-            if not self._verify_hmac(data, actual_hmac):
-                raise RuntimeError("HMAC verification failed")
-
-            obj = pickle.loads(data)  # nosec B301
-        else:
-            # Receive data without HMAC
-            obj = self.socket.recv_pyobj()
-        return obj
-
-    async def get_async(self) -> Any:
-        self.setup_lazily()
-
-        if self.use_hmac_encryption:
-            # Receive signed data with HMAC
-            signed_data = await self.socket.recv()
-
-            # Split data and HMAC
-            data = signed_data[:-32]
-            actual_hmac = signed_data[-32:]
-
-            # Verify HMAC
-            if not self._verify_hmac(data, actual_hmac):
-                raise RuntimeError("HMAC verification failed")
-
-            obj = pickle.loads(data)  # nosec B301
-        else:
-            # Receive data without HMAC
-            obj = await self.socket.recv_pyobj()
-        return obj
-=======
         return self._recv_data()
 
     async def get_async(self) -> Any:
         self.setup_lazily()
         return await self._recv_data_async()
->>>>>>> upstream/main
 
     def close(self):
         if self.socket:
@@ -284,8 +209,6 @@ class ZeroMqQueue:
     def __del__(self):
         self.close()
 
-<<<<<<< HEAD
-=======
     def _prepare_data(self, obj: Any) -> bytes:
         """Serialize object and optionally add HMAC signature."""
         data = pickle.dumps(obj)  # nosec B301
@@ -388,7 +311,6 @@ class ZeroMqQueue:
 
         return False
 
->>>>>>> upstream/main
 
 IpcQueue = ZeroMqQueue
 

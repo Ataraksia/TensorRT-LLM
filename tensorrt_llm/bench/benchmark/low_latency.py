@@ -1,36 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-<<<<<<< HEAD
-import json
-import os
-=======
 import os
 from functools import partial
->>>>>>> upstream/main
 from pathlib import Path
 
 import click
 import yaml
 from click_option_group import (MutuallyExclusiveOptionGroup, OptionGroup,
                                 optgroup)
-<<<<<<< HEAD
-
-from tensorrt_llm.bench.benchmark.utils.asynchronous import async_benchmark
-from tensorrt_llm.bench.benchmark.utils.general import generate_warmup_dataset
-from tensorrt_llm.bench.benchmark.utils.processes import IterationWriter
-from tensorrt_llm.bench.dataclasses.configuration import RuntimeConfig
-from tensorrt_llm.bench.dataclasses.general import BenchmarkEnvironment
-from tensorrt_llm.bench.dataclasses.reporting import ReportUtility
-from tensorrt_llm.llmapi import LLM, CapacitySchedulerPolicy
-from tensorrt_llm.models.modeling_utils import SpeculativeDecodingMode
-
-# isort: off
-from tensorrt_llm.bench.benchmark.utils.general import get_settings_from_engine
-# isort: on
-from tensorrt_llm.bench.utils.data import (create_dataset_from_stream,
-                                           initialize_tokenizer)
-=======
 from huggingface_hub import snapshot_download
 
 from tensorrt_llm.bench.benchmark import (generate_json_report,
@@ -51,7 +29,6 @@ from tensorrt_llm.bench.benchmark.utils.general import (
 from tensorrt_llm.bench.utils.data import (create_dataset_from_stream,
                                            initialize_tokenizer,
                                            update_metadata_for_multimodal)
->>>>>>> upstream/main
 from tensorrt_llm.logger import logger
 from tensorrt_llm.sampling_params import SamplingParams
 
@@ -65,12 +42,6 @@ from tensorrt_llm.sampling_params import SamplingParams
                     readable=True,
                     path_type=Path,
                     resolve_path=True),
-<<<<<<< HEAD
-    required=True,
-    help="Path to a serialized TRT-LLM engine.",
-)
-@optgroup.option(
-=======
     default=None,
     help="Path to a serialized TRT-LLM engine.",
 )
@@ -86,21 +57,17 @@ from tensorrt_llm.sampling_params import SamplingParams
                  default="pytorch",
                  help="The backend to use when running benchmarking.")
 @optgroup.option(
->>>>>>> upstream/main
     "--kv_cache_free_gpu_mem_fraction",
     type=float,
     default=.90,
     help="The percentage of memory to use for KV Cache after model load.",
 )
-<<<<<<< HEAD
-=======
 @optgroup.option(
     "--max_seq_len",
     type=int,
     default=None,
     help="Maximum sequence length.",
 )
->>>>>>> upstream/main
 @optgroup.group(
     "Engine Input Configuration",
     help="Input configuration for driving the engine.",
@@ -115,8 +82,6 @@ from tensorrt_llm.sampling_params import SamplingParams
     help="Pass in a dataset file for parsing instead of stdin.",
 )
 @optgroup.option(
-<<<<<<< HEAD
-=======
     "--modality",
     type=click.Choice(["image", "video"]),
     default=None,
@@ -131,7 +96,6 @@ from tensorrt_llm.sampling_params import SamplingParams
     "is specified since the actual number of vision tokens is unknown before the model is run.",
 )
 @optgroup.option(
->>>>>>> upstream/main
     "--num_requests",
     type=int,
     default=0,
@@ -144,8 +108,6 @@ from tensorrt_llm.sampling_params import SamplingParams
     default=2,
     help="Number of requests warm up benchmark.",
 )
-<<<<<<< HEAD
-=======
 @optgroup.option(
     "--tp",
     type=int,
@@ -164,13 +126,10 @@ from tensorrt_llm.sampling_params import SamplingParams
     default=None,
     help="expert parallelism size",
 )
->>>>>>> upstream/main
 @optgroup.group("Request Load Control Options",
                 cls=MutuallyExclusiveOptionGroup,
                 help="Limits how requests are loaded.")
 @optgroup.option(
-<<<<<<< HEAD
-=======
     "--beam_width",
     type=int,
     default=1,
@@ -184,7 +143,6 @@ from tensorrt_llm.sampling_params import SamplingParams
                  default=None,
                  help="Path to a YAML file that sets sampler options.")
 @optgroup.option(
->>>>>>> upstream/main
     "--concurrency",
     type=int,
     default=1,
@@ -232,39 +190,6 @@ def latency_command(
     **params,
 ) -> None:
     """Run a latency test on a TRT-LLM engine."""
-<<<<<<< HEAD
-
-    logger.info("Preparing to run latency benchmark...")
-    # Parameters from CLI
-    # Model, experiment, and engine params
-    dataset_path: Path = params.pop("dataset")
-    num_requests: int = params.pop("num_requests")
-    model: str = bench_env.model
-    checkpoint_path: Path = bench_env.checkpoint_path or bench_env.model
-    engine_dir: Path = params.pop("engine_dir")
-    concurrency: int = params.pop("concurrency")
-    warmup: int = params.get("warmup")
-    # Engine configuration parsing
-    exec_settings, build_cfg = get_settings_from_engine(engine_dir)
-    exec_settings["model"] = model
-    engine_tokens = exec_settings["settings_config"]["max_num_tokens"]
-    engine_max_seq_len = build_cfg["max_seq_len"]
-
-    # Runtime Options
-    kv_cache_percent = params.pop("kv_cache_free_gpu_mem_fraction")
-    medusa_choices = params.pop("medusa_choices")
-
-    # Reporting Options
-    report_json: Path = params.pop("report_json")
-    iteration_log: Path = params.pop("iteration_log")
-    iteration_writer = IterationWriter(iteration_log)
-
-    # Update configuration with runtime options
-    exec_settings["settings_config"]["kv_cache_percent"] = kv_cache_percent
-    exec_settings["settings_config"]["max_batch_size"] = 1
-    exec_settings["settings_config"]["max_num_tokens"] = engine_tokens
-    exec_settings["settings_config"]["beam_width"] = 1
-=======
     logger.info("Preparing to run latency benchmark...")
     # Parameters from CLI
     # Model, experiment, and engine params
@@ -332,7 +257,6 @@ def latency_command(
     exec_settings["settings_config"]["max_batch_size"] = 1
     exec_settings["settings_config"]["max_num_tokens"] = engine_tokens
     exec_settings["settings_config"]["beam_width"] = options.beam_width
->>>>>>> upstream/main
     exec_settings["settings_config"]["chunking"] = False
     exec_settings["settings_config"][
         "scheduler_policy"] = CapacitySchedulerPolicy.GUARANTEED_NO_EVICT
@@ -349,11 +273,8 @@ def latency_command(
     exec_settings["performance_options"]["cuda_graphs"] = True
     exec_settings["performance_options"]["multi_block_mode"] = True
 
-<<<<<<< HEAD
-=======
     exec_settings["extra_llm_api_options"] = params.get("extra_llm_api_options")
 
->>>>>>> upstream/main
     # Decoding Options
     if medusa_choices is not None:
         with open(medusa_choices, "r") as medusa_yml:
@@ -363,49 +284,6 @@ def latency_command(
     # Construct the runtime configuration dataclass.
     runtime_config = RuntimeConfig(**exec_settings)
 
-<<<<<<< HEAD
-    # Initialize the HF tokenizer for the specified model.
-    ignore_eos = True if runtime_config.decoding_config.decoding_mode == SpeculativeDecodingMode.NONE else False
-    tokenizer = initialize_tokenizer(checkpoint_path)
-    eos_id = tokenizer.eos_token_id if not ignore_eos else -1
-    pad_id = tokenizer.pad_token_id if not ignore_eos else -1
-
-    # Dataset Loading and Preparation
-    with open(dataset_path, "r") as dataset:
-        metadata, requests = create_dataset_from_stream(
-            tokenizer, dataset, num_requests=num_requests)
-        metadata.dataset_path = dataset_path
-
-    if metadata.max_sequence_length > engine_max_seq_len:
-        raise RuntimeError(
-            f"Engine supports a max sequence of {engine_max_seq_len}. Provided "
-            "dataset contains a maximum sequence of "
-            f"{metadata.max_sequence_length}. Please rebuild a new engine to"
-            "support this dataset.")
-
-    logger.info(metadata.get_summary_for_print())
-    logger.info("Running experimental latency benchmark.")
-
-    llm = None
-    kwargs = runtime_config.get_llm_args()
-
-    try:
-        sampling_params = SamplingParams(
-            end_id=eos_id,
-            pad_id=pad_id,
-            n=1,
-        )
-        llm = LLM(**kwargs)
-
-        # Perform warmup if requested.
-        if warmup > 0:
-            logger.info("Setting up for warmup...")
-            warmup_dataset = generate_warmup_dataset(requests, warmup)
-            logger.info("Running warmup.")
-            asyncio.run(
-                async_benchmark(llm, sampling_params, warmup_dataset, False,
-                                concurrency))
-=======
     llm = None
     kwargs = kwargs | runtime_config.get_llm_args()
     kwargs['backend'] = options.backend
@@ -445,28 +323,12 @@ def latency_command(
                                 False,
                                 options.concurrency,
                                 modality=options.modality))
->>>>>>> upstream/main
             # WAR: IterationResult is a singleton tied to the executor.
             # Since the benchmark calls asyncio.run() multiple times (e.g., during warmup),
             # we must reset it to ensure it attaches to the correct event loop.
             llm._executor._iter_stats_result = None
             logger.info("Warmup done.")
 
-<<<<<<< HEAD
-        with iteration_writer.capture():
-            statistics = asyncio.run(
-                async_benchmark(llm, sampling_params, requests, True,
-                                concurrency, iteration_writer.full_address))
-
-        logger.info(f"Benchmark done. Reporting results...")
-        report_utility = ReportUtility(statistics, metadata, runtime_config,
-                                       logger, kwargs, True)
-        if report_json:
-            logger.info(f"Writing report to '{report_json}'.")
-            with open(report_json, "w") as f:
-                f.write(
-                    json.dumps(report_utility.get_statistics_dict(), indent=4))
-=======
         iteration_writer = options.iteration_writer
         with iteration_writer.capture():
             statistics = asyncio.run(
@@ -496,7 +358,6 @@ def latency_command(
         generate_json_report(
             options.request_json,
             partial(report_utility.get_request_info, tokenizer))
->>>>>>> upstream/main
         report_utility.report_statistics()
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, exiting benchmark...")

@@ -18,12 +18,9 @@
 
 #include <cstdint>
 
-<<<<<<< HEAD
-=======
 namespace gemmGatedAct
 {
 
->>>>>>> upstream/main
 namespace gemm
 {
 
@@ -42,8 +39,6 @@ enum class AllReduceAlgo : uint32_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 enum class MatrixLayout
 {
     // K-major layout (default). [Mn, K]
@@ -69,7 +64,6 @@ enum class MatrixLayout
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
->>>>>>> upstream/main
 enum class SplitK : uint32_t
 {
     // No split-k is needed. I.e. mNumSlicesForSplitK == 1.
@@ -85,8 +79,6 @@ enum class SplitK : uint32_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 enum class BiasType : uint32_t
 {
     // No bias.
@@ -101,7 +93,6 @@ enum class BiasType : uint32_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
->>>>>>> upstream/main
 enum class TileScheduler
 {
     // Static scheduler (Non-persistent).
@@ -128,9 +119,6 @@ SPLIT_K_FUNCTION(Dsmem)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-} // namespace gemm
-=======
 // Helper functions to check the Bias type.
 
 #define BIAS_TYPE_FUNCTION(Mode)                                                                                       \
@@ -151,4 +139,3 @@ BIAS_TYPE_FUNCTION(Mn)
 } // namespace gemm
 
 } // namespace gemmGatedAct
->>>>>>> upstream/main

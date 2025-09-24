@@ -154,11 +154,7 @@ __global__ void activationDeepSeekKernel(KernelParams params)
                 float constexpr E4m3MaxVal{448.f};
 
                 // Compute the absolute max
-<<<<<<< HEAD
-                float aMax = BlockReduce(temp_storage).Reduce(fabsf(out), cub::Max());
-=======
                 float aMax = BlockReduce(temp_storage).Reduce(fabsf(out), cuda::maximum<>());
->>>>>>> upstream/main
                 if (threadIdx.x == 0)
                 {
                     s_scaleOut = aMax / E4m3MaxVal;
@@ -190,22 +186,14 @@ void run(Data const& data, void* stream)
     if (data.mUseDeepSeekFp8)
     {
         int const numThreads = 128;
-<<<<<<< HEAD
-        const dim3 grid(data.innerDim / 128, data.topK, data.numTokens);
-=======
         const dim3 grid(data.innerDim / 128, data.topK, std::min(8192, data.numTokens));
->>>>>>> upstream/main
 
         LAUNCH(data, activationDeepSeekKernel, grid, numThreads, 0, stream);
     }
     else
     {
         int const numThreads = 256;
-<<<<<<< HEAD
-        const dim3 grid(data.innerDim / 128, data.topK, data.numTokens);
-=======
         const dim3 grid(data.innerDim / 128, data.topK, std::min(8192, data.numTokens));
->>>>>>> upstream/main
 
         LAUNCH(data, activationKernel, grid, numThreads, 0, stream);
     }
@@ -383,11 +371,7 @@ void run(Data const& data, void* stream)
     constexpr int VecSize = 4;
     int const numThreads = 128;
     int const numBlocksX = (data.hiddenDimSf / VecSize - 1 + numThreads) / numThreads;
-<<<<<<< HEAD
-    int const numBlocksY = data.numTokens;
-=======
     int const numBlocksY = std::min(8192, data.numTokens);
->>>>>>> upstream/main
     dim3 numBlocks(numBlocksX, numBlocksY);
 #define CONVERT_FP4_SF_LAUNCH(LayoutSrc, LayoutDst)                                                                    \
     if (data.sfLayoutSrc == tg::SfLayout::LayoutSrc && data.sfLayoutDst == tg::SfLayout::LayoutDst)                    \
@@ -473,11 +457,7 @@ void run(Data const& data, void* stream)
 {
     int const numThreads = 256;
     int const numBlocksX = (data.hiddenDim - 1 + numThreads) / numThreads;
-<<<<<<< HEAD
-    int const numBlocksY = data.numTokens;
-=======
     int const numBlocksY = std::min(8192, data.numTokens);
->>>>>>> upstream/main
     dim3 numBlocks(numBlocksX, numBlocksY);
 
     LAUNCH(data, permuteKernel, numBlocks, numThreads, 0, stream);
@@ -680,11 +660,7 @@ __global__ void finalizeDeepSeekKernel(KernelParams params)
             float constexpr E4m3MaxVal{448.f};
 
             // Compute the absolute max
-<<<<<<< HEAD
-            float aMax = BlockReduce(temp_storage).Reduce(fabsf(acc), cub::Max());
-=======
             float aMax = BlockReduce(temp_storage).Reduce(fabsf(acc), cuda::maximum<>());
->>>>>>> upstream/main
 
             if (threadIdx.x == 0)
             {

@@ -1,11 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, final
 
-<<<<<<< HEAD
-from ..pyexecutor.llm_request import LlmRequest
-=======
 from ..pyexecutor.llm_request import LlmRequest, get_draft_token_length
->>>>>>> upstream/main
 from ..pyexecutor.resource_manager import ResourceManager
 from ..pyexecutor.scheduler import ScheduledRequests
 
@@ -31,23 +27,14 @@ class Drafter(ABC):
         raise NotImplementedError
 
     @final
-<<<<<<< HEAD
-    def should_use_spec_decode(self, requests: List[LlmRequest]) -> bool:
-=======
     def should_use_spec_decode(self, requests: List[LlmRequest],
                                max_batch_size: int, max_num_tokens: int,
                                max_draft_len: int) -> bool:
->>>>>>> upstream/main
         """
         You probably don't want to override this. ModelEngine
         assumes that speculation is always on if max_concurrency
         is not specified by the user's spec config.
         """
-<<<<<<< HEAD
-        if self.max_concurrency is not None:
-            return len(requests) <= self.max_concurrency
-        return True
-=======
 
         # Inputs typically validated upstream: max_batch_size>0, max_num_tokens>0, max_draft_len>=0
 
@@ -80,4 +67,3 @@ class Drafter(ABC):
             num_draft_tokens = get_draft_token_length(req)
             req.py_draft_tokens.extend(
                 0 for _ in range(max_draft_tokens - num_draft_tokens))
->>>>>>> upstream/main

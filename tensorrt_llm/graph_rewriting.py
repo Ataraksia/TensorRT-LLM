@@ -148,12 +148,7 @@ class Layer:
     }
 
     if trt_gte(10, 8):
-<<<<<<< HEAD
-        TRT_LAYER_TYPE_TO_LAYER[
-            trt.LayerType.DYNAMIC_QUANTIZE] = trt.IQuantizeLayer
-=======
         TRT_LAYER_TYPE_TO_LAYER[trt.LayerType.DYNAMIC_QUANTIZE] = trt.IQuantizeLayer
->>>>>>> upstream/main
 
     def as_layer(self) -> Any:
         """Convert to a actual TensorRT layer object.
@@ -201,18 +196,6 @@ class PatternRewriter(_Pattern):
     ):
         """Constructor.
 
-<<<<<<< HEAD
-    def __init__(self,
-                 name: str,
-                 root_layer: Optional[Set[trt.LayerType]] = None,
-                 separate_match_rewrite=False):
-        '''
-        Parameters:
-            name: the name of the rewrite pattern
-            root_layer: the root layer types to start the pattern matching, if not provided, the pattern will traverse all the layers in the graph.
-            separate_match_rewrite: if set to True, the pattern should override match() and rewrite() separately, otherwise, the pattern should override match_and_rewrite()
-        '''
-=======
         Parameters:
             name: the name of the rewrite pattern
             root_layer: the root layer types to start the pattern matching, if not provided, the pattern
@@ -220,7 +203,6 @@ class PatternRewriter(_Pattern):
             separate_match_rewrite: if set to True, the pattern should override match() and rewrite()
                 separately, otherwise, the pattern should override match_and_rewrite()
         """
->>>>>>> upstream/main
         super().__init__(name)
         self.root_layer = root_layer
         self._separate_match_rewrite = separate_match_rewrite
@@ -265,12 +247,8 @@ class _PatternManager:
 class RewritePatternManager(_PatternManager):
     def rewrite(self, net: Network, args=None):
         modified = True
-<<<<<<< HEAD
-        # TODO: we can optimize this by asking TRT to expose a graph iterator consistent even after the graph is modified
-=======
         # TODO: we can optimize this by asking TRT to expose a graph iterator consistent even after
         # the graph is modified.
->>>>>>> upstream/main
         while modified:
             modified = False
             # Since the graph iterator is hold by the underlying INetwork, we can only rebuild the
@@ -389,22 +367,11 @@ class FLayerInfo:
         return self.raw_inputs[name]
 
     def clone_inputs(self):
-<<<<<<< HEAD
-        '''
-        Get a shallow copy of the inputs.
-        '''
-        return copy(self.raw_inputs)
-
-    def replace_input_with(self, src, dst):
-        '''
-        Replace the input `src` with the input `dst` in the raw_inputs.
-=======
         """Get a shallow copy of the inputs."""
         return copy(self.raw_inputs)
 
     def replace_input_with(self, src, dst):
         """Replace the input `src` with the input `dst` in the raw_inputs.
->>>>>>> upstream/main
 
         src: Tensor
         dst: Tensor
@@ -425,12 +392,7 @@ class FLayerInfo:
         replace(self.raw_inputs)
 
     def replace_outputs_uses_with(self, net: Network, new_outs: List[Any]):
-<<<<<<< HEAD
-        '''
-        Replace the output users with the new outputs.
-=======
         """Replace the output users with the new outputs.
->>>>>>> upstream/main
 
         new_outs: List[Tensor], the new outputs to replace with
         """
@@ -445,11 +407,7 @@ class FLayerInfo:
 
         def _swap_tensor_info(new, deprecated):
             name = deprecated.trt_tensor.name
-<<<<<<< HEAD
-            deprecated.trt_tensor.name = name + '_deprecated'
-=======
             deprecated.trt_tensor.name = name + "_deprecated"
->>>>>>> upstream/main
             from .functional import cast
 
             new = cast(new, deprecated.dtype)
@@ -578,13 +536,9 @@ class FLayerScope:
     def __exit__(self, exc_type, exc_val, exc_tb):
         FLayerInfoMemo.cur_flayer = None
         if exc_type is None:
-<<<<<<< HEAD
-            assert self.layer.layer_name != "", f"FLayer {self.layer.layer_kind} without a plugin name detected"
-=======
             assert self.layer.layer_name != "", (
                 f"FLayer {self.layer.layer_kind} without a plugin name detected"
             )
->>>>>>> upstream/main
             FLayerInfoMemo.instance().add(self.layer.layer_name, self.layer)
 
 
@@ -608,12 +562,7 @@ _global_analysis_pattern_manager = AnalysisPatternManager()
 
 class FuseAttentionWithBiasPass(PatternRewriter):
     def __init__(self):
-<<<<<<< HEAD
-        super().__init__(name="fuse_attention_with_bias",
-                         separate_match_rewrite=False)
-=======
         super().__init__(name="fuse_attention_with_bias", separate_match_rewrite=False)
->>>>>>> upstream/main
 
     @staticmethod
     def is_attention_plugin(layer: Layer) -> bool:
@@ -667,14 +616,8 @@ class FuseAttentionWithBiasPass(PatternRewriter):
             if not self.is_attention_plugin(layer):
                 return False
             plugin_flayer = FLayerInfoMemo.instance().get(layer.name)
-<<<<<<< HEAD
-            input = plugin_flayer.raw_inputs['qkv']
-            if input is None or isinstance(input, list) or len(
-                    list(input.get_users())) != 1:
-=======
             input = plugin_flayer.raw_inputs["qkv"]
             if input is None or isinstance(input, list) or len(list(input.get_users())) != 1:
->>>>>>> upstream/main
                 return False
             parent_layer = input.get_parent()
             if not self.is_elementwise_sum(parent_layer):
@@ -684,13 +627,8 @@ class FuseAttentionWithBiasPass(PatternRewriter):
                 return False
             if plugin_flayer.raw_inputs["qkv_bias"] is not None:
                 return False
-<<<<<<< HEAD
-            plugin_flayer.raw_inputs['qkv'] = eltwise_mutable_inputs[0]
-            plugin_flayer.raw_inputs['qkv_bias'] = eltwise_const_inputs[0]
-=======
             plugin_flayer.raw_inputs["qkv"] = eltwise_mutable_inputs[0]
             plugin_flayer.raw_inputs["qkv_bias"] = eltwise_const_inputs[0]
->>>>>>> upstream/main
             from .functional import gpt_attention
 
             new_outputs = gpt_attention(**plugin_flayer.raw_inputs)

@@ -134,23 +134,14 @@ void invokeUpdateCacheIndirection(int* tgtCI, int const* srcCI, BeamHypotheses& 
     sync_check_cuda_error(stream);
 }
 
-<<<<<<< HEAD
-template <typename T>
-__global__ void addCumLogProbs(T* __restrict pStage1LogProbs, float const* __restrict cumLogProbs,
-=======
 __global__ void addCumLogProbs(float* __restrict pStage1LogProbs, float const* __restrict cumLogProbs,
->>>>>>> upstream/main
     FinishedState const* finished, int const* endIds, float const* diversityRates,
     runtime::SizeType32 const* batchSlots, size_t const nBS, size_t const nBMIn, size_t const nBMOut, size_t const nBM)
 {
     int const bid = blockIdx.x; // Index of request in batch
     runtime::SizeType32 const slot = batchSlots[bid];
     float const diversityRate{diversityRates[slot]};
-<<<<<<< HEAD
-    T* pLocalLogProbs = pStage1LogProbs + bid * nBMIn * nBMOut * 2;
-=======
     float* pLocalLogProbs = pStage1LogProbs + bid * nBMIn * nBMOut * 2;
->>>>>>> upstream/main
 
     for (int i = threadIdx.x; i < nBMIn * nBMOut * 2; i += blockDim.x)
     {
@@ -168,15 +159,6 @@ __global__ void addCumLogProbs(float* __restrict pStage1LogProbs, float const* _
     return;
 }
 
-<<<<<<< HEAD
-template __global__ void addCumLogProbs<float>(float* __restrict pStage1LogProbs, float const* __restrict cumLogProbs,
-    FinishedState const* finished, int const* endIds, float const* diversityRates,
-    runtime::SizeType32 const* batchSlots, size_t const nBS, size_t const nBMIn, size_t const nBMOut, size_t const nBM);
-
-template __global__ void addCumLogProbs<half>(half* __restrict pStage1LogProbs, float const* __restrict cumLogProbs,
-    FinishedState const* finished, int const* endIds, float const* diversityRates,
-    runtime::SizeType32 const* batchSlots, size_t const nBS, size_t const nBMIn, size_t const nBMOut, size_t const nBM);
-=======
 __global__ void addCumLogProbs(half* __restrict pStage1LogProbs, float const* __restrict cumLogProbs,
     FinishedState const* finished, int const* endIds, float const* diversityRates,
     runtime::SizeType32 const* batchSlots, size_t const nBS, size_t const nBMIn, size_t const nBMOut, size_t const nBM)
@@ -201,7 +183,6 @@ __global__ void addCumLogProbs(half* __restrict pStage1LogProbs, float const* __
     }
     return;
 }
->>>>>>> upstream/main
 
 __global__ void gatherId(int const* __restrict pStage1Id, int* __restrict pStage2Id, size_t const nBS,
     size_t const nBMIn, size_t const nBMOut, size_t const nV)

@@ -1,17 +1,4 @@
 import types
-<<<<<<< HEAD
-from typing import List, Optional
-
-from ...executor.result import CompletionOutput
-from ...inputs.registry import create_input_processor
-from ...llmapi.llm import RequestOutput, _TorchLLM
-from ...llmapi.tokenizer import TokenizerBase, tokenizer_factory
-from .distributed import common as dist_ad
-from .llm_args import LlmArgs
-from .shim.demollm import DemoGenerationExecutor
-
-
-=======
 from typing import Any, Dict, List, Optional, Tuple
 
 from ...executor.result import CompletionOutput
@@ -89,13 +76,10 @@ class ADInputProcessor(DefaultInputProcessor):
             return token_ids, None
 
 
->>>>>>> upstream/main
 class LLM(_TorchLLM):
     """LLM class is the main class for running an LLM model using AutoDeploy backend."""
 
     args: LlmArgs
-<<<<<<< HEAD
-=======
     _factory: ModelFactory
 
     @property
@@ -103,7 +87,6 @@ class LLM(_TorchLLM):
         if not getattr(self, "_factory", None):
             self._factory = self.args.create_factory()
         return self._factory
->>>>>>> upstream/main
 
     def __init__(self, *args, **kwargs):
         kwargs["backend"] = "_autodeploy"
@@ -113,29 +96,18 @@ class LLM(_TorchLLM):
         if self.args.skip_tokenizer_init:
             return None
 
-<<<<<<< HEAD
-        factory = self.args.create_factory()
-        return tokenizer_factory(factory.init_tokenizer())
-=======
         return tokenizer_factory(self.factory.init_tokenizer())
->>>>>>> upstream/main
 
     def _validate_args_for_torch_backend(self, kwargs: dict) -> None:
         """We don't need to validate args for AutoDeploy backend for now."""
         pass
 
-<<<<<<< HEAD
-    def _prefetch_model(self):
-        """Prefetch the model for the LLM."""
-        self.args.create_factory().prefetch_checkpoint()
-=======
     def _create_input_processor(self) -> ADInputProcessor:
         return ADInputProcessor(self.tokenizer, self.factory.init_processor())
 
     def _prefetch_model(self):
         """Prefetch the model for the LLM."""
         self.factory.prefetch_checkpoint()
->>>>>>> upstream/main
 
     def _build_model(self):
         """Build the model for the LLM.
@@ -150,14 +122,11 @@ class LLM(_TorchLLM):
         # _autodeploy backend.
         super()._build_model()
 
-<<<<<<< HEAD
-=======
         # now correct input processor
         assert isinstance(self.input_processor, DefaultInputProcessor)
         assert self.tokenizer is None or isinstance(self.tokenizer, TransformersTokenizer)
         self.input_processor = self._create_input_processor()
 
->>>>>>> upstream/main
 
 class DemoLLM(LLM):
     """A simple LLM class to demo the LLM interface while debugging the e2e workflow.
@@ -174,13 +143,9 @@ class DemoLLM(LLM):
         # prefetch model and load tokenizer
         self._prefetch_model()
         self._tokenizer = self._try_load_tokenizer()
-<<<<<<< HEAD
-        self.input_processor = create_input_processor(None, self.tokenizer)
-=======
         self._hf_model_config = self._try_load_hf_model_config()
         self._generation_config = self._try_load_generation_config()
         self.input_processor = self._create_input_processor()
->>>>>>> upstream/main
 
         # construct demo executor + engine
         self._executor = DemoGenerationExecutor(

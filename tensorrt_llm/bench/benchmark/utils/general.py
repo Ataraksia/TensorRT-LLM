@@ -12,10 +12,7 @@ from tensorrt_llm._torch.pyexecutor.model_engine import \
     validate_and_set_kv_cache_quant
 from tensorrt_llm.bench.build.build import (get_benchmark_engine_settings,
                                             get_model_config)
-<<<<<<< HEAD
-=======
 from tensorrt_llm.bench.build.dataclasses import NemotronHybridConfig
->>>>>>> upstream/main
 from tensorrt_llm.bench.dataclasses.general import (DatasetMetadata,
                                                     InferenceRequest)
 from tensorrt_llm.logger import logger
@@ -26,11 +23,8 @@ _KV_CACHE_MAP = {
     QuantAlgo.NVFP4.value: "fp8",
 }
 
-<<<<<<< HEAD
-=======
 ALL_SUPPORTED_BACKENDS = ["pytorch", "_autodeploy", "tensorrt"]
 
->>>>>>> upstream/main
 
 def get_settings_from_engine(
     engine_path: Path
@@ -95,18 +89,6 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
     enable_chunked_prefill = params.get("enable_chunked_prefill", False)
 
     kv_cache_dtype = "auto"
-<<<<<<< HEAD
-    if extra_llm_api_options:
-        with open(extra_llm_api_options, 'r') as f:
-            llm_args_dict = yaml.safe_load(f)
-            if "pytorch_backend_config" in llm_args_dict:
-                if "kv_cache_dtype" in llm_args_dict["pytorch_backend_config"]:
-                    kv_cache_dtype = llm_args_dict["pytorch_backend_config"][
-                        "kv_cache_dtype"]
-
-            enable_chunked_prefill = llm_args_dict.get("enable_chunked_prefill",
-                                                       enable_chunked_prefill)
-=======
     mamba_ssm_cache_dtype = params.get("mamba_ssm_cache_dtype", "auto")
     kv_cache_config = {}
     if extra_llm_api_options:
@@ -121,7 +103,6 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
 
         enable_chunked_prefill = llm_args_dict.get("enable_chunked_prefill",
                                                    enable_chunked_prefill)
->>>>>>> upstream/main
 
     world_config = {
         "pp_size": params.get("pp"),
@@ -138,12 +119,9 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
     else:
         model_config = get_model_config(model, model_path)
 
-<<<<<<< HEAD
-=======
         if isinstance(model_config, NemotronHybridConfig):
             model_config.set_mamba_ssm_cache_dtype(mamba_ssm_cache_dtype)
 
->>>>>>> upstream/main
         from tensorrt_llm._torch.model_config import ModelConfig
         model = model_path or model
         tllm_model_config = ModelConfig.from_pretrained(model,
@@ -163,10 +141,7 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
             params.get("pp"),
             dataset_metadata.avg_isl,
             dataset_metadata.avg_osl,
-<<<<<<< HEAD
-=======
             params.get("kv_cache_free_gpu_mem_fraction"),
->>>>>>> upstream/main
         )
 
         logger.info(
@@ -175,27 +150,11 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
         )
 
         # If chunked prefill is disabled, we need to ensure that the max_num_tokens is at least the max_isl
-<<<<<<< HEAD
-        if not enable_chunked_prefill and max_num_tokens < dataset_metadata.max_isl:
-=======
         if not enable_chunked_prefill:
->>>>>>> upstream/main
             logger.warning(
                 f"Chunked prefill is disabled, but max_num_tokens ({max_num_tokens}) is less than the max ISL ({dataset_metadata.max_isl}). "
                 f"Forcing max_num_tokens to {dataset_metadata.max_isl + max_batch_size}."
             )
-<<<<<<< HEAD
-            max_num_tokens = dataset_metadata.max_isl + max_batch_size
-
-    pyt_options = {
-        "use_cuda_graph": True,
-        "cuda_graph_padding_enabled": True,
-        "kv_cache_dtype": kv_cache_dtype,
-        "cuda_graph_max_batch_size": max_batch_size,
-    }
-    backend = params.get("backend", "pytorch")
-
-=======
             max_num_tokens = max(max_num_tokens,
                                  dataset_metadata.max_isl + max_batch_size)
         else:
@@ -217,7 +176,6 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
     }
 
     backend = params.get("backend", "pytorch")
->>>>>>> upstream/main
     return {
         "sw_version": version("tensorrt_llm"),
         "model_path": model_path,
@@ -241,8 +199,6 @@ def generate_warmup_dataset(requests, steps) -> List[InferenceRequest]:
     warm_up_dataset = choices(requests, k=steps)
     shuffle(warm_up_dataset)
     return warm_up_dataset
-<<<<<<< HEAD
-=======
 
 
 def update_sampler_args_with_extra_options(sampler_args: Dict,
@@ -279,4 +235,3 @@ def update_sampler_args_with_extra_options(sampler_args: Dict,
 
         sampler_args = sampler_args | sampler_options_dict
     return sampler_args
->>>>>>> upstream/main

@@ -112,11 +112,8 @@ class TritonPythonModel:
             self.image_session = Session.from_serialized_engine(engine_buffer)
 
             self.vision_dtype_str = visual_config['builder_config']['precision']
-<<<<<<< HEAD
-=======
             self.vision_max_batch_size = visual_config['builder_config'][
                 'max_batch_size']
->>>>>>> upstream/main
             features_output_name = "OUT_PROMPT_EMBEDDING_TABLE"
             if self.model_type == "mllama":
                 features_output_name = "ENCODER_INPUT_FEATURES"
@@ -167,9 +164,6 @@ class TritonPythonModel:
                 self.vocab_size = hf_config.vocab_size
                 self.qwen2vl_utils = Qwen2VLUtils(hf_config)
 
-<<<<<<< HEAD
-    def get_requests(self, request: List) -> Dict[str, torch.Tensor]:
-=======
             if self.model_type == 'pixtral':
                 from transformers import AutoConfig
                 hf_model_path = model_config['parameters'].get(
@@ -185,7 +179,6 @@ class TritonPythonModel:
                 self.relevant_patch_size = self.patch_size * self.spatial_merge_size
 
     def get_requests(self, request) -> Dict[str, torch.Tensor]:
->>>>>>> upstream/main
         """
         Processes the incoming request to extract and organize input tensors
         for different model types.
@@ -216,15 +209,10 @@ class TritonPythonModel:
 
         img_tensor = (pb_utils.get_input_tensor_by_name(request, 'pixel_values')
                       or pb_utils.get_input_tensor_by_name(request, 'IMAGE'))
-<<<<<<< HEAD
-        # mllama supports img_tensor is None case
-        assert img_tensor != None or self.model_type == 'mllama', "There is no preprocessed image tensor to encode"
-=======
         # mllama and pixtral support img_tensor is None case
         assert img_tensor != None or self.model_type in [
             'mllama', 'pixtral'
         ], "There is no preprocessed image tensor to encode"
->>>>>>> upstream/main
         if img_tensor is not None:
             img_tensor = from_dlpack(img_tensor.to_dlpack())
 
@@ -272,12 +260,9 @@ class TritonPythonModel:
                 image_sizes = from_dlpack(
                     pb_utils.get_input_tensor_by_name(
                         request, 'image_sizes').to_dlpack())
-<<<<<<< HEAD
-=======
                 # Remove dimension 1, which was added to match the dimensions defined in config.pbtxt
                 assert image_sizes.shape[1] == 1
                 image_sizes.squeeze_(1)
->>>>>>> upstream/main
                 from transformers.models.llava_onevision.modeling_llava_onevision import \
                     image_size_to_num_patches
                 image_num_patches = [
@@ -312,8 +297,6 @@ class TritonPythonModel:
             input_tensors['attention_mask_llm'].append(attention_mask)
             input_tensors['image_grid_thw'].append(image_grid_thw)
 
-<<<<<<< HEAD
-=======
         elif self.model_type == 'pixtral':
             if img_tensor is None:
                 input_tensors['pixel_values'].append(None)
@@ -341,7 +324,6 @@ class TritonPythonModel:
                                    self.patch_size, :image_w //
                                    self.patch_size] = 0
                 input_tensors['attention_mask'].append(attention_mask)
->>>>>>> upstream/main
         else:
             input_tensors['input'].append(
                 img_tensor.view(-1, img_tensor.shape[2], img_tensor.shape[3],
@@ -474,11 +456,7 @@ class TritonPythonModel:
                     f"encoder_output_lengths: {encoder_output_lengths}")
                 # True when the request does not have image input
 
-<<<<<<< HEAD
-                output_tensors = [
-=======
                 response_tensors = [
->>>>>>> upstream/main
                     pb_utils.Tensor.from_dlpack(
                         'ENCODER_INPUT_FEATURES',
                         to_dlpack(encoder_input_features)),
@@ -487,28 +465,16 @@ class TritonPythonModel:
                         to_dlpack(encoder_output_lengths))
                 ]
                 if cross_attention_mask is not None:
-<<<<<<< HEAD
-                    output_tensors.append(
-                        pb_utils.Tensor.from_dlpack(
-                            'CROSS_ATTENTION_MASK',
-                            to_dlpack(cross_attention_mask)))
-                output_tensors.append(
-=======
                     response_tensors.append(
                         pb_utils.Tensor.from_dlpack(
                             'CROSS_ATTENTION_MASK',
                             to_dlpack(cross_attention_mask)))
                 response_tensors.append(
->>>>>>> upstream/main
                     pb_utils.Tensor.from_dlpack(
                         'SKIP_CROSS_ATTN_BLOCKS',
                         to_dlpack(skip_cross_attn_blocks)))
                 inference_response = pb_utils.InferenceResponse(
-<<<<<<< HEAD
-                    output_tensors=output_tensors)
-=======
                     output_tensors=response_tensors)
->>>>>>> upstream/main
                 responses.append(inference_response)
         elif self.model_type == 'llava_onevision':
             for req_idx, embeddings in enumerate(
@@ -525,12 +491,9 @@ class TritonPythonModel:
                     image_sizes = from_dlpack(
                         pb_utils.get_input_tensor_by_name(
                             request, 'image_sizes').to_dlpack())
-<<<<<<< HEAD
-=======
                     # Remove dimension 1, which was added to match the dimensions defined in config.pbtxt
                     assert image_sizes.shape[1] == 1
                     image_sizes.squeeze_(1)
->>>>>>> upstream/main
                     from transformers.models.llava_onevision.modeling_llava_onevision import \
                         image_size_to_num_patches
                     image_num_patches = [
@@ -546,17 +509,10 @@ class TritonPythonModel:
                         embeddings, image_sizes, image_num_patches)
                 prompt_embedding_table_tensor = pb_utils.Tensor.from_dlpack(
                     'OUT_PROMPT_EMBEDDING_TABLE', to_dlpack(prompt_table))
-<<<<<<< HEAD
-                output_tensors = [prompt_embedding_table_tensor]
-
-                inference_response = pb_utils.InferenceResponse(
-                    output_tensors=output_tensors)
-=======
                 response_tensors = [prompt_embedding_table_tensor]
 
                 inference_response = pb_utils.InferenceResponse(
                     output_tensors=response_tensors)
->>>>>>> upstream/main
                 responses.append(inference_response)
         elif self.model_type == 'qwen2_vl':
             image_grid_thw = other_vision_input_tensors.get('image_grid_thw')
@@ -588,18 +544,11 @@ class TritonPythonModel:
                     'MROPE_ROTARY_COS_SIN', to_dlpack(mrope_rotary_cos_sin))
                 mrope_position_deltas_tensor = pb_utils.Tensor.from_dlpack(
                     'MROPE_POSITION_DELTAS', to_dlpack(mrope_position_deltas))
-<<<<<<< HEAD
-                output_tensors = [
-=======
                 response_tensors = [
->>>>>>> upstream/main
                     prompt_embedding_table_tensor, mrope_rotary_cos_sin_tensor,
                     mrope_position_deltas_tensor
                 ]
                 inference_response = pb_utils.InferenceResponse(
-<<<<<<< HEAD
-                    output_tensors=output_tensors)
-=======
                     output_tensors=response_tensors)
                 responses.append(inference_response)
         elif self.model_type == 'pixtral':
@@ -681,7 +630,6 @@ class TritonPythonModel:
                     [prompt_embedding_table_tensor, prompt_vocab_size_tensor])
                 inference_response = pb_utils.InferenceResponse(
                     output_tensors=response_tensors)
->>>>>>> upstream/main
                 responses.append(inference_response)
         else:
             for req_idx, embeddings in enumerate(
@@ -713,27 +661,17 @@ class TritonPythonModel:
                 prompt_vocab_size_tensor = pb_utils.Tensor(
                     'OUT_PROMPT_VOCAB_SIZE', prompt_vocab_size.astype(np.int32))
 
-<<<<<<< HEAD
-                output_tensors = [
-=======
                 response_tensors = [
->>>>>>> upstream/main
                     prompt_embedding_table_tensor, prompt_vocab_size_tensor
                 ]
 
                 inference_response = pb_utils.InferenceResponse(
-<<<<<<< HEAD
-                    output_tensors=output_tensors)
-=======
                     output_tensors=response_tensors)
->>>>>>> upstream/main
                 responses.append(inference_response)
         # You should return a list of pb_utils.InferenceResponse. Length
         # of this list must match the length of `requests` list.
         return responses
 
-<<<<<<< HEAD
-=======
     def run_vision_encoder(self, vit_input: Dict[str,
                                                  torch.Tensor]) -> torch.Tensor:
         batch_size = [v.shape[0] for v in vit_input.values()]
@@ -784,7 +722,6 @@ class TritonPythonModel:
         self.vision_stream.synchronize()
         return embeddings
 
->>>>>>> upstream/main
     def execute(self, requests: List):
         """`execute` must be implemented in every Python model. `execute`
         function receives a list of pb_utils.InferenceRequest as the only
@@ -908,33 +845,8 @@ class TritonPythonModel:
                     vit_input['attention_mask'] = attention_mask_vit.to(
                         str_dtype_to_torch(self.vision_dtype_str)).to('cuda')
 
-<<<<<<< HEAD
-                # Set up output tensors
-                vit_input_info = [
-                    TensorInfo(key, torch_dtype_to_trt(val.dtype), val.shape)
-                    for key, val in vit_input.items()
-                ]
-                vit_output_info = self.image_session.infer_shapes(
-                    vit_input_info)
-                vit_output = {
-                    t.name:
-                    torch.empty(tuple(t.shape),
-                                dtype=trt_dtype_to_torch(t.dtype),
-                                device='cuda')
-                    for t in vit_output_info
-                }
-                # Run the vision encoder
-                with torch.cuda.stream(self.vision_stream):
-                    ok = self.image_session.run(vit_input, vit_output,
-                                                self.vision_stream.cuda_stream)
-                    assert ok, "Runtime execution failed for vision encoder session"
-                    embeddings = vit_output['encoder_output'].to(
-                        self.vision_output_dtype)
-                self.vision_stream.synchronize()
-=======
                 embeddings = self.run_vision_encoder(vit_input)
 
->>>>>>> upstream/main
             # Post process output and save in responses
             responses.extend(
                 self.postprocess_output_tensors(embeddings,

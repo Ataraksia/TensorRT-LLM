@@ -12,16 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-<<<<<<< HEAD
-import random
-from abc import ABC, abstractmethod
-from typing import Any, Iterable, List, Optional
-=======
 import copy
 import random
 from abc import ABC, abstractmethod
 from typing import Any, Iterable, List, Optional, Union
->>>>>>> upstream/main
 
 import numpy as np
 import torch
@@ -39,19 +33,13 @@ class Evaluator(ABC):
     def __init__(self,
                  random_seed: int = 0,
                  apply_chat_template: bool = False,
-<<<<<<< HEAD
-=======
                  fewshot_as_multiturn: bool = False,
->>>>>>> upstream/main
                  system_prompt: Optional[str] = None):
         random.seed(random_seed)
         np.random.seed(random_seed)
         torch.manual_seed(random_seed)
         self.apply_chat_template = apply_chat_template
-<<<<<<< HEAD
-=======
         self.fewshot_as_multiturn = fewshot_as_multiturn
->>>>>>> upstream/main
         self.system_prompt = system_prompt
 
     @abstractmethod
@@ -63,17 +51,12 @@ class Evaluator(ABC):
                       *auxiliaries) -> float:
         raise NotImplementedError()
 
-<<<<<<< HEAD
-    def do_apply_chat_template(self, llm: Any, prompt: str) -> str:
-        messages = [{"role": "user", "content": prompt}]
-=======
     def do_apply_chat_template(self, llm: Any,
                                prompt: Union[str, List[dict]]) -> str:
         if isinstance(prompt, str):
             messages = [{"role": "user", "content": prompt}]
         else:
             messages = prompt
->>>>>>> upstream/main
         if self.system_prompt is not None:
             messages = [{
                 "role": "system",
@@ -83,18 +66,6 @@ class Evaluator(ABC):
                                                  tokenize=False,
                                                  add_generation_prompt=True)
 
-<<<<<<< HEAD
-    def evaluate(self,
-                 llm: Any,
-                 sampling_params: Optional[SamplingParams] = None) -> float:
-        profiler.start("trtllm exec")
-        outputs, references, auxiliaries = [], [], []
-        for prompt, reference, *aux in tqdm(self.generate_samples(),
-                                            desc="Submitting requests"):
-            if self.apply_chat_template:
-                prompt = self.do_apply_chat_template(llm, prompt)
-            output = llm.generate_async(prompt, sampling_params)
-=======
     def _get_sampline_params(self, sampling_params: Optional[SamplingParams],
                              sampling_args: Optional[dict]) -> SamplingParams:
         if sampling_params is None:
@@ -124,7 +95,6 @@ class Evaluator(ABC):
                 sampling_params,
                 streaming=streaming,
             )
->>>>>>> upstream/main
             outputs.append(output)
             references.append(reference)
             auxiliaries.append(aux)

@@ -78,11 +78,7 @@ protected:
         auto constexpr dataType = nvinfer1::DataType::kFLOAT;
 
         using BlocksPerWindow = std::map<SizeType32, std::tuple<SizeType32, SizeType32>>;
-<<<<<<< HEAD
-        const BlocksPerWindow blocksPerWindow
-=======
         BlocksPerWindow const blocksPerWindow
->>>>>>> upstream/main
             = {{maxAttentionWindow, std::make_tuple(totalNumBlocks, blocksInSecondaryPool)}};
 
         mCacheManager = std::make_unique<KVCacheManager>(numLayers, numHeads, sizePerHead, tokensPerBlock,
@@ -94,12 +90,8 @@ protected:
 
         size_t maxNumTokens = 1024;
         mTransBufferManager = std::make_unique<CacheTransBufferManager>(mCacheManager.get(), maxNumTokens);
-<<<<<<< HEAD
-        mCacheState = std::make_unique<CacheState>(numLayers, numHeads, sizePerHead, tokensPerBlock, 1, 1, 1, dataType);
-=======
         mCacheState = std::make_unique<CacheState>(
             numLayers, numHeads, sizePerHead, tokensPerBlock, 1, 1, 1, std::vector<SizeType32>{numLayers}, dataType);
->>>>>>> upstream/main
     }
 
     void TearDown() override
@@ -116,11 +108,7 @@ protected:
 
 TEST_F(AgentCommTest, AgentConnectionManagerBasic)
 {
-<<<<<<< HEAD
-    auto connectionManager = std::make_unique<AgentConnectionManager>(mTransBufferManager.get());
-=======
     auto connectionManager = std::make_unique<AgentConnectionManager>(mTransBufferManager.get(), *mCacheState);
->>>>>>> upstream/main
     ASSERT_TRUE(connectionManager != nullptr);
     ASSERT_TRUE(connectionManager->getCacheTransBufferManager() != nullptr);
     ASSERT_EQ(connectionManager->getDeviceId(), 0);
@@ -133,13 +121,8 @@ TEST_F(AgentCommTest, AgentConnectionManagerBasic)
 
 TEST_F(AgentCommTest, AgentConnectionManagerConnect)
 {
-<<<<<<< HEAD
-    auto connectionManager0 = std::make_unique<AgentConnectionManager>(mTransBufferManager.get());
-    auto connectionManager1 = std::make_unique<AgentConnectionManager>(mTransBufferManager.get());
-=======
     auto connectionManager0 = std::make_unique<AgentConnectionManager>(mTransBufferManager.get(), *mCacheState);
     auto connectionManager1 = std::make_unique<AgentConnectionManager>(mTransBufferManager.get(), *mCacheState);
->>>>>>> upstream/main
     auto agentName0 = connectionManager0->getAgentName();
     auto agentName1 = connectionManager1->getAgentName();
     ASSERT_TRUE(!agentName0.empty());

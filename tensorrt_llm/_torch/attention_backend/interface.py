@@ -3,13 +3,8 @@ import weakref
 from collections import namedtuple
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-<<<<<<< HEAD
-from typing import (Generic, List, Optional, Protocol, Tuple, Type, TypeVar,
-                    Union)
-=======
 from typing import (Dict, Generic, List, Optional, Protocol, Tuple, Type,
                     TypeVar, Union)
->>>>>>> upstream/main
 
 import torch
 from typing_extensions import Self
@@ -29,11 +24,8 @@ class AttentionRuntimeFeatures:
     chunked_prefill: bool = False
     cache_reuse: bool = False
     has_speculative_draft_tokens: bool = False
-<<<<<<< HEAD
-=======
     chunk_size: int = 0  # this is the chunk size for MLA chunked prefill, it will split kv cache into chunks to save global memory.
     chunked_prefill_buffer_batch_size: int = 4  # real chunk size for MLA chunked prefill is chunked_prefill_buffer_batch_size * chunk_size.
->>>>>>> upstream/main
 
 
 # The type of requests in qkv passed to attention
@@ -54,21 +46,14 @@ class AttentionMetadata:
     max_num_requests: int
     # The max number of tokens in all requests in a single batch.
     max_num_tokens: int
-<<<<<<< HEAD
-=======
     # The max number of sequences in a single batch.
     max_num_sequences: Optional[int] = None
->>>>>>> upstream/main
     # The KV cache manager.
     kv_cache_manager: KVCacheManager
     mapping: Optional[Mapping] = None
 
     enable_flash_mla: bool = False
-<<<<<<< HEAD
-    enable_paged_context_mla: bool = False
-=======
     enable_context_mla_with_cached_kv: bool = False
->>>>>>> upstream/main
     # Whether CUDA graph is enabled.
     is_cuda_graph: bool = field(default=False, repr=False)
 
@@ -136,10 +121,7 @@ class AttentionMetadata:
     runtime_features: AttentionRuntimeFeatures = field(
         default_factory=AttentionRuntimeFeatures)
 
-<<<<<<< HEAD
-=======
     # The number of tokens in each rank.
->>>>>>> upstream/main
     all_rank_num_tokens: Optional[List[int]] = None
 
     # These fields are set when changing seq_lens and _num_contexts to avoid computation
@@ -149,8 +131,6 @@ class AttentionMetadata:
     _num_ctx_tokens: int = field(init=False, default=0, repr=False)
     _num_tokens: int = field(init=False, default=0, repr=False)
 
-<<<<<<< HEAD
-=======
     # The number of tokens in the padded sequence.
     padded_num_tokens: Optional[int] = None
 
@@ -161,7 +141,6 @@ class AttentionMetadata:
     _saved_tensors: Dict[str, torch.Tensor] = field(init=False,
                                                     default_factory=dict)
 
->>>>>>> upstream/main
     def __post_init__(self) -> None:
         if self.is_cross:
             assert self.cross is None or self.cross is self, "Cross attention metadata should not have sub metadata"
@@ -296,12 +275,8 @@ class AttentionMetadata:
     def create_cuda_graph_metadata(self,
                                    max_batch_size: int,
                                    sub_cross_metadata: bool = False,
-<<<<<<< HEAD
-                                   max_draft_tokens: int = 0) -> Self:
-=======
                                    max_draft_tokens: int = 0,
                                    buffers=None) -> Self:
->>>>>>> upstream/main
         """
         Creates metadata for CUDA graph execution.
         CUDA graphs require to use pre-allocated buffers for all tensors in fields.
@@ -313,10 +288,7 @@ class AttentionMetadata:
 
         cuda_graph_metadata = copy.copy(self)
         cuda_graph_metadata.is_cuda_graph = True
-<<<<<<< HEAD
-=======
         cuda_graph_metadata.cuda_graph_buffers = buffers
->>>>>>> upstream/main
         if self.has_cross_sub_metadata:
             cuda_graph_metadata.cross = cuda_graph_metadata.cross.create_cuda_graph_metadata(
                 max_batch_size, True)
@@ -344,8 +316,6 @@ class AttentionMetadata:
         cuda_graph_metadata.__post_init__()
         return cuda_graph_metadata
 
-<<<<<<< HEAD
-=======
     def prepare_for_spec_dec(self, *fields) -> None:
         assert len(self._saved_tensors) == 0
         for f in fields:
@@ -365,7 +335,6 @@ class AttentionMetadata:
         Hook to be called when using TRTLLM attention backend in spec-dec mode.
         """
 
->>>>>>> upstream/main
 
 class PositionalEmbedder(Protocol):
     """
@@ -381,10 +350,7 @@ class PositionalEmbedder(Protocol):
 class RopeParams:
     dim: int = 0
     theta: float = 10000.0
-<<<<<<< HEAD
-=======
     alpha: float = 1.0
->>>>>>> upstream/main
     scale_type: RotaryScalingType = RotaryScalingType.none
     scale: float = 1.0
     low_freq_factor: float = 1.0
@@ -397,13 +363,10 @@ class RopeParams:
     beta_slow: int = 1
     mscale: float = 1.0
     mscale_all_dim: float = 0.0
-<<<<<<< HEAD
-=======
     short_factor: Optional[Tuple[float]] = None
     long_factor: Optional[Tuple[float]] = None
     max_seq_len: Optional[int] = None
     duplicate_data: bool = True
->>>>>>> upstream/main
 
     @staticmethod
     def from_config(config) -> "RopeParams":
@@ -412,14 +375,9 @@ class RopeParams:
         # get rotary parameters.
         hidden_size = config.hidden_size
         num_attention_heads = config.num_attention_heads
-<<<<<<< HEAD
-        head_dim = getattr(config, 'head_dim',
-                           hidden_size // num_attention_heads)
-=======
         head_dim = getattr(config, 'head_dim', None)
         if not isinstance(head_dim, int):
             head_dim = hidden_size // num_attention_heads
->>>>>>> upstream/main
         rope_scaling = getattr(config, 'rope_scaling', None)
         rope_params.max_positions = config.max_position_embeddings
         rope_params.theta = getattr(config, 'rope_theta', 10000.0)
@@ -435,10 +393,7 @@ class RopeParams:
         rope_params.scale_type = RotaryScalingType.none
         rope_params.scale = 1.0
         if rope_scaling is not None:
-<<<<<<< HEAD
-=======
             rope_params.alpha = rope_scaling.get("alpha", 1.0)
->>>>>>> upstream/main
             rotary_scaling_type = rope_scaling.get(
                 "type", None) or rope_scaling.get("rope_type")
             rope_params.scale_type = RotaryScalingType.from_string(
@@ -448,24 +403,14 @@ class RopeParams:
                 "low_freq_factor", 1.0)
             rope_params.high_freq_factor = rope_scaling.get(
                 "high_freq_factor", 4.0)
-<<<<<<< HEAD
-            rope_params.original_max_positions = rope_scaling.get(
-                "original_max_position_embeddings", 1024)
-=======
             rope_params.original_max_positions = getattr(
                 config,
                 "original_max_position_embeddings", None) or rope_scaling.get(
                     "original_max_position_embeddings", None) or 1024
->>>>>>> upstream/main
             rope_params.beta_fast = rope_scaling.get("beta_fast", 32)
             rope_params.beta_slow = rope_scaling.get("beta_slow", 1)
             rope_params.mscale = rope_scaling.get("mscale", 1.0)
             rope_params.mscale_all_dim = rope_scaling.get("mscale_all_dim", 0.0)
-<<<<<<< HEAD
-        # Workaround for DeepSeek V3 Lite since its rope_scaling is null in config.json.
-        elif config.model_type == "deepseek_v3":
-            rope_params.scale_type = RotaryScalingType.yarn
-=======
             if "short_factor" in rope_scaling:
                 rope_params.short_factor = tuple(rope_scaling["short_factor"])
             if "long_factor" in rope_scaling:
@@ -475,7 +420,6 @@ class RopeParams:
             rope_params.scale_type = RotaryScalingType.yarn
         # Other metdadata for RoPE.
         rope_params.max_seq_len = getattr(config, 'max_seq_len', None)
->>>>>>> upstream/main
 
         return rope_params
 
@@ -497,12 +441,7 @@ class RopeParams:
                 )
 
         if self.scale_type == RotaryScalingType.yarn:
-<<<<<<< HEAD
-            rope_inv_freq = None
-            _, rope_cos_sin = RopeEmbeddingUtils.create_sinusoidal_positions_yarn(
-=======
             rope_inv_freq, rope_cos_sin = RopeEmbeddingUtils.create_sinusoidal_positions_yarn(
->>>>>>> upstream/main
                 self.max_positions,
                 self.dim,
                 self.theta,
@@ -512,11 +451,6 @@ class RopeParams:
                 self.beta_slow,
                 self.mscale,
                 self.mscale_all_dim,
-<<<<<<< HEAD
-            )
-        elif self.scale_type == RotaryScalingType.longrope:
-            raise NotImplementedError("Long RoPE is not supported.")
-=======
                 self.duplicate_data,
             )
         elif self.scale_type == RotaryScalingType.longrope:
@@ -529,7 +463,6 @@ class RopeParams:
                 long_factor=self.long_factor,
                 max_seq_len=self.max_seq_len,
             )
->>>>>>> upstream/main
         else:
             rope_inv_freq, rope_cos_sin = RopeEmbeddingUtils.create_sinusoidal_positions_for_attention_plugin(
                 self.max_positions,
@@ -539,21 +472,14 @@ class RopeParams:
                 self.scale_type,
                 rope_scaling_config={
                     "factor": self.scale,
-<<<<<<< HEAD
-=======
                     "alpha": self.alpha,
->>>>>>> upstream/main
                     "low_freq_factor": self.low_freq_factor,
                     "high_freq_factor": self.high_freq_factor,
                     "original_max_position_embeddings":
                     self.original_max_positions,
                 })
         if rope_inv_freq is not None:
-<<<<<<< HEAD
-            rope_inv_freq = torch.torch.tensor(
-=======
             rope_inv_freq = torch.tensor(
->>>>>>> upstream/main
                 rope_inv_freq,
                 dtype=torch.float32,
                 device='cuda',
@@ -562,11 +488,7 @@ class RopeParams:
             rope_cos_sin = rope_cos_sin.reshape(
                 self.max_positions, -1,
                 2)[:, :self.dim // 2, :].transpose(0, 2, 1).reshape(1, -1)
-<<<<<<< HEAD
-        rope_cos_sin = torch.torch.tensor(
-=======
         rope_cos_sin = torch.tensor(
->>>>>>> upstream/main
             rope_cos_sin,
             dtype=torch.float32,
             device='cuda',
@@ -589,12 +511,9 @@ class PositionalEmbeddingParams:
     rope: Optional[RopeParams] = None
     is_neox: bool = True
 
-<<<<<<< HEAD
-=======
     # mRoPE params (currently, Qwen2/2.5-VL uses it)
     mrope_section: Optional[List[int]] = None
 
->>>>>>> upstream/main
     def __post_init__(self) -> None:
         if self.type.is_deferred():
             assert self.embedder is not None, f"{self.type} requires a not-none external embedder"
@@ -620,10 +539,6 @@ class PredefinedAttentionMask(str, Enum):
     FULL = "full"
 
 
-<<<<<<< HEAD
-# May extend to custom attention mask type
-AttentionMask = Union[PredefinedAttentionMask]
-=======
 class CustomAttentionMask(str, Enum):
     """
     Custom attention mask types
@@ -632,7 +547,6 @@ class CustomAttentionMask(str, Enum):
 
 
 AttentionMask = Union[PredefinedAttentionMask, CustomAttentionMask]
->>>>>>> upstream/main
 
 
 class AttentionBackend(Generic[TMetadata]):
@@ -711,13 +625,10 @@ class AttentionBackend(Generic[TMetadata]):
     def support_mla(cls) -> bool:
         return False
 
-<<<<<<< HEAD
-=======
     @classmethod
     def support_nvfp4_output(cls) -> bool:
         return False
 
->>>>>>> upstream/main
 
 @dataclass(kw_only=True, unsafe_hash=True)
 class MLAParams:
@@ -727,7 +638,4 @@ class MLAParams:
     qk_nope_head_dim: int = 0
     v_head_dim: int = 0
     predicted_tokens_per_seq: int = 1
-<<<<<<< HEAD
-=======
     chunked_prefill_buffer_batch_size: int = 1
->>>>>>> upstream/main

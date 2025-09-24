@@ -1,19 +1,10 @@
-<<<<<<< HEAD
-from typing import List
-=======
 from typing import List, Tuple
->>>>>>> upstream/main
 
 import torch
 from torch import nn
 
-<<<<<<< HEAD
-from ..attention_backend import IS_FLASHINFER_AVAILABLE
-from ..attention_backend.interface import RopeParams
-=======
 from ..attention_backend.interface import RopeParams
 from ..flashinfer_utils import IS_FLASHINFER_AVAILABLE
->>>>>>> upstream/main
 
 
 class RotaryEmbedding(nn.Module):
@@ -134,8 +125,6 @@ class RotaryEmbedding(nn.Module):
         else:
             embed = torch.stack((o1, o2), dim=-1).flatten(-2)
             return torch.cat((embed, q_or_k_pass), dim=-1)
-<<<<<<< HEAD
-=======
 
 
 class MRotaryEmbedding(RotaryEmbedding):
@@ -209,4 +198,3 @@ class MRotaryEmbedding(RotaryEmbedding):
             return target
 
         return [rope_target(target) for target in targets]
->>>>>>> upstream/main

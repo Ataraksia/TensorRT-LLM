@@ -1,46 +1,28 @@
 # Adapted from
 # https://github.com/vllm-project/vllm/blob/aae6927be06dedbda39c6b0c30f6aa3242b84388/tests/entrypoints/openai/test_chat.py
-<<<<<<< HEAD
-import os
-import tempfile
-
-=======
 import json
 import os
 import re
 import tempfile
 
 import jsonschema
->>>>>>> upstream/main
 import openai
 import pytest
 import yaml
 
-<<<<<<< HEAD
-from ..test_llm import get_model_path, similar
-=======
 from ..test_llm import get_model_path
->>>>>>> upstream/main
 from .openai_server import RemoteOpenAIServer
 
 pytestmark = pytest.mark.threadleak(enabled=False)
 
 
-<<<<<<< HEAD
-@pytest.fixture(scope="module", ids=["TinyLlama-1.1B-Chat"])
-=======
 @pytest.fixture(scope="module")
->>>>>>> upstream/main
 def model_name():
     return "llama-3.1-model/Llama-3.1-8B-Instruct"
 
 
 @pytest.fixture(scope="module")
-<<<<<<< HEAD
-def temp_extra_llm_api_options_file(request):
-=======
 def temp_extra_llm_api_options_file():
->>>>>>> upstream/main
     temp_dir = tempfile.gettempdir()
     temp_file_path = os.path.join(temp_dir, "extra_llm_api_options.yaml")
     try:
@@ -58,16 +40,12 @@ def temp_extra_llm_api_options_file():
 @pytest.fixture(scope="module")
 def server(model_name: str, temp_extra_llm_api_options_file: str):
     model_path = get_model_path(model_name)
-<<<<<<< HEAD
-    args = ["--extra_llm_api_options", temp_extra_llm_api_options_file]
-=======
 
     # Use small max_batch_size/max_seq_len/max_num_tokens to avoid OOM on A10/A30 GPUs.
     args = [
         "--max_batch_size=8", "--max_seq_len=1024", "--max_num_tokens=1024",
         f"--extra_llm_api_options={temp_extra_llm_api_options_file}"
     ]
->>>>>>> upstream/main
     with RemoteOpenAIServer(model_path, args) as remote_server:
         yield remote_server
 
@@ -142,16 +120,7 @@ def tool_get_current_date():
 
 def test_chat_structural_tag(client: openai.OpenAI, model_name: str,
                              tool_get_current_weather, tool_get_current_date):
-<<<<<<< HEAD
-    messages = [
-        {
-            "role":
-            "system",
-            "content":
-            f"""
-=======
     system_prompt = f"""
->>>>>>> upstream/main
 # Tool Instructions
 - Always execute python code in messages that you share.
 - When looking for real time information use relevant functions if available else fallback to brave_search
@@ -174,15 +143,6 @@ Reminder:
 - Only call one function at a time
 - Put the entire function call reply on one line
 - Always add your sources when using search results to answer the user query
-<<<<<<< HEAD
-You are a helpful assistant.""",
-        },
-        {
-            "role":
-            "user",
-            "content":
-            "You are in New York. Please get the current date and time, and the weather.",
-=======
 You are a helpful assistant."""
     user_prompt = "You are in New York. Please get the current date and time, and the weather."
 
@@ -194,37 +154,12 @@ You are a helpful assistant."""
         {
             "role": "user",
             "content": user_prompt,
->>>>>>> upstream/main
         },
     ]
 
     chat_completion = client.chat.completions.create(
         model=model_name,
         messages=messages,
-<<<<<<< HEAD
-        max_completion_tokens=100,
-        response_format={
-            "type":
-            "structural_tag",
-            "structures": [
-                {
-                    "begin": "<function=get_current_weather>",
-                    "schema":
-                    tool_get_current_weather["function"]["parameters"],
-                    "end": "</function>",
-                },
-                {
-                    "begin": "<function=get_current_date>",
-                    "schema": tool_get_current_date["function"]["parameters"],
-                    "end": "</function>",
-                },
-            ],
-            "triggers": ["<function="],
-        },
-    )
-    assert chat_completion.id is not None
-    assert len(chat_completion.choices) == 1
-=======
         max_completion_tokens=256,
         response_format={
             "type": "structural_tag",
@@ -258,15 +193,10 @@ You are a helpful assistant."""
         },
     )
 
->>>>>>> upstream/main
     message = chat_completion.choices[0].message
     assert message.content is not None
     assert message.role == "assistant"
 
-<<<<<<< HEAD
-    reference = '<function=get_current_date>{"timezone": "America/New_York"}</function>\n<function=get_current_weather>{"city": "New York", "state": "NY", "unit": "fahrenheit"}</function>\n\nSources:\n- get_current_date function\n- get_current_weather function'
-    assert similar(chat_completion.choices[0].message.content, reference)
-=======
     match = re.search(r'<function=get_current_weather>([\S\s]+?)</function>',
                       message.content)
     params = json.loads(match.group(1))
@@ -277,4 +207,3 @@ You are a helpful assistant."""
                       message.content)
     params = json.loads(match.group(1))
     jsonschema.validate(params, tool_get_current_date["function"]["parameters"])
->>>>>>> upstream/main

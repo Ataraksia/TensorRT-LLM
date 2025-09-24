@@ -1,25 +1,17 @@
 import asyncio
 import heapq
 from abc import ABC, abstractmethod
-<<<<<<< HEAD
-from typing import Iterable, Optional, Union
-=======
 from typing import Dict, Iterable, List, Optional, Union
->>>>>>> upstream/main
 
 import aiohttp
 from transformers import AutoTokenizer
 
 from tensorrt_llm.bindings.internal.batch_manager import (BlockKey,
                                                           BlockKeyHasher)
-<<<<<<< HEAD
-from tensorrt_llm.llmapi.disagg_utils import RouterConfig
-=======
 from tensorrt_llm.llmapi.disagg_utils import (MetadataServerConfig,
                                               RouterConfig, ServerRole)
 from tensorrt_llm.logger import logger
 from tensorrt_llm.serve.metadata_server import JsonDictionary
->>>>>>> upstream/main
 from tensorrt_llm.serve.openai_protocol import (ChatCompletionRequest,
                                                 CompletionRequest)
 
@@ -27,11 +19,7 @@ OpenAIRequest = Union[CompletionRequest, ChatCompletionRequest]
 
 
 def get_request_num_tokens(request: OpenAIRequest) -> int:
-<<<<<<< HEAD
-    if request.disaggregated_params.request_type == "context_only":
-=======
     if request.disaggregated_params is None or request.disaggregated_params.request_type == "context_only":
->>>>>>> upstream/main
         if isinstance(request, ChatCompletionRequest):
             raise ValueError(
                 "LoadBalancing router with tokens doesn't support ChatCompletionRequest yet"
@@ -77,14 +65,6 @@ class ServerState:
             self._num_active_requests -= 1
             self._num_active_tokens -= num_tokens
 
-<<<<<<< HEAD
-
-class KvCacheAwareServerState(ServerState):
-
-    def __init__(self, server: str, use_tokens: bool = False):
-        super().__init__(server, use_tokens)
-        self._kv_cache_block_table: set[int] = set()
-=======
     async def is_healthy(self) -> bool:
         try:
             async with self._session.get(self._server + "/health") as response:
@@ -102,7 +82,6 @@ class KvCacheAwareServerState(ServerState):
         super().__init__(server, use_tokens)
         self._kv_cache_block_table: set[int] = set()
         self._tokens_per_block = tokens_per_block
->>>>>>> upstream/main
 
     def add_blocks(self, block_hashes: Iterable[int]):
         for hash in block_hashes:
@@ -131,23 +110,14 @@ class KvCacheAwareServerState(ServerState):
             events_raw = await response.json()
         return events_raw
 
-<<<<<<< HEAD
-    async def match_blocks(self, block_hashes: list[list[int]]) -> int:
-=======
     async def matched_tokens(self, block_hashes: list[list[int]]) -> int:
->>>>>>> upstream/main
         match_count = 0
         async with self._lock:
             for hash_list in block_hashes:
                 for hash in hash_list:
-<<<<<<< HEAD
-                    if hash in self._kv_cache_block_table:
-                        match_count += 1
-=======
                     # TODO: 1) parent hash verification, 2) partial matching
                     if hash in self._kv_cache_block_table:
                         match_count += self._tokens_per_block
->>>>>>> upstream/main
                     else:
                         break
         return match_count
@@ -175,10 +145,6 @@ class KvCacheAwareServerState(ServerState):
 
 class Router(ABC):
 
-<<<<<<< HEAD
-    def __init__(self, servers: list[str] = None):
-        self._servers = servers
-=======
     def __init__(self, server_role: ServerRole, servers: List[str],
                  metadata_server_cfg: Optional[MetadataServerConfig],
                  metadata_server: Optional[JsonDictionary]):
@@ -197,7 +163,6 @@ class Router(ABC):
             old_servers: The previous server list
             new_servers: The new server list
         """
->>>>>>> upstream/main
 
     @abstractmethod
     async def get_next_server(self, request: OpenAIRequest) -> tuple[str, dict]:
@@ -207,18 +172,6 @@ class Router(ABC):
     async def finish_request(self, request: OpenAIRequest):
         pass
 
-<<<<<<< HEAD
-
-class RoundRobinRouter(Router):
-
-    def __init__(self, servers: list[str] = None, **kwargs):
-        super().__init__(servers)
-        self._server_idx = 0
-
-    async def get_next_server(self, request: OpenAIRequest) -> tuple[str, dict]:
-        server = self._servers[self._server_idx]
-        self._server_idx = (self._server_idx + 1) % len(self._servers)
-=======
     async def start_server_monitoring(self, poll_interval: float = 10.0):
         """Start monitoring servers update from metadata service"""
         if not self._metadata_server:
@@ -465,7 +418,6 @@ class RoundRobinRouter(Router):
 
             server = self._servers[self._server_idx]
             self._server_idx = (self._server_idx + 1) % len(self._servers)
->>>>>>> upstream/main
         return server, {}
 
     async def finish_request(self, request: OpenAIRequest):
@@ -475,13 +427,6 @@ class RoundRobinRouter(Router):
 class LoadBalancingRouter(Router):
 
     def __init__(self,
-<<<<<<< HEAD
-                 servers: list[str] = None,
-                 use_tokens: bool = False,
-                 **kwargs):
-        super().__init__(servers)
-        self._lock = asyncio.Lock()
-=======
                  server_role: ServerRole,
                  servers: List[str] = None,
                  metadata_server_cfg: MetadataServerConfig = None,
@@ -490,7 +435,6 @@ class LoadBalancingRouter(Router):
                  **kwargs):
         super().__init__(server_role, servers, metadata_server_cfg,
                          metadata_server)
->>>>>>> upstream/main
         # Load map between servers and their number of tokens processed
         self._server_state = {}
         self._server_load_heap = []
@@ -501,8 +445,6 @@ class LoadBalancingRouter(Router):
         self._use_tokens = use_tokens
         self._init_heap()
 
-<<<<<<< HEAD
-=======
     def _on_servers_updated(self, old_servers, new_servers):
         """Rebuild the heap when the server list changes."""
         # Keep the state for servers that still exist
@@ -522,7 +464,6 @@ class LoadBalancingRouter(Router):
             heapq.heappush(self._server_load_heap,
                            (self._get_server_load(server), server))
 
->>>>>>> upstream/main
     def _init_heap(self):
         for server in self._servers:
             self._server_state[server] = ServerState(server, self._use_tokens)
@@ -530,8 +471,6 @@ class LoadBalancingRouter(Router):
                            (self._get_server_load(server), server))
 
     async def get_next_server(self, request: OpenAIRequest) -> tuple[str, dict]:
-<<<<<<< HEAD
-=======
         if not self._servers:
             if self._metadata_server:
                 raise ValueError(
@@ -540,7 +479,6 @@ class LoadBalancingRouter(Router):
             else:
                 raise ValueError(f"No {self._server_role} servers available")
 
->>>>>>> upstream/main
         async with self._lock:
             server = heapq.heappop(self._server_load_heap)[1]
             await self._server_state[server].increment_load(request)
@@ -574,34 +512,22 @@ def block_key_hasher(token_ids: list[int],
 class KvCacheAwareRouter(Router):
 
     def __init__(self,
-<<<<<<< HEAD
-                 servers: list[str] = None,
-=======
                  server_role: ServerRole = None,
                  servers: list[str] = None,
                  metadata_server_cfg: MetadataServerConfig = None,
                  metadata_server: JsonDictionary = None,
->>>>>>> upstream/main
                  use_tokens: bool = False,
                  max_batch_size: int = 64,
                  tokens_per_block: int = 32,
                  **kwargs):
-<<<<<<< HEAD
-        super().__init__(servers)
-=======
         super().__init__(server_role, servers, metadata_server_cfg,
                          metadata_server)
->>>>>>> upstream/main
         self._lock = asyncio.Lock()
 
         # Load map between servers and their number of tokens processed
         self._server_state: dict[str, KvCacheAwareServerState] = {
             server: KvCacheAwareServerState(server, use_tokens)
-<<<<<<< HEAD
-            for server in servers
-=======
             for server in servers or []
->>>>>>> upstream/main
         }
 
         # Routing table to map requests to servers
@@ -643,13 +569,9 @@ class KvCacheAwareRouter(Router):
                     block_key_hasher(token_list[t:t_end],
                                      None if t == 0 else hash_list[-1]))
             block_hashes.append(hash_list)
-<<<<<<< HEAD
-        total_blocks = sum(len(hash_list) for hash_list in block_hashes)
-=======
         padded_tokens = sum(
             len(hash_list)
             for hash_list in block_hashes) * self._tokens_per_block
->>>>>>> upstream/main
         # select the server by (KV match - load)
         # TODO: more options
         workloads = [
@@ -661,34 +583,19 @@ class KvCacheAwareRouter(Router):
         for i in range(len(servers)):
             server = servers[i]
             # https://github.com/ai-dynamo/dynamo/blob/main/docs/kv_cache_routing.md#kv-cache-routing-and-load-balancing
-<<<<<<< HEAD
-            match_count = await self._server_state[server].match_blocks(
-                block_hashes)
-            score = match_count / total_blocks - workloads[
-                i] / self._max_batch_size
-            scores.append(score)
-            matches.append(match_count)
-=======
             matches.append(
                 await self._server_state[server].matched_tokens(block_hashes))
             score = matches[-1] / padded_tokens - workloads[
                 i] / self._max_batch_size
             scores.append(score)
->>>>>>> upstream/main
         server = servers[scores.index(max(scores))]
         await self._server_state[server].increment_load(request)
         async with self._lock:
             self._req_routing_table[id(request)] = server
         return server, {
-<<<<<<< HEAD
-            "block_hashes": block_hashes,
-            "token_lists": token_lists,
-            "matches": matches,
-=======
             "block_hashes": block_hashes,  # list[list[int]]
             "token_lists": token_lists,  # list[list[int]]
             "matches": matches,  # list[int]
->>>>>>> upstream/main
         }
 
     async def finish_request(self,
@@ -700,11 +607,6 @@ class KvCacheAwareRouter(Router):
         await self._server_state[server].decrement_load(request,
                                                         session=session)
 
-<<<<<<< HEAD
-
-def create_router(router_config: Optional[RouterConfig],
-                  servers: list[str]) -> Router:
-=======
     def _on_servers_updated(self, old_servers, new_servers):
         raise NotImplementedError(
             "KvCacheAwareRouter does not support server updates")
@@ -714,7 +616,6 @@ def create_router(router_config: Optional[RouterConfig],
                   servers: Optional[List[str]],
                   metadata_server_cfg: Optional[MetadataServerConfig] = None,
                   metadata_server: Optional[JsonDictionary] = None) -> Router:
->>>>>>> upstream/main
     """
     Factory function to create different types of router instances.
 
@@ -732,12 +633,8 @@ def create_router(router_config: Optional[RouterConfig],
         ValueError: If an unsupported router type is provided
     """
     if router_config is None:
-<<<<<<< HEAD
-        return RoundRobinRouter(servers)
-=======
         # Create a default router without server_role
         return RoundRobinRouter(None, servers)
->>>>>>> upstream/main
 
     router_map = {
         "round_robin": RoundRobinRouter,
@@ -751,10 +648,6 @@ def create_router(router_config: Optional[RouterConfig],
         raise ValueError(f"Unsupported router type: {router_type}. "
                          f"Supported types are: {list(router_map.keys())}")
 
-<<<<<<< HEAD
-    return router_class(servers, **router_config.args)
-=======
     # Pass server_role as the first argument
     return router_class(router_config.server_role, servers, metadata_server_cfg,
                         metadata_server, **router_config.args)
->>>>>>> upstream/main

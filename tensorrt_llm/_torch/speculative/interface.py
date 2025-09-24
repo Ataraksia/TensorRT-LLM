@@ -1,33 +1,17 @@
 import copy
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
-<<<<<<< HEAD
-from typing import Dict, List, Optional
-=======
 from typing import List, Optional, Type
->>>>>>> upstream/main
 
 import torch
 
 from ..._utils import get_sm_version
 from ..attention_backend.trtllm import AttentionBackend, TrtllmAttention
-<<<<<<< HEAD
-from ..model_config import TConfig
-from ..pyexecutor.scheduler import ScheduledRequests
-=======
->>>>>>> upstream/main
 
 
 class SpeculativeDecodingMode(IntEnum):
     MTP = auto()
     MTP_EAGLE = auto()
-<<<<<<< HEAD
-    EAGLE3 = auto()
-    NONE = auto()
-
-    def is_mtp(self):
-        return self == SpeculativeDecodingMode.MTP or self == SpeculativeDecodingMode.MTP_EAGLE
-=======
     MTP_EAGLE_ONE_MODEL = auto()
     EAGLE3 = auto()
     EAGLE3_ONE_MODEL = auto()
@@ -45,7 +29,6 @@ class SpeculativeDecodingMode(IntEnum):
 
     def is_mtp_vanilla(self):
         return self == SpeculativeDecodingMode.MTP
->>>>>>> upstream/main
 
     def is_mtp_eagle(self):
         return self == SpeculativeDecodingMode.MTP_EAGLE
@@ -53,18 +36,6 @@ class SpeculativeDecodingMode(IntEnum):
     def is_eagle3(self):
         return self == SpeculativeDecodingMode.EAGLE3
 
-<<<<<<< HEAD
-    def is_none(self):
-        return self == SpeculativeDecodingMode.NONE
-
-    def needs_kv_cache_rewind(self):
-        return self.is_mtp()
-
-    def support_overlap_scheduler(self):
-        return self.is_mtp()
-
-    def extend_ctx(self, attention_backend: AttentionBackend):
-=======
     def use_one_engine(self):
         return self.is_eagle3_one_model() or self.is_mtp_one_model()
 
@@ -127,18 +98,12 @@ class SpeculativeDecodingMode(IntEnum):
         ) or self.is_user_provided() or self.is_mtp_eagle()
 
     def extend_ctx(self, attention_backend: Type[AttentionBackend]):
->>>>>>> upstream/main
         """
         If true, treat generation requests with draft tokens as
         chunked context requests at the kernel level. Required for
         any spec dec mode that uses the SpecExecutor.
         """
 
-<<<<<<< HEAD
-        # Fixme: only trtllm attention backend supports eagle3 generation-phase kernels on blackwell.
-        return self.is_eagle3() and not (isinstance(
-            attention_backend, TrtllmAttention) and get_sm_version() == 100)
-=======
         if self.use_one_engine():
             # 1-model has separate logic for handling draft tokens
             return False
@@ -152,7 +117,6 @@ class SpeculativeDecodingMode(IntEnum):
         If true, the attention backend kernel needs to run in spec-dec mode (multi-token query mode).
         """
         return self.is_eagle3_one_model()
->>>>>>> upstream/main
 
     @staticmethod
     def from_string(name: Optional[str]) -> "SpeculativeDecodingMode":
@@ -162,37 +126,6 @@ class SpeculativeDecodingMode(IntEnum):
 
 
 @dataclass
-<<<<<<< HEAD
-class SpecConfig:
-    """
-    Configuration for speculative decoding.
-    """
-    # The name of speculative decoding.
-    spec_dec_name = None
-    # The mode of speculative decoding.
-    spec_dec_mode: SpeculativeDecodingMode = SpeculativeDecodingMode.NONE
-    # The max number of draft tokens
-    max_draft_tokens: int = 1024
-
-    def __post_init__(self) -> None:
-        self.spec_dec_mode = SpeculativeDecodingMode.from_string(
-            self.spec_dec_name)
-
-    def update_from_model_config(self, model_config: TConfig):
-        pass
-
-    def get_draft_model_prompt(self,
-                               input_tokens: torch.Tensor) -> torch.Tensor:
-        """
-        Override for spec dec modes that need to preprocess prompt
-        tokens before passing them to the draft model.
-        """
-        return input_tokens
-
-
-@dataclass
-=======
->>>>>>> upstream/main
 class SpecMetadata:
     """
     Metadata for speculative decoding.
@@ -200,29 +133,17 @@ class SpecMetadata:
     # The max number of requests in a single batch.
     max_num_requests: int
     # The max number of draft tokens.
-<<<<<<< HEAD
-    max_draft_tokens: int
-=======
     max_draft_len: int
->>>>>>> upstream/main
     # The number of gen-phase sequences in the batch.
     num_generations: int = 0
     # Whether CUDA graph is enabled.
     is_cuda_graph: bool = field(default=False, repr=False)
     # The mode of speculative decoding.
-<<<<<<< HEAD
-    spec_dec_mode: SpeculativeDecodingMode = SpeculativeDecodingMode.NONE,
-    # Draft tokens.
-    draft_tokens: Optional[torch.Tensor] = None,
-    # The length of the draft tokens.
-    draft_lens: Optional[torch.Tensor] = None,
-=======
     spec_dec_mode: SpeculativeDecodingMode = SpeculativeDecodingMode.NONE
     # Draft tokens.
     draft_tokens: Optional[torch.Tensor] = None
     # The length of the draft tokens.
     draft_lens: Optional[torch.Tensor] = None
->>>>>>> upstream/main
     # The request ID of each sequence in the batch.
     # The shape is (batch_size).
     request_ids: Optional[List[int]] = None
@@ -234,22 +155,13 @@ class SpecMetadata:
     num_tokens: int = 0
     # The number of tokens for speculative model/layer of different rank
     all_rank_num_tokens: Optional[List[int]] = None
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/main
     # The number of sequences for speculative model/layer of different rank
     all_rank_num_seqs: Optional[List[int]] = None
     # The number of extra kv tokens
     # Some speculative decoding methods need to use different kv lengths for the
     # draft/target layers. But KVCacheManager can only support kv caches with the
     # same kv lengths for different layers. Add extra kv token in kv cache manager
-<<<<<<< HEAD
-    # to haddle this issue.
-    num_extra_kv_tokens: Optional[int] = 0  # Number of layers in target model
-    num_layers: int = 0
-
-=======
     # to handle this issue.
     num_extra_kv_tokens: Optional[int] = 0  # Number of layers in target model
     # The number of layers
@@ -263,7 +175,6 @@ class SpecMetadata:
     def __post_init__(self):
         pass
 
->>>>>>> upstream/main
     def prepare(self):
         """
         Hook to be called before the forward step of the model.
@@ -282,8 +193,6 @@ class SpecMetadata:
         cuda_graph_metadata.__post_init__()
         return cuda_graph_metadata
 
-<<<<<<< HEAD
-=======
     def is_layer_capture(self, layer_id: int):
         """
         Whether the layer should be captured (eg for Eagle3).
@@ -291,7 +200,6 @@ class SpecMetadata:
         """
         return False
 
->>>>>>> upstream/main
     def maybe_capture_hidden_states(self, layer_id: int,
                                     hidden_states: torch.Tensor,
                                     residual: torch.Tensor) -> None:
@@ -299,24 +207,3 @@ class SpecMetadata:
         Some spec decode algorithms require hidden states from the target
         model. Use this method to record them. By default, does nothing.
         """
-<<<<<<< HEAD
-
-    def get_hidden_states(
-            self,
-            scheduled_requests: ScheduledRequests,
-            num_rejected_tokens: Optional[Dict] = None) -> List[torch.Tensor]:
-        """
-        Return any captured hidden states. Should do any necessary
-        pre-processing.
-
-        num_rejected_tokens is a dictionary mapping request IDs to the
-        number of tokens rejected for that request. If a request ID isn't
-        in the dictionary, it means that the request is not needed for drafting.
-
-        If the dictionary is not given, this function assumes that the hidden
-        states are being prepared for running the draft model autoregressively,
-        and only the last hidden state vector for each sequence is returned.
-        """
-        return []
-=======
->>>>>>> upstream/main

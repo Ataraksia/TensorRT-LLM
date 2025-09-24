@@ -11,10 +11,6 @@ from tensorrt_llm.models.modeling_utils import QuantConfig
 from ...llmapi.llm_args import BaseLlmArgs, BuildConfig, _ParallelConfig
 from ...llmapi.utils import get_type_repr
 from .models import ModelFactory, ModelFactoryRegistry
-<<<<<<< HEAD
-from .transform.interface import TransformConfig
-=======
->>>>>>> upstream/main
 from .utils._config import DynamicYamlMixInForSettings
 
 PathLike = Union[str, Path]
@@ -24,10 +20,6 @@ def _get_config_dict() -> SettingsConfigDict:
     return SettingsConfigDict(
         arbitrary_types_allowed=True,
         extra="forbid",
-<<<<<<< HEAD
-        yaml_file=str(files("tensorrt_llm._torch.auto_deploy.config") / "default.yaml"),
-=======
->>>>>>> upstream/main
         nested_model_default_partial_update=True,
     )
 
@@ -63,11 +55,7 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
         description="The path to the model checkpoint or the model name from the Hugging Face Hub."
     )
 
-<<<<<<< HEAD
-    model_factory: Literal["AutoModelForCausalLM", "AutoModelForImageTextToText"] = Field(
-=======
     model_factory: str = Field(
->>>>>>> upstream/main
         default="AutoModelForCausalLM",
         description="The model factory to use for loading the model.",
     )
@@ -117,15 +105,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
         description="Disable the overlap scheduler in trtllm runtime",
     )
 
-<<<<<<< HEAD
-    enable_mixed_sampler: bool = Field(
-        default=False,
-        description="If true, will iterate over sampling_params of each request and use the corresponding "
-        "sampling strategy, e.g. top-k, top-p, etc.",
-    )
-
-=======
->>>>>>> upstream/main
     world_size: int = Field(
         default=1,
         ge=0,
@@ -172,8 +151,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
         "If False, auto-detect and use column+row (all_reduce) sharding when possible.",
     )
 
-<<<<<<< HEAD
-=======
     use_sharding_from_factory: bool = Field(
         default=False,
         description="If True, use sharding from the model factory. If False, use sharding from the "
@@ -185,7 +162,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
         description="The sharding methods to apply by the heuristic sharding stage.",
     )
 
->>>>>>> upstream/main
     compile_backend: Literal["torch-simple", "torch-compile", "torch-cudagraph", "torch-opt"] = (
         Field(
             default="torch-compile",
@@ -200,9 +176,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
     visualize: bool = Field(default=False, description="Whether to visualize the model graph.")
 
     ### NEW INFERENCE OPTIMIZER CONFIG #############################################################
-<<<<<<< HEAD
-    transforms: Dict[str, TransformConfig] = Field(
-=======
     mode: Literal["graph", "transformers"] = Field(
         default="graph",
         description="The mode to use for the inference optimizer. Currently, we "
@@ -211,7 +184,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
     )
 
     transforms: Dict[str, Any] = Field(
->>>>>>> upstream/main
         default_factory=dict,
         description="A dictionary of transform configurations. The key is the transform name and "
         "the value is the transform configuration.",
@@ -232,18 +204,13 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
 
     ### VALIDATION #################################################################################
     @model_validator(mode="after")
-<<<<<<< HEAD
-=======
     # TODO: discuss what to do with this once we fully transition to the new inference optimizer
->>>>>>> upstream/main
     def update_attn_page_size(self):
         # NOTE force attn_page_size to equal max_seq_len for triton backend
         if self.attn_backend == "triton" or self.attn_backend == "torch":
             self.attn_page_size = self.max_seq_len
         return self
 
-<<<<<<< HEAD
-=======
     @field_validator("model_factory", mode="after")
     @classmethod
     def model_factory_exists(cls, value: str) -> str:
@@ -255,7 +222,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
 
         return value
 
->>>>>>> upstream/main
     ### UTILITY METHODS ############################################################################
     def create_factory(self) -> ModelFactory:
         """Create a model factory from the arguments."""
@@ -274,11 +240,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
         """Convert the arguments to a dictionary."""
         return self.model_dump()
 
-<<<<<<< HEAD
-    def to_llm_args(self) -> "LlmArgs":
-        """Convert the arguments to a LlmArgs instance that is used for the LLM API."""
-        return LlmArgs(**self.to_dict())
-=======
     def to_llm_kwargs(self) -> Dict[str, Any]:
         """Convert the arguments to a dictionary that can be used as kwargs for the LLM API."""
         kwargs = self.to_dict()
@@ -300,7 +261,6 @@ class AutoDeployConfig(DynamicYamlMixInForSettings, BaseSettings):
             "transformers": str(config_path / "transformers.yaml"),
         }
         return mapping.get(mode)
->>>>>>> upstream/main
 
 
 class LlmArgs(AutoDeployConfig, BaseLlmArgs, BaseSettings):
@@ -354,8 +314,6 @@ class LlmArgs(AutoDeployConfig, BaseLlmArgs, BaseSettings):
         self._quant_config = value
 
     ### VALIDATION #################################################################################
-<<<<<<< HEAD
-=======
     @field_validator("max_seq_len", mode="before")
     @classmethod
     def ensure_max_seq_len(cls, value: Any, info: ValidationInfo) -> Any:
@@ -366,7 +324,6 @@ class LlmArgs(AutoDeployConfig, BaseLlmArgs, BaseSettings):
             )
         return value
 
->>>>>>> upstream/main
     @field_validator("build_config", mode="before")
     @classmethod
     def ensure_no_build_config(cls, value: Any, info: ValidationInfo) -> Any:
@@ -413,15 +370,6 @@ class LlmArgs(AutoDeployConfig, BaseLlmArgs, BaseSettings):
     def get_pytorch_backend_config(self) -> "LlmArgs":
         """Return the LlmArgs (self) object."""
         # TODO: can we just pass through self directly??
-<<<<<<< HEAD
-        return type(self)(**self.to_dict())
-
-    def to_dict(self) -> Dict:
-        """Convert model to a dictionary such that cls(**self.to_dict()) == self."""
-        self_dict = dict(self)
-        self_dict.pop("build_config")
-        self_dict.pop("mpi_session")
-=======
         return type(self)(**self.to_llm_kwargs())
 
     def to_dict(self) -> Dict:
@@ -429,5 +377,4 @@ class LlmArgs(AutoDeployConfig, BaseLlmArgs, BaseSettings):
         self_dict = super().to_dict()
         self_dict.pop("build_config", None)
         self_dict.pop("mpi_session", None)
->>>>>>> upstream/main
         return self_dict

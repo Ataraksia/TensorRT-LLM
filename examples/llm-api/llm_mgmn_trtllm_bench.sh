@@ -76,10 +76,7 @@ srun -l \
 
         # This is optional
         cat > /tmp/pytorch_extra_args.txt << EOF
-<<<<<<< HEAD
-=======
 cuda_graph_config: null
->>>>>>> upstream/main
 print_iter_log: true
 enable_attention_dp: false
 EOF

@@ -1,7 +1,4 @@
 from dataclasses import dataclass
-<<<<<<< HEAD
-from typing import List, Optional
-=======
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -10,26 +7,12 @@ import numpy as np
 # needed before trying to import bindings to load tensorrt_libs
 import tensorrt as trt  # noqa
 # isort: on
->>>>>>> upstream/main
 
 from tensorrt_llm.bindings import executor as tllme
 
 
 @dataclass(slots=True, kw_only=True)
 class DisaggregatedParams:
-<<<<<<< HEAD
-    """
-    Disaggregated seving parameters
-
-    Args:
-        request_type (str): The type of request ("context_only" or "generation_only")
-        first_gen_tokens (List[int]): The first tokens of the generation request
-        ctx_request_id (int): The context request id
-        opaque_state(bytes): Any additional state needing to be exchanged between context and gen instances
-    """
-
-    request_type: Optional[str] = None
-=======
     """Disaggregated serving parameters.
 
     Args:
@@ -45,19 +28,11 @@ class DisaggregatedParams:
 
     request_type: Optional[str] = None
     # P-D Disaggregated Params
->>>>>>> upstream/main
     first_gen_tokens: Optional[List[int]] = None
     ctx_request_id: Optional[int] = None
     opaque_state: Optional[bytes] = None
     draft_tokens: Optional[List[int]] = None
 
-<<<<<<< HEAD
-    def get_context_phase_params(self) -> tllme.ContextPhaseParams:
-
-        return tllme.ContextPhaseParams(self.first_gen_tokens,
-                                        self.ctx_request_id, self.opaque_state,
-                                        self.draft_tokens)
-=======
     # E-P Disaggregated Params
     multimodal_embedding_handles: Optional[List[Dict[str, Any]]] = (
         None  # multimodal embedding handles should be a list of cudaIPC handles for each mm_embedding
@@ -70,7 +45,6 @@ class DisaggregatedParams:
         return tllme.ContextPhaseParams(
             self.first_gen_tokens, self.ctx_request_id, self.opaque_state, self.draft_tokens
         )
->>>>>>> upstream/main
 
     def get_request_type(self) -> tllme.RequestType:
         if self.request_type == "context_only":
@@ -81,10 +55,6 @@ class DisaggregatedParams:
             return tllme.RequestType.REQUEST_TYPE_CONTEXT_AND_GENERATION
         else:
             raise ValueError(
-<<<<<<< HEAD
-                f"Unknown request type: {self.request_type}. Must be context_only, generation_only or context_and_generation"
-            )
-=======
                 f"Unknown request type: {self.request_type}. Must be context_only, generation_only or "
                 "context_and_generation"
             )
@@ -120,4 +90,3 @@ class DisaggregatedParams:
                     np.iinfo(np.int32).min, np.iinfo(np.int32).max, size=8, dtype=np.int32
                 ).tolist()
                 self.multimodal_hashes = [vals] * len(self.multimodal_embedding_handles)
->>>>>>> upstream/main

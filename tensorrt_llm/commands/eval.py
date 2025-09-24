@@ -18,19 +18,11 @@ import click
 
 import tensorrt_llm.profiler as profiler
 
-<<<<<<< HEAD
-from .._torch.llm import LLM as PyTorchLLM
-from .._torch.pyexecutor.config import PyTorchConfig
-from ..evaluate import (GSM8K, MMLU, CnnDailymail, GPQADiamond, GPQAExtended,
-                        GPQAMain)
-from ..llmapi import LLM, BuildConfig, KvCacheConfig
-=======
 from .. import LLM as PyTorchLLM
 from .._tensorrt_engine import LLM
 from ..evaluate import (GSM8K, MMLU, MMMU, CnnDailymail, GPQADiamond,
                         GPQAExtended, GPQAMain, JsonModeEval)
 from ..llmapi import BuildConfig, KvCacheConfig
->>>>>>> upstream/main
 from ..llmapi.llm_utils import update_llm_args_with_extra_options
 from ..logger import logger, severity_map
 
@@ -103,24 +95,17 @@ from ..logger import logger, severity_map
               type=str,
               default=None,
               help="Path to a YAML file that overwrites the parameters")
-<<<<<<< HEAD
-=======
 @click.option("--disable_kv_cache_reuse",
               is_flag=True,
               default=False,
               help="Flag for disabling KV cache reuse.")
->>>>>>> upstream/main
 @click.pass_context
 def main(ctx, model: str, tokenizer: Optional[str], log_level: str,
          backend: str, max_beam_width: int, max_batch_size: int,
          max_num_tokens: int, max_seq_len: int, tp_size: int, pp_size: int,
          ep_size: Optional[int], gpus_per_node: Optional[int],
          kv_cache_free_gpu_memory_fraction: float, trust_remote_code: bool,
-<<<<<<< HEAD
-         extra_llm_api_options: Optional[str]):
-=======
          extra_llm_api_options: Optional[str], disable_kv_cache_reuse: bool):
->>>>>>> upstream/main
     logger.set_level(log_level)
     build_config = BuildConfig(max_batch_size=max_batch_size,
                                max_num_tokens=max_num_tokens,
@@ -128,21 +113,11 @@ def main(ctx, model: str, tokenizer: Optional[str], log_level: str,
                                max_seq_len=max_seq_len)
 
     kv_cache_config = KvCacheConfig(
-<<<<<<< HEAD
-        free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction)
-
-    if backend == "tensorrt":
-        backend = None
-    pytorch_backend_config = None
-    if backend == "pytorch":
-        pytorch_backend_config = PyTorchConfig()
-=======
         free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
         enable_block_reuse=not disable_kv_cache_reuse)
 
     if backend == "tensorrt":
         backend = None
->>>>>>> upstream/main
 
     llm_args = {
         "model": model,
@@ -155,10 +130,6 @@ def main(ctx, model: str, tokenizer: Optional[str], log_level: str,
         "build_config": build_config,
         "kv_cache_config": kv_cache_config,
         "backend": backend,
-<<<<<<< HEAD
-        "pytorch_backend_config": pytorch_backend_config,
-=======
->>>>>>> upstream/main
     }
 
     if extra_llm_api_options is not None:
@@ -185,11 +156,8 @@ main.add_command(GSM8K.command)
 main.add_command(GPQADiamond.command)
 main.add_command(GPQAMain.command)
 main.add_command(GPQAExtended.command)
-<<<<<<< HEAD
-=======
 main.add_command(JsonModeEval.command)
 main.add_command(MMMU.command)
->>>>>>> upstream/main
 
 if __name__ == "__main__":
     main()

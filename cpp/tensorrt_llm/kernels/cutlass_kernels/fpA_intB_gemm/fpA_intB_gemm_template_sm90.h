@@ -30,11 +30,7 @@ namespace tensorrt_llm
 {
 namespace kernels
 {
-<<<<<<< HEAD
-namespace cutlass_kernels
-=======
 namespace cutlass_kernels_oss
->>>>>>> upstream/main
 {
 namespace tk = tensorrt_llm::common;
 namespace tkc = tensorrt_llm::cutlass_extensions;
@@ -272,10 +268,6 @@ void sm90_dispatch_gemm_to_cutlass(ActivationType const* A, WeightType const* B,
     }
 }
 
-<<<<<<< HEAD
-} // namespace cutlass_kernels
-=======
 } // namespace cutlass_kernels_oss
->>>>>>> upstream/main
 } // namespace kernels
 } // namespace tensorrt_llm

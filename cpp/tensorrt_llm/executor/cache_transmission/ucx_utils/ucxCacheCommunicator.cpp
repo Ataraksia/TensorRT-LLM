@@ -73,62 +73,6 @@ public:
     }
 };
 
-<<<<<<< HEAD
-static std::string getLocalIp()
-{
-    struct ifaddrs *ifaddr, *ifa;
-    void* addr_ptr;
-    std::string ip("UNKNOWN IP");
-
-    // Get the list of network interfaces
-    if (getifaddrs(&ifaddr) == -1)
-    {
-        perror("getifaddrs");
-        return ip;
-    }
-
-    // Loop through the linked list of interfaces
-    for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
-    {
-        // Check if the interface is an IP interface
-        if (ifa->ifa_addr == nullptr)
-            continue;
-
-        std::string ucxInterface = common::getEnvUCXInterface();
-        if (!ucxInterface.empty() && strcmp(ifa->ifa_name, ucxInterface.c_str()) != 0)
-        {
-            continue;
-        }
-
-        // Skip the loopback interface
-        if (ucxInterface.empty() && (strncmp(ifa->ifa_name, "docker", 6) == 0 || strcmp(ifa->ifa_name, "lo") == 0))
-        {
-            continue;
-        }
-
-        // Check if the address family is AF_INET (IPv4)
-        // TODO: USER CAN SPECIFY THE IP ADDRESS
-        if (ifa->ifa_addr->sa_family == AF_INET)
-        {
-            addr_ptr = &((struct sockaddr_in*) ifa->ifa_addr)->sin_addr;
-            char address_buffer[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, addr_ptr, address_buffer, sizeof(address_buffer));
-
-            TLLM_LOG_DEBUG(mpi::MpiComm::world().getRank(), " ***** UCX    Interface: %s IP Address: %s", ifa->ifa_name,
-                address_buffer);
-            ip = address_buffer;
-            break;
-        }
-    }
-    if (ifa == nullptr)
-    {
-        TLLM_LOG_ERROR(mpi::MpiComm::world().getRank(),
-            "UCX   No valid IP address found please set correct UCX interface with env variable TRTLLM_UCX_INTERFACE");
-    }
-
-    freeifaddrs(ifaddr);
-    return ip;
-=======
 std::string getLocalIpByNic(std::string const& interface)
 {
     struct ifaddrs* ifaddr = nullptr;
@@ -315,17 +259,12 @@ static std::string getLocalIp()
         TLLM_THROW("getLocalIp: Can't get local ip");
     }
     return localIP;
->>>>>>> upstream/main
 }
 
 std::optional<std::pair<std::string, int>> parse_zmq_endpoint(std::string const& endpoint)
 {
     std::regex ipv4_regex(R"(tcp://([\d\.]+):(\d+))");
-<<<<<<< HEAD
-    std::regex ipv6_regex(R"(tcp://\[([0-9a-fA-F:]+)\]:(\d+))");
-=======
     std::regex ipv6_regex(R"(tcp://\[([0-9a-fA-F:%\w]+)\]:(\d+))");
->>>>>>> upstream/main
     std::smatch match;
     if (std::regex_match(endpoint, match, ipv4_regex))
     {
@@ -364,8 +303,6 @@ UcxConnectionManager::UcxConnectionManager()
         mZmqRepSocket = zmq::socket_t(mZmqContext, zmq::socket_type::rep);
         mZmqRepSocket.set(zmq::sockopt::sndhwm, 1000);
         std::string localIp = getLocalIp();
-<<<<<<< HEAD
-=======
         if (localIp.find(':') != std::string::npos)
         {
             // ipv6
@@ -375,7 +312,6 @@ UcxConnectionManager::UcxConnectionManager()
         }
         TLLM_LOG_INFO(
             mpi::MpiComm::world().getRank(), "UcxConnectionManager::UcxConnectionManager localIp: %s", localIp.c_str());
->>>>>>> upstream/main
         mZmqRepSocket.bind("tcp://" + localIp + ":*");
         mZmqRepEndpoint = mZmqRepSocket.get(zmq::sockopt::last_endpoint);
         TLLM_LOG_INFO(mpi::MpiComm::world().getRank(), "UcxConnectionManager::UcxConnectionManager mZmqRepEndpoint: %s",
@@ -490,10 +426,7 @@ UcxConnectionManager::~UcxConnectionManager()
     if (mZmqRepThread.joinable())
     {
         zmq::socket_t socket(mZmqContext, zmq::socket_type::req);
-<<<<<<< HEAD
-=======
         socket.set(zmq::sockopt::ipv6, 1);
->>>>>>> upstream/main
         socket.connect(mZmqRepEndpoint);
         UcxCmMessage stopMessage(UcxCmMessage::MessageType::STOP, std::nullopt);
         std::ostringstream oStream;
@@ -575,10 +508,7 @@ UcxConnection::ConnectionIdType UcxConnectionManager::addConnection(std::string 
             // connection at a time, guaranteeing that the only one listener will send connectionId to requester in the
             // same time.
             auto reqSocket = zmq::socket_t(mZmqContext, zmq::socket_type::req);
-<<<<<<< HEAD
-=======
             reqSocket.set(zmq::sockopt::ipv6, 1);
->>>>>>> upstream/main
             reqSocket.connect(build_zmq_endpoint(ip, port));
             UcxCmMessage getWorkerAddressMessage(UcxCmMessage::MessageType::GET_WORKER_ADDRESS, mWorkerAddress);
             std::ostringstream oStream;

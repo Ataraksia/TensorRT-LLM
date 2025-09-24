@@ -1,47 +1,14 @@
 import json
 from functools import partial
-<<<<<<< HEAD
-from typing import Any, Dict, List, TextIO, Tuple
-=======
 from typing import List, TextIO, Tuple
->>>>>>> upstream/main
 
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 from tensorrt_llm.bench.dataclasses.general import (DatasetMetadata,
                                                     InferenceRequest)
 from tensorrt_llm.bench.dataclasses.statistics import PercentileStats
-<<<<<<< HEAD
-from tensorrt_llm.inputs import (INPUT_FORMATTER_MAP, default_image_loader,
-                                 default_video_loader)
-
-
-def prepare_multimodal_inputs(model_dir: str,
-                              model_type: str,
-                              modality: str,
-                              prompts: List[str],
-                              media: List[List[str]],
-                              image_data_format: str = "pt",
-                              num_frames: int = 8) -> List[Dict[str, Any]]:
-    assert model_type in INPUT_FORMATTER_MAP, f"Model type {model_type} not in supported list of models: {INPUT_FORMATTER_MAP.keys()}"
-    formatter = INPUT_FORMATTER_MAP[model_type]
-
-    inputs = []
-    if modality == "image":
-        inputs = default_image_loader(prompts, media, image_data_format)
-    elif modality == "video":
-        inputs = default_video_loader(prompts, media, image_data_format,
-                                      num_frames)
-    else:
-        raise ValueError(f"Unsupported modality: {modality}")
-
-    inputs = formatter(model_dir, inputs)
-
-    return inputs
-=======
 from tensorrt_llm.executor.request import LoRARequest
 from tensorrt_llm.inputs import default_multimodal_input_loader
->>>>>>> upstream/main
 
 
 def initialize_tokenizer(model_name: str) -> PreTrainedTokenizer:
@@ -74,11 +41,8 @@ def create_dataset_from_stream(
     model_dir: str = None,
     model_type: str = None,
     modality: str = None,
-<<<<<<< HEAD
-=======
     image_data_format: str = "pt",
     data_device: str = "cpu",
->>>>>>> upstream/main
     max_input_seq_len_for_multimodal: int = 4096,
 ) -> Tuple[DatasetMetadata, List[InferenceRequest]]:
     """Generate metadata and a list of requests to drive benchmarking.
@@ -121,10 +85,7 @@ def create_dataset_from_stream(
     media_paths = []
     all_logits = []
     task_ids = []
-<<<<<<< HEAD
-=======
     lora_requests = []
->>>>>>> upstream/main
     while (line := stream.readline()) and len(task_ids) < max_requests:
         # We expect the data to come in as a JSON string.
         # For example:
@@ -136,14 +97,11 @@ def create_dataset_from_stream(
         # There once was a man who.", "output_tokens": 1000,
         # "media_paths": ["/path/to/image1.jpg", "/path/to/image2.jpg"]}
         #
-<<<<<<< HEAD
-=======
         # For LoRA data, the data should be of the form:
         # {"prompt": "Generate an infinite response to the following:
         # There once was a man who.", "output_tokens": 1000,
         # "lora_request": {"lora_name": "my_lora", "lora_int_id": 1, "lora_path": "/path/to/lora"}}
         #
->>>>>>> upstream/main
         # Each line should be a complete JSON dictionary with no indentation
         # or newline characters.
         data = json.loads(line)
@@ -153,8 +111,6 @@ def create_dataset_from_stream(
         all_osl.append(data.get("output_tokens"))
         task_ids.append(data.get("task_id"))
 
-<<<<<<< HEAD
-=======
         # Parse LoRA request if present
         lora_data = data.get("lora_request", None)
         if lora_data:
@@ -165,24 +121,11 @@ def create_dataset_from_stream(
         else:
             lora_requests.append(None)
 
->>>>>>> upstream/main
     if modality is not None:
         # Multimodal data need extra preprocessing
         assert modality in [
             "image", "video"
         ], f"Modality must be one of ['image', 'video'] but got {modality}."
-<<<<<<< HEAD
-        prompts = prepare_multimodal_inputs(model_dir,
-                                            model_type,
-                                            modality,
-                                            prompts=prompts,
-                                            media=media_paths)  # list of dicts
-
-    all_isl = []
-    all_seq_len = []
-    for prompt, logits, osl, task_id in zip(prompts, all_logits, all_osl,
-                                            task_ids):
-=======
         prompts = default_multimodal_input_loader(
             tokenizer=tokenizer,
             model_dir=model_dir,
@@ -197,7 +140,6 @@ def create_dataset_from_stream(
     all_seq_len = []
     for prompt, logits, osl, task_id, lora_request in zip(
             prompts, all_logits, all_osl, task_ids, lora_requests):
->>>>>>> upstream/main
         if modality is not None:
             # NOTE: we cannot tokenize multi-modal data, handled by preprocessor
             #       so the actual sequence length is unknown until the model is run
@@ -216,10 +158,7 @@ def create_dataset_from_stream(
             prompt=prompt,
             output_tokens=output_limiter(osl),
             input_ids=logits,
-<<<<<<< HEAD
-=======
             lora_request=lora_request,
->>>>>>> upstream/main
         )
         dataset.append(request)
 

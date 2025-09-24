@@ -1,26 +1,15 @@
-<<<<<<< HEAD
-from .cpp_custom_ops import _register_fake
-from .flashinfer_custom_ops import IS_FLASHINFER_AVAILABLE
-from .torch_custom_ops import bmm_out
-=======
 from ..cute_dsl_utils import IS_CUTLASS_DSL_AVAILABLE
 from ..flashinfer_utils import IS_FLASHINFER_AVAILABLE
 from ..modules.attention import attn_custom_op_inplace, mla_custom_op_inplace
 from .cpp_custom_ops import _register_fake
 from .torch_custom_ops import bmm_out
 from .trtllm_gen_custom_ops import fp8_block_scale_moe_runner
->>>>>>> upstream/main
 from .userbuffers_custom_ops import add_to_ub, copy_to_userbuffers, matmul_to_ub
 
 __all__ = [
     'IS_FLASHINFER_AVAILABLE',
     '_register_fake',
     'bmm_out',
-<<<<<<< HEAD
-    'add_to_ub',
-    'copy_to_userbuffers',
-    'matmul_to_ub',
-=======
     'fp8_block_scale_moe_runner',
     'add_to_ub',
     'copy_to_userbuffers',
@@ -28,7 +17,6 @@ __all__ = [
     'attn_custom_op_inplace',
     'mla_custom_op_inplace',
     'IS_CUTLASS_DSL_AVAILABLE',
->>>>>>> upstream/main
 ]
 
 if IS_FLASHINFER_AVAILABLE:
@@ -42,12 +30,9 @@ if IS_FLASHINFER_AVAILABLE:
         'flashinfer_fused_add_rmsnorm',
         'flashinfer_apply_rope_with_cos_sin_cache_inplace',
     ]
-<<<<<<< HEAD
-=======
 
 if IS_CUTLASS_DSL_AVAILABLE:
     from .cute_dsl_custom_ops import cute_dsl_nvfp4_gemm_blackwell
     __all__ += [
         'cute_dsl_nvfp4_gemm_blackwell',
     ]
->>>>>>> upstream/main

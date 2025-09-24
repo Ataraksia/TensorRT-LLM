@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-# Copyright (c) 2024, Tri Dao, Albert Gu.
-# Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/ssd_chunk_state.py
-"""We want triton==2.1.0 or 2.2.0 for this"""
-=======
 # Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/ssd_chunk_state.py
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 #
@@ -20,7 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
->>>>>>> upstream/main
 
 import math
 
@@ -31,15 +25,6 @@ import triton.language as tl
 from .softplus import softplus
 
 
-<<<<<<< HEAD
-def init_to_zero(names):
-    return lambda nargs: [
-        nargs[name].zero_() for name in names if nargs[name] is not None
-    ]
-
-
-=======
->>>>>>> upstream/main
 @triton.autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_H": 1}),
@@ -88,14 +73,10 @@ def _chunk_cumsum_fwd_kernel(
     BLOCK_SIZE_CHUNK: tl.constexpr,
 ):
     pid_b = tl.program_id(axis=0)
-<<<<<<< HEAD
-    pid_c = tl.program_id(axis=1)
-=======
 
     # if dt is long, may cause problems, so use 64 bit
     # https://github.com/triton-lang/triton/issues/1058
     pid_c = tl.program_id(axis=1).to(tl.int64)
->>>>>>> upstream/main
     pid_h = tl.program_id(axis=2)
     dt_ptr += pid_b * stride_dt_batch + pid_c * chunk_size * stride_dt_seqlen
     dt_out_ptr += pid_b * stride_dt_out_batch + pid_c * stride_dt_out_chunk
@@ -277,11 +258,7 @@ def _chunk_state_fwd_kernel(
     BLOCK_SIZE_N: tl.constexpr,
     BLOCK_SIZE_K: tl.constexpr,
 ):
-<<<<<<< HEAD
-    pid_bc = tl.program_id(axis=1)
-=======
     pid_bc = tl.program_id(axis=1).to(tl.int64)
->>>>>>> upstream/main
     pid_c = pid_bc // batch
     pid_b = pid_bc - pid_c * batch
     pid_h = tl.program_id(axis=2)
@@ -372,8 +349,6 @@ def _chunk_state_fwd_kernel(
     tl.store(states_ptrs, states, mask=c_mask)
 
 
-<<<<<<< HEAD
-=======
 @triton.autotune(
     configs=[
         triton.Config(
@@ -615,7 +590,6 @@ def _chunk_state_varlen_kernel(
     tl.store(states_ptrs, states, mask=c_mask)
 
 
->>>>>>> upstream/main
 def _chunk_cumsum_fwd(dt,
                       A,
                       chunk_size,
@@ -748,8 +722,6 @@ def _chunk_state_fwd(B,
             HAS_SEQ_IDX=seq_idx is not None,
         )
     return states
-<<<<<<< HEAD
-=======
 
 
 def chunk_state_varlen(B,
@@ -826,4 +798,3 @@ def chunk_state_varlen(B,
               (0, 0, 0, 0)),
             HAS_INITSTATES=initial_states is not None)
     return states
->>>>>>> upstream/main

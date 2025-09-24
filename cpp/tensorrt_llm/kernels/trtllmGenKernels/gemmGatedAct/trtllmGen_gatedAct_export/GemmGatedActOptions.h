@@ -48,12 +48,9 @@
 namespace gemmGatedAct
 {
 
-<<<<<<< HEAD
-=======
 namespace gemmGatedAct
 {
 
->>>>>>> upstream/main
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace tg = trtllm::gen;
@@ -61,10 +58,6 @@ namespace tg = trtllm::gen;
 // Type of the gated activation
 enum class ActType
 {
-<<<<<<< HEAD
-    // silu(x) = x * sigmoid(x) = x * (1 / (1 + e^(-x)))
-    Silu = 0
-=======
     // For ActType == SwiGlu, ideally we would like to have something like
     //    gatedAct = scaleC * (x0 * scaleAb + beta) * ((x1 * scaleGate) * sigmoid(alpha * x1 *
     //    scaleGate)).
@@ -80,7 +73,6 @@ enum class ActType
     // where x0 and x1 are the raw numbers from Gemm, while scaleC and scaleGate are input scales,
     // beta' = beta / scaleAb, scaleC' = scaleC * scaleAb.
     GeGlu,
->>>>>>> upstream/main
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,26 +85,13 @@ enum class ActType
         return (type == ActType::actType);                                                                             \
     }
 
-<<<<<<< HEAD
-TLLM_ACT_TYPE_FUNCTION(Silu)
-=======
 TLLM_ACT_TYPE_FUNCTION(SwiGlu)
 TLLM_ACT_TYPE_FUNCTION(GeGlu)
->>>>>>> upstream/main
 
 #undef TLLM_ACT_TYPE_FUNCTION
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-struct GemmGatedActOptions : virtual public gemm::GemmOptions
-{
-    GemmGatedActOptions() = default;
-
-    GemmGatedActOptions(gemm::GemmOptions const& options, ActType actType)
-        : gemm::GemmOptions(options)
-        , mActType(actType)
-=======
 inline std::string getActTypeName(ActType type)
 {
     switch (type)
@@ -133,18 +112,13 @@ struct GemmGatedActOptions : public gemm::GemmOptions
         : gemm::GemmOptions(options)
         , mActType(actType)
         , mClampBeforeAct(clampBeforeAct)
->>>>>>> upstream/main
     {
     }
 
     // Type of the gated activation.
-<<<<<<< HEAD
-    ActType mActType{ActType::Silu};
-=======
     ActType mActType{ActType::SwiGlu};
     // Clamp the dequantized values to the range [-limit, limit].
     bool mClampBeforeAct{false};
->>>>>>> upstream/main
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,11 +140,7 @@ inline bool checkAndUpdateGemmGatedActOptions(
 
     if (options.mUseTmaStore)
     {
-<<<<<<< HEAD
-        TLLM_CHECK_ERROR(hiddenEpilogueTileSize * tg::dtypeGetNumBits(options.mDtypeElt) / /* bits */ 8 % 32 == 0,
-=======
         TLLM_CHECK_ERROR(hiddenEpilogueTileSize * tg::dtypeGetNumBits(options.mDtypeC) / /* bits */ 8 % 32 == 0,
->>>>>>> upstream/main
             "Unsupported output hidden tile size");
     }
 
@@ -200,14 +170,11 @@ inline bool checkAndUpdateGemmGatedActOptions(
         TLLM_CHECK_ERROR(doesSplitKUseDsmem(options.mSplitK), "Split-k GMEM and GemmGatedAct are not supported yet.");
     }
 
-<<<<<<< HEAD
-=======
     if (gemm::isBiasTypeMn(options.mBiasType))
     {
         TLLM_CHECK_ERROR(options.mTransposeMmaOutput, "Bias type Mn is not supported with not transpose mma output.");
     }
 
->>>>>>> upstream/main
     return true;
 }
 
@@ -218,12 +185,8 @@ inline std::string dumpOptions(GemmGatedActOptions const& options)
     std::stringstream ss;
     ss << gemm::dumpOptions(options) << ", ";
     ss << "mActType="
-<<<<<<< HEAD
-       << "gemmGatedAct::ActType(" << static_cast<int32_t>(options.mActType) << ")" << std::endl;
-=======
        << "gemmGatedAct::ActType(" << static_cast<int32_t>(options.mActType) << ")," << std::endl;
     ss << "mClampBeforeAct=" << options.mClampBeforeAct << "" << std::endl;
->>>>>>> upstream/main
     return ss.str();
 }
 
@@ -244,10 +207,7 @@ struct GemmGatedActConfig
     uint32_t const mSharedMemSize{0};
     char const* mFunctionName{nullptr};
     uint32_t const mNumThreadsPerCTA{0};
-<<<<<<< HEAD
-=======
     char const* mHash{nullptr};
->>>>>>> upstream/main
 #else
     trtllm::gen::CudaRunner* mCudaRunner{nullptr};
 #endif
@@ -269,8 +229,5 @@ struct GemmGatedActConfig
 #undef TLLM_LOG_INFO
 #undef TLLM_LOG_ERROR
 #endif // TLLM_GEN_EXPORT_INTERFACE
-<<<<<<< HEAD
-=======
 
 } // namespace gemmGatedAct
->>>>>>> upstream/main

@@ -16,13 +16,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-<<<<<<< HEAD
-=======
 #include <filesystem>
 
 namespace fs = std::filesystem;
 
->>>>>>> upstream/main
 using namespace tensorrt_llm::executor::kv_cache;
 
 class RegisteredHostMemory
@@ -348,8 +345,6 @@ TEST_F(TransferAgentTest, SyncMessage)
     nixlAgent0->invalidateRemoteAgent(agent1);
     nixlAgent1->invalidateRemoteAgent(agent0);
 }
-<<<<<<< HEAD
-=======
 
 class LoopbackAgentTest : public ::testing::Test,
                           public ::testing::WithParamInterface<bool> // NOLINT(cppcoreguidelines-pro-type-member-init)
@@ -465,4 +460,3 @@ TEST_P(LoopbackAgentTest, GpuToFile)
 }
 
 INSTANTIATE_TEST_SUITE_P(, LoopbackAgentTest, ::testing::Values(true, false));
->>>>>>> upstream/main

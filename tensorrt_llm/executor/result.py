@@ -3,13 +3,8 @@ import json
 import weakref
 from dataclasses import dataclass, field
 from queue import Empty, Queue
-<<<<<<< HEAD
-from typing import (TYPE_CHECKING, Any, Callable, List, Literal, NamedTuple,
-                    Optional, TypeAlias, Union)
-=======
 from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Literal,
                     NamedTuple, Optional, TypeAlias, Union)
->>>>>>> upstream/main
 from weakref import WeakMethod
 
 import torch
@@ -20,10 +15,7 @@ from ..bindings import executor as tllm
 from ..disaggregated_params import DisaggregatedParams
 from ..llmapi.tracer import global_tracer
 from ..llmapi.utils import AsyncQueue
-<<<<<<< HEAD
-=======
 from ..metrics import MetricNames, MetricsCollector, RequestEventTiming
->>>>>>> upstream/main
 from ..sampling_params import LogprobParams, SamplingParams
 from .utils import ErrorResponse, has_event_loop, is_llm_response
 
@@ -59,22 +51,13 @@ class LogProbsResult(NamedTuple):
 
 
 class ResponseWrapper:
-<<<<<<< HEAD
-    """Wrapper of runtime response with optional outputs computed post runtime.
-=======
     """
     1. Wrapper of runtime response with optional outputs computed post runtime.
     2. A workaround to pass around RequestPerfMetrics.
->>>>>>> upstream/main
     """
 
     def __init__(self,
                  response: Union["PostprocWorker.Output", tllm.Response],
-<<<<<<< HEAD
-                 logprobs: Optional[LogProbsResult] = None):
-        self._response = response
-        self.logprobs = logprobs
-=======
                  logprobs: Optional[LogProbsResult] = None,
                  request_perf_metrics: Optional[dict[str, float]] = None):
         self._response = response
@@ -85,14 +68,11 @@ class ResponseWrapper:
     def _is_llm_response(self):
         response = object.__getattribute__(self, '_response')
         return isinstance(response, tllm.Response)
->>>>>>> upstream/main
 
     def __getattr__(self, name):
         response = object.__getattribute__(self, '_response')
         return getattr(response, name)
 
-<<<<<<< HEAD
-=======
     def __getstate__(self):
         return (self._response, self.logprobs, self.request_perf_metrics)
 
@@ -101,7 +81,6 @@ class ResponseWrapper:
         self.logprobs = state[1]
         self.request_perf_metrics = state[2]
 
->>>>>>> upstream/main
 
 @dataclass(slots=True)
 class CompletionOutput:
@@ -112,51 +91,33 @@ class CompletionOutput:
         text (str): The generated output text. Defaults to "".
         token_ids (List[int], optional): The token ids of the generated output text. Defaults to [].
         cumulative_logprob (float, optional): The cumulative log probability of the generated output text. Defaults to None.
-<<<<<<< HEAD
-        logprobs (TokenLogprobs, optional): The log probabilities of the top probability words at each position if the logprobs are requested. Defaults to None.
-=======
         logprobs (TokenLogprobs | List[float], optional): The log probabilities of the top probability words at each position if the logprobs are requested. Defaults to None.
->>>>>>> upstream/main
         prompt_logprobs (TokenLogprobs, optional): The log probabilities per prompt token. Defaults to None.
         finish_reason (Literal['stop', 'length', 'timeout', 'cancelled'], optional): The reason why the sequence is finished. Defaults to None.
         stop_reason (int, str, optional): The stop string or token id that caused the completion to stop, None if the completion finished for some other reason. Defaults to None.
         generation_logits (torch.Tensor, optional): The logits on the generated output token ids. Defaults to None.
         disaggregated_params (tensorrt_llm.disaggregated_params.DisaggregatedParams, optional): Parameters needed for disaggregated serving. Includes the type of request, the first generated tokens, the context request id and the any additional state needing to be transferred from context and generation instances. Defaults to None.
-<<<<<<< HEAD
-=======
         request_perf_metrics (tensorrt_llm.bindings.executor.RequestPerfMetrics, optional): Performance metrics for the request. Defaults to None.
->>>>>>> upstream/main
 
     Attributes:
         length (int): The number of generated tokens.
         token_ids_diff (List[int]): Newly generated token ids.
-<<<<<<< HEAD
-        logprobs_diff (List[float]): Logprobs of newly generated tokens.
-=======
         logprobs_diff (TokenLogprobs | List[float]): Logprobs of newly generated tokens.
->>>>>>> upstream/main
         text_diff (str): Newly generated tokens.
     """
     index: int
     text: str = ""
     token_ids: Optional[List[int]] = field(default_factory=list)
     cumulative_logprob: Optional[float] = None
-<<<<<<< HEAD
-    logprobs: Optional[TokenLogprobs] = field(default_factory=list)
-=======
     logprobs: Optional[TokenLogprobs
                        | List[float]] = field(default_factory=list)
->>>>>>> upstream/main
     prompt_logprobs: Optional[TokenLogprobs] = field(default_factory=list)
     finish_reason: Optional[Literal['stop', 'length', 'timeout',
                                     'cancelled']] = None
     stop_reason: Optional[Union[int, str]] = None
     generation_logits: Optional[torch.Tensor] = None
     disaggregated_params: Optional[DisaggregatedParams] = None
-<<<<<<< HEAD
-=======
     request_perf_metrics: Optional[tllm.RequestPerfMetrics] = None
->>>>>>> upstream/main
 
     # hidden fields for tracking the diffs
     _last_text_len: int = field(default=0, init=False, repr=False)
@@ -181,11 +142,7 @@ class CompletionOutput:
         return self.token_ids[self._last_token_ids_len:]
 
     @property
-<<<<<<< HEAD
-    def logprobs_diff(self) -> List[float]:
-=======
     def logprobs_diff(self) -> TokenLogprobs | List[float]:
->>>>>>> upstream/main
         return self.logprobs[self._last_logprobs_len:]
 
 
@@ -202,15 +159,11 @@ class GenerationResultBase:
         self.postproc_params = postproc_params
         self.disaggregated_params = None
         self.decoding_iter = 0
-<<<<<<< HEAD
-        self._done = False
-=======
         # Average decoded tokens per runtime iteration; set when the first LLM response arrives.
         # None indicates not yet available (e.g., before first step/stream).
         self.avg_decoded_tokens_per_iter: Optional[float] = None
         self._done = False
         self.metrics_dict = {}
->>>>>>> upstream/main
 
         if has_event_loop():
             self.aqueue = AsyncQueue()
@@ -226,10 +179,7 @@ class GenerationResultBase:
             CompletionOutput(i) for i in range(self.sampling_params.best_of)
         ]
         self._context_logits: Optional[torch.Tensor] = None
-<<<<<<< HEAD
-=======
         self._mm_embedding_handle: Optional[Dict[str, Any]] = None
->>>>>>> upstream/main
 
         self._background_error_handler = None
         if background_error_handler is not None:
@@ -266,25 +216,18 @@ class GenerationResultBase:
     def context_logits(self) -> Optional[torch.Tensor]:
         return self._context_logits
 
-<<<<<<< HEAD
-=======
     @property
     # TODO: Keep this property only for backward compatibility. In the future, access multimodal embedding handles from disaggregated_params instead.
     def mm_embedding_handle(self) -> Optional[Dict[str, Any]]:
         return self._mm_embedding_handle
 
->>>>>>> upstream/main
     def _handle_sequence(self,
                          finish_reasons,
                          response_tensors,
                          sequence_index,
-<<<<<<< HEAD
-                         logprobs_result=None):
-=======
                          logprobs_result=None,
                          req_perf_metrics_dict: Optional[dict[str,
                                                               float]] = None):
->>>>>>> upstream/main
         """ Handle a single sequence in the response. """
 
         seq_idx = sequence_index
@@ -299,41 +242,24 @@ class GenerationResultBase:
         else:
             output.token_ids.extend(response_tensors.output_token_ids[src_idx])
 
-<<<<<<< HEAD
-        # In PD, the first token should be ignored in streaming mode, since it's already been returned by the context server
-        if self.disaggregated_params is not None and self.disaggregated_params.request_type == "generation_only" and self._streaming and self.decoding_iter == 2:
-            output._last_token_ids_len = 1
-
-=======
->>>>>>> upstream/main
         if response_tensors.cum_log_probs is not None:
             output.cumulative_logprob = response_tensors.cum_log_probs[src_idx]
 
         if logprobs_result:
-<<<<<<< HEAD
-            output.prompt_logprobs = logprobs_result.prompt
-            output.logprobs = logprobs_result.generation
-
-        if response_tensors.log_probs is not None:
-=======
             # update logprobs from ResponseWrapper (TRT top logprobs WAR)
             output._last_logprobs_len = len(output.logprobs)
             output.prompt_logprobs = logprobs_result.prompt
             output.logprobs += logprobs_result.generation
         elif response_tensors.log_probs is not None:
             # handle logprobs directly from response tensors
->>>>>>> upstream/main
             output._last_logprobs_len = len(output.logprobs)
             output.logprobs = response_tensors.log_probs[src_idx]
             # overcome some WAR in the cpp executor
             if finish_reasons[src_idx] != tllm.FinishReason.CANCELLED:
-<<<<<<< HEAD
-=======
                 if len(output.logprobs) > output.length:
                     # LlmResult holds a reference to LogProbStorage, which may be updated by the worker before the result is serialized.
                     # Therefore, we treat extra logprobs/logits as expected and only consume what's needed.
                     output.logprobs = output.logprobs[:output.length]
->>>>>>> upstream/main
                 assert len(output.logprobs) == output.length
         if response_tensors.generation_logits is not None:
             output.generation_logits = response_tensors.generation_logits[
@@ -345,12 +271,9 @@ class GenerationResultBase:
                 src_idx] == tllm.FinishReason.CANCELLED:
             output.finish_reason = 'cancelled'
 
-<<<<<<< HEAD
-=======
         if response_tensors.request_perf_metrics is not None:
             output.request_perf_metrics = response_tensors.request_perf_metrics
 
->>>>>>> upstream/main
         if self._done:
             if finish_reasons[src_idx] == tllm.FinishReason.END_ID:
                 output.finish_reason = 'stop'
@@ -367,22 +290,16 @@ class GenerationResultBase:
                 output.finish_reason = 'length'
             elif finish_reasons[src_idx] == tllm.FinishReason.TIMED_OUT:
                 output.finish_reason = 'timeout'
-<<<<<<< HEAD
-=======
             # For disaggregated serving, finish reason might be NOT_FINISHED which is ok
             elif finish_reasons[
                     src_idx] == tllm.FinishReason.NOT_FINISHED and self.disaggregated_params is not None and self.disaggregated_params.request_type == "context_only":
                 output.finish_reason = 'not_finished'
->>>>>>> upstream/main
             elif finish_reasons[src_idx] == tllm.FinishReason.CANCELLED:
                 pass
             else:
                 raise ValueError(
                     f"Unknown finish reason: {finish_reasons[src_idx]}")
-<<<<<<< HEAD
-=======
             self.record_stats(output, req_perf_metrics_dict)
->>>>>>> upstream/main
 
     @nvtx_range_debug("handle_response",
                       color="red",
@@ -390,13 +307,9 @@ class GenerationResultBase:
     def _handle_response(self,
                          response: Union["PostprocWorker.Output", tllm.Response,
                                          ResponseWrapper, ErrorResponse]):
-<<<<<<< HEAD
-        if isinstance(response, ResponseWrapper):
-=======
         req_perf_metrics_dict = None
         if isinstance(response, ResponseWrapper):
             req_perf_metrics_dict = response.request_perf_metrics
->>>>>>> upstream/main
             logprobs_result = response.logprobs
             response = response._response
         else:
@@ -409,11 +322,8 @@ class GenerationResultBase:
                 self._outputs[0] = response.res
             else:
                 self._outputs[0]._postprocess_result = response.res
-<<<<<<< HEAD
-=======
             if response.metrics:
                 self.metrics_dict = response.metrics
->>>>>>> upstream/main
 
             if response.error:
                 if self._background_error_handler is not None and (
@@ -426,11 +336,6 @@ class GenerationResultBase:
                     handler(response.error_msg)
 
             response_result = response.result
-<<<<<<< HEAD
-            self._done = response_result.is_final
-            context_phase_params = response_result.context_phase_params
-            self.decoding_iter = response_result.decoding_iter
-=======
             if hasattr(response_result, "_result") and isinstance(
                     response_result._result, bytes):
                 response_result.deserialize()
@@ -439,7 +344,6 @@ class GenerationResultBase:
             context_phase_params = response_result.context_phase_params
             self.decoding_iter = response_result.decoding_iter
             self.avg_decoded_tokens_per_iter = response_result.avg_decoded_tokens_per_iter
->>>>>>> upstream/main
             if context_phase_params is not None:
                 self.disaggregated_params = DisaggregatedParams(
                     request_type="context_only",
@@ -453,26 +357,16 @@ class GenerationResultBase:
             if self.sampling_params.use_beam_search:
                 for beam_idx, _ in enumerate(response_result.output_token_ids):
                     self._handle_sequence(finish_reasons, response_result,
-<<<<<<< HEAD
-                                          beam_idx, logprobs_result)
-            else:
-                self._handle_sequence(finish_reasons, response_result,
-                                      response_result.sequence_index,
-                                      logprobs_result)
-=======
                                           beam_idx, logprobs_result,
                                           req_perf_metrics_dict)
             else:
                 self._handle_sequence(finish_reasons, response_result,
                                       response_result.sequence_index,
                                       logprobs_result, req_perf_metrics_dict)
->>>>>>> upstream/main
 
             if response_result.context_logits is not None:
                 self._context_logits = response_result.context_logits
 
-<<<<<<< HEAD
-=======
             if hasattr(response_result, 'mm_embedding_handle'
                        ) and response_result.mm_embedding_handle is not None:
                 self._mm_embedding_handle = response_result.mm_embedding_handle
@@ -488,7 +382,6 @@ class GenerationResultBase:
                         ],
                         multimodal_hashes=self._multimodal_hashes)
 
->>>>>>> upstream/main
             # Processing background errors here ASAF during generation.
             if self._background_error_handler and (
                     handler := self._background_error_handler()):
@@ -500,8 +393,6 @@ class GenerationResultBase:
         else:
             raise ValueError(f"Unknown response type: {response}")
 
-<<<<<<< HEAD
-=======
     def record_stats(self,
                      output: CompletionOutput,
                      stats: Optional[dict[str, float]] = None) -> None:
@@ -525,7 +416,6 @@ class GenerationResultBase:
             metrics_stats.update(processed_metrics_stat)
         self.metrics_dict = metrics_stats
 
->>>>>>> upstream/main
 
 class DetokenizedGenerationResultBase(GenerationResultBase):
     ''' The base class for the generation result with detokenization support. '''
@@ -548,12 +438,6 @@ class DetokenizedGenerationResultBase(GenerationResultBase):
         self.tokenizer = tokenizer
         self._streaming = streaming
 
-<<<<<<< HEAD
-    @nvtx_range_debug("handle_response",
-                      color="red",
-                      category="DetokenizedGenerationResultBase")
-=======
->>>>>>> upstream/main
     def _handle_response(self, response: "GenerationExecutor.Response"):
         GenerationResultBase._handle_response(self, response)
 
@@ -570,19 +454,6 @@ class DetokenizedGenerationResultBase(GenerationResultBase):
         if self.sampling_params.detokenize and self.tokenizer is not None:
             for beam_output in self.outputs:
                 beam_output._last_text_len = len(beam_output.text)
-<<<<<<< HEAD
-                if hasattr(self.tokenizer, 'decode_incrementally'):
-                    if self._streaming and not self.sampling_params.use_beam_search:
-                        beam_output.text, beam_output._incremental_states = self.tokenizer.decode_incrementally(
-                            beam_output.token_ids_diff,
-                            prev_text=beam_output.text,
-                            states=beam_output._incremental_states,
-                            flush=self._done,
-                            **kwargs)
-                    else:
-                        beam_output.text, _ = self.tokenizer.decode_incrementally(
-                            beam_output.token_ids, flush=self._done, **kwargs)
-=======
                 if hasattr(
                         self.tokenizer, 'decode_incrementally'
                 ) and self._streaming and not self.sampling_params.use_beam_search:
@@ -593,13 +464,10 @@ class DetokenizedGenerationResultBase(GenerationResultBase):
                         flush=self._done,
                         stream_interval=self.sampling_params._stream_interval,
                         **kwargs)
->>>>>>> upstream/main
                 else:
                     beam_output.text = self.tokenizer.decode(
                         beam_output.token_ids, **kwargs)
 
-<<<<<<< HEAD
-=======
                 is_generating = not self._done
                 is_finished_with_stop_or_length = (
                     beam_output.finish_reason == 'stop'
@@ -624,7 +492,6 @@ class DetokenizedGenerationResultBase(GenerationResultBase):
                             self._done = True
                             break
 
->>>>>>> upstream/main
 
 # alias
 PostprocWorker = DetokenizedGenerationResultBase.PostprocWorker
@@ -665,15 +532,12 @@ class GenerationResult(GenerationResultBase):
             "GenerationExecutor"]] = weakref.ref(executor) if executor else None
         self._aborted = False
 
-<<<<<<< HEAD
-=======
         # Pipelined multimodal hashes from request to result
         mm_hashes = getattr(
             getattr(getattr(generation_request, "multimodal_params", None),
                     "multimodal_input", None), "multimodal_hashes", None)
         self._multimodal_hashes = mm_hashes
 
->>>>>>> upstream/main
     @property
     def request_id(self) -> int:
         return self._generation_request.id
@@ -772,11 +636,7 @@ class GenerationResult(GenerationResultBase):
     def _repr_fields(self):
         return [
             'request_id', 'prompt_token_ids', 'outputs', 'finished',
-<<<<<<< HEAD
-            "context_logits"
-=======
             "context_logits", "mm_embedding_handle"
->>>>>>> upstream/main
         ]
 
     def __repr__(self) -> str:
@@ -908,8 +768,6 @@ def compute_logprobs(
 
     return LogProbsResult(prompt=prompt_logprobs,
                           generation=generation_logprobs)
-<<<<<<< HEAD
-=======
 
 
 def _process_req_perf_metrics(
@@ -937,4 +795,3 @@ def _process_req_perf_metrics(
         stat.update({MetricNames.TPOT: tpot})
     stat = dict(filter(lambda item: item[1] > 0, stat.items()))
     return stat
->>>>>>> upstream/main

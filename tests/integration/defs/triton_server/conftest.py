@@ -70,14 +70,6 @@ def test_case_name(request):
 
 
 @pytest.fixture(scope="session")
-<<<<<<< HEAD
-def output_dir(request):
-    return request.config._trt_config["output_dir"]
-
-
-@pytest.fixture(scope="session")
-=======
->>>>>>> upstream/main
 def llm_backend_root():
     llm_root = os.environ.get("LLM_ROOT", find_repo_root())
     backend_root = os.path.join(llm_root, "triton_backend")
@@ -567,8 +559,6 @@ def tiny_llama_model_root():
     return tiny_llama_model_root
 
 
-<<<<<<< HEAD
-=======
 @pytest.fixture(scope="session")
 def mistral_small_3_1_24b_model_root():
     models_root = llm_models_root()
@@ -582,7 +572,6 @@ def mistral_small_3_1_24b_model_root():
     return model_root
 
 
->>>>>>> upstream/main
 # Returns an array of total memory for each available device
 @pytest.fixture(scope="session")
 def total_gpu_memory_mib():
@@ -661,17 +650,10 @@ def install_root_requirements(llm_backend_root):
 
 @pytest.fixture(scope="session")
 def output_dir(request):
-<<<<<<< HEAD
-    if USE_TURTLE:
-        return request.config._trt_config["output_dir"]
-    else:
-        return request.config.getoption("--output-dir")
-=======
     output = request.config.getoption("--output-dir")
     if output:
         os.makedirs(str(output), exist_ok=True)
     return output
->>>>>>> upstream/main
 
 
 def deselect_by_regex(regexp, items, test_prefix, config):

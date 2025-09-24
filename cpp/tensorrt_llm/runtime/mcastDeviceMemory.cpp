@@ -20,11 +20,7 @@
 #include "tensorrt_llm/common/cudaDriverWrapper.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/common/logger.h"
-<<<<<<< HEAD
-#include "tensorrt_llm/runtime/utils/mpiUtils.h"
-=======
 
->>>>>>> upstream/main
 #include <cstddef>
 #include <cstdint>
 #include <cuda_runtime_api.h>
@@ -42,11 +38,7 @@ inline size_t roundUp(size_t val, size_t gran)
 } // namespace
 
 McastDeviceMemory::McastDeviceMemory(
-<<<<<<< HEAD
-    size_t bufSize, uint32_t groupSize, uint32_t groupRank, int deviceIdx, bool mnNvlink)
-=======
     size_t bufSize, uint32_t groupSize, uint32_t groupRank, uint32_t splitColor, int deviceIdx, bool mnNvlink)
->>>>>>> upstream/main
     : mIsMNNvlink(mnNvlink)
     , mDeviceIdx(deviceIdx)
     , mGroupSize(groupSize)
@@ -56,10 +48,7 @@ McastDeviceMemory::McastDeviceMemory(
     , mAllocationSize(0)
     , mMcPtr(0)
     , mMcHandle(0)
-<<<<<<< HEAD
-=======
     , mGroupComm(tensorrt_llm::mpi::MpiComm::session().split(splitColor, mGroupRank))
->>>>>>> upstream/main
 {
 
     TLLM_CUDA_CHECK(cudaSetDevice(mDeviceIdx));
@@ -74,18 +63,12 @@ McastDeviceMemory::McastDeviceMemory(
     // From pytorch implementation for alignment
     constexpr size_t kSignalPadAlignment = 16UL;
     mSignalPadOffset = roundUp(mBufSize, kSignalPadAlignment);
-<<<<<<< HEAD
-    TLLM_LOG_DEBUG(
-        "[McastDeviceMemory] Rank: %u, Group size: %u, isMultiNode: %d, device_idx: %d, Signal pad offset: %zu",
-        mGroupRank, mGroupSize, mIsMNNvlink, mDeviceIdx, mSignalPadOffset);
-=======
     int const world_rank{tensorrt_llm::mpi::MpiComm::session().getRank()};
 
     TLLM_LOG_DEBUG(
         "[McastDeviceMemory] World Rank: %u, Group Rank: %u, Group size: %u, GroupSplitColor: %u, isMultiNode: %d, "
         "device_idx: %d, Signal pad offset: %zu",
         world_rank, mGroupRank, mGroupSize, splitColor, mIsMNNvlink, mDeviceIdx, mSignalPadOffset);
->>>>>>> upstream/main
 
     if (mIsMNNvlink)
     {
@@ -148,12 +131,6 @@ McastDeviceMemory::~McastDeviceMemory()
 
 void McastDeviceMemory::allocMnMcastMem(size_t bufSize)
 {
-<<<<<<< HEAD
-
-    auto const& mpi_comm = tensorrt_llm::mpi::MpiComm::session();
-
-=======
->>>>>>> upstream/main
     CUmemAllocationHandleType const handle_type = CU_MEM_HANDLE_TYPE_FABRIC;
     CUmemAllocationProp prop = {};
     prop.requestedHandleTypes = handle_type;
@@ -180,11 +157,7 @@ void McastDeviceMemory::allocMnMcastMem(size_t bufSize)
     // All gather
     cudaMallocHost(&exphndl, mGroupSize * sizeof(CUmemFabricHandle));
     memcpy(exphndl + mGroupRank * sizeof(CUmemFabricHandle), &myhndl, sizeof(CUmemFabricHandle));
-<<<<<<< HEAD
-    mpi_comm.allgather(
-=======
     mGroupComm.allgather(
->>>>>>> upstream/main
         exphndl + mGroupRank * sizeof(CUmemFabricHandle), exphndl, sizeof(CUmemFabricHandle), mpi::MpiType::kCHAR);
     cudaDeviceSynchronize();
 
@@ -203,11 +176,7 @@ void McastDeviceMemory::allocMnMcastMem(size_t bufSize)
         TLLM_CU_CHECK(cuMemExportToShareableHandle((void*) fabric_handle, mMcHandle, CU_MEM_HANDLE_TYPE_FABRIC, 0));
     }
     // Broadcast
-<<<<<<< HEAD
-    mpi_comm.bcast(fabric_handle, sizeof(CUmemFabricHandle), mpi::MpiType::kCHAR, 0);
-=======
     mGroupComm.bcast(fabric_handle, sizeof(CUmemFabricHandle), mpi::MpiType::kCHAR, 0);
->>>>>>> upstream/main
     cudaDeviceSynchronize();
     if (mGroupRank != 0)
     {
@@ -242,18 +211,9 @@ void McastDeviceMemory::allocMnMcastMem(size_t bufSize)
 
 void McastDeviceMemory::allocNvlsMcastMem(size_t bufSize)
 {
-<<<<<<< HEAD
-    // Create a std::set to include all ranks in range (0, group_size)
-    std::set<int> ranks;
-    for (uint32_t i = 0; i < mGroupSize; ++i)
-    {
-        ranks.insert(i);
-    }
-=======
     // Get the world ranks for ranks in this group
     auto ranks_ = tensorrt_llm::mpi::getWorldRanks(mGroupComm);
     std::set<int> ranks(ranks_.begin(), ranks_.end());
->>>>>>> upstream/main
     // Reuse existing implementation
     mNvlsHandle = tensorrt_llm::runtime::ipcNvlsAllocate(bufSize, ranks);
     mMcHandle = mNvlsHandle->mc_handle;

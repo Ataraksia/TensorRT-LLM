@@ -111,11 +111,8 @@ constexpr int32_t kSM_86 = 86;
 constexpr int32_t kSM_89 = 89;
 constexpr int32_t kSM_90 = 90;
 constexpr int32_t kSM_100 = 100;
-<<<<<<< HEAD
-=======
 constexpr int32_t kSM_100f = 10100;
 constexpr int32_t kSM_103 = 103;
->>>>>>> upstream/main
 constexpr int32_t kSM_120 = 120;
 constexpr int32_t kSM_121 = 121;
 

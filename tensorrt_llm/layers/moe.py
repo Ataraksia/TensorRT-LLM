@@ -40,35 +40,23 @@ from ..module import Module, ModuleList
 from ..parameter import Parameter
 from ..plugin import TRT_LLM_PLUGIN_NAMESPACE
 from ..quantization import GroupwiseQuantAlgo, QuantMode
-<<<<<<< HEAD
-from ..quantization.functional import (postprocess_weight_only,
-=======
 from ..quantization.functional import (get_weight_scale_interleave_factor,
                                        postprocess_weight_only,
->>>>>>> upstream/main
                                        preprocess_weights_for_mixed_gemm,
                                        quantize)
 from .linear import RowLinear
 from .mlp import MLP, GatedMLP
 
 activation_str_to_int_map = {
-<<<<<<< HEAD
-    # [WARNING] Keep the below in sync with cpp/tensorrt_llm/kernels/internal_cutlass_kernels/include/moe_gemm_kernels.h
-=======
     # [WARNING] Keep the below in sync with cpp/tensorrt_llm/kernels/cutlass_kernels/include/common.h
->>>>>>> upstream/main
     "gelu": 0,
     "gelu_new": 0,
     "relu": 1,
     "silu": 2,
     "swiglu": 3,
     "geglu": 4,
-<<<<<<< HEAD
-    "identity": 5,
-=======
     "swiglu_bias": 5,
     "identity": 6,
->>>>>>> upstream/main
 }
 
 
@@ -502,13 +490,6 @@ class MOEWeightWrapper(Module):
             self.alpha = Parameter(shape=(experts_per_node, ),
                                    dtype=trt.float32)
         elif quant_mode.has_per_group_scaling():
-<<<<<<< HEAD
-            self.weight = Parameter(shape=(experts_per_node, in_features,
-                                           out_features // 4),
-                                    dtype=dtype)
-            scale_shape = (experts_per_node, in_features // group_size,
-                           out_features)
-=======
             self.weight = Parameter(
                 shape=(experts_per_node, in_features,
                        out_features // 4),  # int4 <--> fp16/bf16
@@ -521,7 +502,6 @@ class MOEWeightWrapper(Module):
             scale_shape = (experts_per_node,
                            in_features // group_size // scale_interleave_factor,
                            out_features * scale_interleave_factor)
->>>>>>> upstream/main
             self.weights_scaling_factor = Parameter(shape=scale_shape,
                                                     dtype=dtype)
             if groupwise_quant_algo & GroupwiseQuantAlgo.ZERO:
@@ -721,11 +701,7 @@ class MOEWeightWrapper(Module):
             weights = stack_weights(tllm_key, weights)
         if tllm_key.endswith("weights_block_scaling_factor_interleaved"):
             weights = stack_weights(tllm_key, weights)
-<<<<<<< HEAD
-            weights = torch.ops.tensorrt_llm.nvfp4_block_scale_interleave(
-=======
             weights = torch.ops.trtllm.block_scale_interleave(
->>>>>>> upstream/main
                 weights.to(torch.float8_e4m3fn).view(
                     torch.uint8).cpu().contiguous()).reshape(
                         weights.shape).view(torch.float8_e4m3fn)
@@ -801,11 +777,7 @@ class MixtureOfExperts(Module):
         self.use_int8_weight = use_int8_weight
         self.group_size = group_size
 
-<<<<<<< HEAD
-        if self.use_int8_weight:
-=======
         if self.use_int8_weight and self.group_size > 0:
->>>>>>> upstream/main
             raise NotImplementedError("INT8-GPTQ is not implemented for MoE.")
 
         self.static_routing = static_routing

@@ -39,8 +39,6 @@ enum class AllReduceAlgo : uint32_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 enum class MatrixLayout
 {
     // K-major layout (default). [Mn, K]
@@ -66,7 +64,6 @@ enum class MatrixLayout
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
->>>>>>> upstream/main
 enum class SplitK : uint32_t
 {
     // No split-k is needed. I.e. mNumSlicesForSplitK == 1.
@@ -82,8 +79,6 @@ enum class SplitK : uint32_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 enum class BiasType : uint32_t
 {
     // No bias.
@@ -98,7 +93,6 @@ enum class BiasType : uint32_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
->>>>>>> upstream/main
 enum class TileScheduler
 {
     // Static scheduler (Non-persistent).
@@ -125,8 +119,6 @@ SPLIT_K_FUNCTION(Dsmem)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 // Helper functions to check the Bias type.
 
 #define BIAS_TYPE_FUNCTION(Mode)                                                                                       \
@@ -144,7 +136,6 @@ BIAS_TYPE_FUNCTION(Mn)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
->>>>>>> upstream/main
 } // namespace gemm
 
 } // namespace gemm

@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-<<<<<<< HEAD
-=======
 import re
->>>>>>> upstream/main
 from pathlib import Path
 from typing import Any, Callable
 
@@ -177,8 +174,6 @@ def make_server_with_custom_sampler_fixture(api_type: str) -> Callable:
             yield remote_server
 
     return server_with_custom_sampler
-<<<<<<< HEAD
-=======
 
 
 def expand_slurm_nodelist(nodelist_str):
@@ -262,4 +257,3 @@ def expand_slurm_nodelist(nodelist_str):
             expanded_nodes.append(group)
 
     return expanded_nodes
->>>>>>> upstream/main

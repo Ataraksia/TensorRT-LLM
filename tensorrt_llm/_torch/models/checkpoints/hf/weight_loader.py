@@ -1,10 +1,7 @@
 import glob
 import multiprocessing
 import os
-<<<<<<< HEAD
-=======
 from concurrent.futures import ThreadPoolExecutor
->>>>>>> upstream/main
 from typing import Any, List
 
 import psutil
@@ -29,8 +26,6 @@ class HfWeightLoader(BaseWeightLoader):
 
     def load_weights(self, checkpoint_dir: str) -> dict[str, Any]:
         weight_files = glob.glob(f"{checkpoint_dir}/*.safetensors")
-<<<<<<< HEAD
-=======
         # Some model checkpoint directories contain not only the sharded safetensors, but one
         # consolidated tensor. In the presence of both, we favor the former, as there really is no need
         # to prefetch the (usually) ridiculously large consolidated tensor into memory in such a case.
@@ -39,7 +34,6 @@ class HfWeightLoader(BaseWeightLoader):
         ]
         if len(filtered_weight_files) > 0:
             weight_files = filtered_weight_files
->>>>>>> upstream/main
         if weight_files:
             # Prefetch the weight files to CPU memory if the size is less than 90% of the available memory.
             # This is a heuristic to avoid prefetching files that are too large and causing file cache thrashing.
@@ -135,14 +129,7 @@ class HfWeightLoader(BaseWeightLoader):
         if len(local_file_names) == 0:
             return
 
-<<<<<<< HEAD
-        max_processes = min(multiprocessing.cpu_count() * 2, 16,
-                            len(local_file_names))
-        with multiprocessing.Pool(processes=max_processes) as pool:
-            pool.map(self._prefetch_one_file, local_file_names)
-=======
         max_workers = min(multiprocessing.cpu_count() * 2, 16,
                           len(local_file_names))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             list(executor.map(self._prefetch_one_file, local_file_names))
->>>>>>> upstream/main

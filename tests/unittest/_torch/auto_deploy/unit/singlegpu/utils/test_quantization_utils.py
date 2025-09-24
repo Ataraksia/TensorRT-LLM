@@ -2,14 +2,6 @@ import pytest
 import torch
 
 from tensorrt_llm._torch.auto_deploy.custom_ops.quant import FP8_MAX
-<<<<<<< HEAD
-from tensorrt_llm._torch.auto_deploy.utils.quantization_utils import (
-    FP8QuantizationImpl,
-    _shard_fp4_weight_scale,
-    fp4_global_scale,
-    modelopt_fp4_scale_to_cutlass_fp4_scale,
-)
-=======
 from tensorrt_llm._torch.auto_deploy.transform.interface import TransformConfig
 from tensorrt_llm._torch.auto_deploy.transform.library.quantization import (
     FP8LinearQuantizationFromConfig,
@@ -19,7 +11,6 @@ from tensorrt_llm._torch.auto_deploy.utils.quantization_utils import (
     modelopt_fp4_scale_to_cutlass_fp4_scale,
 )
 from tensorrt_llm._torch.auto_deploy.utils.sharding_utils import _shard_fp4_weight_scale
->>>>>>> upstream/main
 
 
 @pytest.mark.parametrize("dim", [0, 1])
@@ -60,12 +51,8 @@ def test_fp4_global_scale():
 
 @pytest.mark.parametrize("amax, expected_scale", [(FP8_MAX, 1.0), (FP8_MAX / 2.0, 0.5)])
 def test_fp8_convert_amax_hook(amax, expected_scale):
-<<<<<<< HEAD
-    fp8_imp = FP8QuantizationImpl()
-=======
     config = TransformConfig(stage="pattern_matcher")
     fp8_imp = FP8LinearQuantizationFromConfig(config)
->>>>>>> upstream/main
 
     mock_state_dict = {"amax": amax}
 

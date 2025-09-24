@@ -122,8 +122,6 @@ def add_multimodal_args(parser):
          " ├── __init__.py"
          " ├── <model_name>.py"
          " └── <sub_dirs>"))
-<<<<<<< HEAD
-=======
     # Add multiturn conversation related parameters
     parser.add_argument("--multiturn",
                         action="store_true",
@@ -133,7 +131,6 @@ def add_multimodal_args(parser):
         type=int,
         default=2,
         help="Number of conversation turns for automated testing.")
->>>>>>> upstream/main
     return parser
 
 
@@ -157,10 +154,6 @@ def parse_arguments():
     parser = add_lora_args(parser)
     args = parser.parse_args()
 
-<<<<<<< HEAD
-    args.disable_kv_cache_reuse = True  # kv cache reuse does not work for multimodal, force overwrite
-=======
->>>>>>> upstream/main
     if args.kv_cache_fraction is None:
         args.kv_cache_fraction = 0.6  # lower the default kv cache fraction for multimodal
 
@@ -203,8 +196,6 @@ def main():
         f"Unsupported model_type: {model_type} found!\n" \
         f"Supported types: {MULTIMODAL_PLACEHOLDER_REGISTRY.get_registered_model_types()}"
 
-<<<<<<< HEAD
-=======
     # If multiturn mode is enabled
     if args.multiturn:
         # Run predefined multiturn conversation examples
@@ -279,7 +270,6 @@ def main():
         return
 
     # Original single-turn processing logic
->>>>>>> upstream/main
     # set prompts and media to example prompts and images if they are not provided
     if args.prompt is None:
         args.prompt = example_medias_and_prompts[args.modality]["prompt"]
@@ -310,8 +300,6 @@ def main():
         prompt = args.prompt[i]
         generated_text = output.outputs[0].text
         print(f"[{i}] Prompt: {prompt!r}, Generated text: {generated_text!r}")
-<<<<<<< HEAD
-=======
         if args.return_context_logits:
             print(f"[{i}] Context logits: {output.context_logits}")
         if args.return_generation_logits:
@@ -320,7 +308,6 @@ def main():
             )
         if args.logprobs:
             print(f"[{i}] Logprobs: {output.outputs[0].logprobs}")
->>>>>>> upstream/main
 
 
 if __name__ == "__main__":

@@ -5,18 +5,6 @@ import operator
 from abc import ABC, abstractmethod
 from enum import IntEnum
 from functools import partial
-<<<<<<< HEAD
-from typing import Callable, Dict, List, Literal, Optional
-
-import torch
-import torch.nn as nn
-from pydantic import BaseModel, ConfigDict, Field
-from torch.fx import GraphModule, Node
-
-from ..utils.logger import ad_logger
-from .node_utils import extract_param_names_from_lin_node, is_op, num_users_of_weight_node
-from .quantization_utils import QuantizationImpl
-=======
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence
 
 import torch
@@ -31,7 +19,6 @@ from .quantization_utils import (
     cutlass_fp4_scale_to_modelopt_fp4_scale,
     modelopt_fp4_scale_to_cutlass_fp4_scale,
 )
->>>>>>> upstream/main
 
 
 def _load_hook(
@@ -75,12 +62,9 @@ def _insert_sharded_matmul(
     world_size: int,
     add_dist: bool = False,
     min_local_shape: int = 1,
-<<<<<<< HEAD
-=======
     quantization_cb: Optional[
         Callable[[GraphModule, nn.Module, Node, str, torch.Size, int, int, int], None]
     ] = None,
->>>>>>> upstream/main
 ) -> None:
     """Replace the matmul node with a new matmul node that accepts sharded weights.
 
@@ -89,11 +73,6 @@ def _insert_sharded_matmul(
     assert dim in [0, 1], "Only dim 0 and 1 are supported for sharding"
     assert add_dist or dim == 0, "For dim=1 sharding, dist_op is required."
 
-<<<<<<< HEAD
-    quantization_impl = QuantizationImpl.create(node)
-
-=======
->>>>>>> upstream/main
     def split_tensor(
         t: torch.Tensor,
         d: int = dim,
@@ -130,12 +109,7 @@ def _insert_sharded_matmul(
             None
             if remove
             else nn.Parameter(
-<<<<<<< HEAD
-                split_tensor(gm.get_parameter(param_key)).detach().clone(),
-                requires_grad=quantization_impl is None,
-=======
                 split_tensor(gm.get_parameter(param_key)).detach().clone(), requires_grad=False
->>>>>>> upstream/main
             )
         )
 
@@ -171,26 +145,6 @@ def _insert_sharded_matmul(
         set_new_param(submod, bias_key, remove=True)
         gm._register_load_state_dict_pre_hook(partial(_load_hook_remove, param_key=bias_key))
 
-<<<<<<< HEAD
-    if quantization_impl:
-        scales = {}
-        for scale_name in quantization_impl.scale_names():
-            scales[scale_name] = submod.get_buffer(scale_name)
-        scales["weight_shape"] = weight_new_shape
-        sharded_scales = quantization_impl.shard_scales(dim, rank, world_size, **scales)
-        for k, v in sharded_scales.items():
-            submod.register_buffer(k, v)
-
-        gm._register_load_state_dict_pre_hook(
-            partial(
-                quantization_impl.shard_load_hook,
-                weight_name=weight_key,
-                weight_shape=weight_new_shape,
-                dim=dim,
-                rank=rank,
-                world_size=world_size,
-            )
-=======
     if quantization_cb is not None:
         quantization_cb(
             gm=gm,
@@ -201,7 +155,6 @@ def _insert_sharded_matmul(
             dim=dim,
             rank=rank,
             world_size=world_size,
->>>>>>> upstream/main
         )
 
     # no comm node needed for single device
@@ -225,17 +178,12 @@ def _insert_sharded_matmul(
 class SplitDimension(IntEnum):
     """Enum for tensor split dimensions in sharding."""
 
-<<<<<<< HEAD
-    ROW = 0  # Split along rows (first dimension)
-    COLUMN = 1  # Split along columns (second dimension)
-=======
     # NOTE: The names COLUMN/ROW reflect the hugging face
     # base_tp_plan sharding notation, but since we assume Y = W @ X^T,
     # when splitting weight matrix W^T across columns, the actual split
     # is over dimension 0
     COLUMN = 0
     ROW = 1
->>>>>>> upstream/main
 
 
 class ShardingTransformInfo(BaseModel, ABC):
@@ -281,21 +229,6 @@ class TPShardingInfo(ShardingTransformInfo):
     dist_op: Optional[Literal["all_reduce", "all_gather"]] = None
     min_local_shape: int = 1
 
-<<<<<<< HEAD
-    def validate(self, gm: GraphModule = None, node: Node = None) -> bool:
-        """Validate the transformation configuration."""
-        if self.dist_op is not None:
-            if self.split_dim == SplitDimension.ROW:
-                if self.dist_op == "all_reduce":
-                    ad_logger.warning(
-                        f"Row split is only supported for all_gather. Skipping {self}."
-                    )
-                    return False
-            if self.split_dim == SplitDimension.COLUMN:
-                if self.dist_op == "all_gather":
-                    ad_logger.warning(
-                        f"Column split is only supported for all_reduce. Skipping {self}."
-=======
     @classmethod
     def from_node(cls, node: Node, **kwargs) -> "TPShardingInfo":
         """
@@ -317,7 +250,6 @@ class TPShardingInfo(ShardingTransformInfo):
                 if self.dist_op == "all_gather":
                     ad_logger.warning(
                         f"Row split is only supported for all_reduce. Skipping {self}."
->>>>>>> upstream/main
                     )
                     return False
         return True
@@ -336,8 +268,6 @@ class TPShardingInfo(ShardingTransformInfo):
         )
 
 
-<<<<<<< HEAD
-=======
 class QuantizationShardingMixin(ABC):
     """
     Mixin that provides a callback to handle quantization-aware sharding:
@@ -533,7 +463,6 @@ def _resolve_tp_cls_from_node(node: Node):
     return TPShardingInfo
 
 
->>>>>>> upstream/main
 class BMMShardingInfo(ShardingTransformInfo):
     """Configuration for BMM sharding transformations."""
 
@@ -641,21 +570,13 @@ def _insert_sharded_moe(
     node: Node,
     rank: int,
     world_size: int,
-<<<<<<< HEAD
-=======
     scale_names: Sequence[str] = (),
->>>>>>> upstream/main
 ):
     """Update the torch_moe node with sharded weight lists,
     sharded `selected_experts` and `final_scales(router_logics)`.
     Add an all_reduce node after the moe node.
     """
-<<<<<<< HEAD
-    quant_impl = QuantizationImpl.create(node)
-    scale_names = quant_impl.scale_names() if quant_impl else []
-=======
     scale_names = list(scale_names)
->>>>>>> upstream/main
 
     num_experts = len(node.args[3])
     args = list(node.args)
@@ -737,18 +658,6 @@ class EPShardingInfo(ShardingTransformInfo):
     rank: int
     world_size: int
 
-<<<<<<< HEAD
-    def validate(self, gm: GraphModule = None, node: Node = None) -> bool:
-        """Validate the transformation configuration."""
-        if not is_op(
-            node,
-            (
-                torch.ops.auto_deploy.torch_moe,
-                torch.ops.auto_deploy.torch_quant_fp8_moe,
-                torch.ops.auto_deploy.torch_quant_fp4_moe,
-            ),
-        ):
-=======
     @classmethod
     def from_node(cls, node: Node, **kwargs) -> "EPShardingInfo":
         """
@@ -760,16 +669,12 @@ class EPShardingInfo(ShardingTransformInfo):
     def validate(self, gm: GraphModule = None, node: Node = None) -> bool:
         """Validate the transformation configuration."""
         if not is_op(node, torch.ops.auto_deploy.torch_moe):
->>>>>>> upstream/main
             ad_logger.warning(f"EP sharding is only supported for MOE nodes. Skipping {self}.")
             return False
         return True
 
     def apply(self, gm: GraphModule, node: Node) -> None:
         """Apply EP sharding transformation to the graph module."""
-<<<<<<< HEAD
-        _insert_sharded_moe(gm, node, self.rank, self.world_size)
-=======
         _insert_sharded_moe(gm, node, self.rank, self.world_size, [])
 
 
@@ -821,17 +726,11 @@ def _resolve_ep_cls_from_node(node: Node) -> type[EPShardingInfo]:
             # Missing op variant in this build or other harmless issues — keep trying.
             pass
     return EPShardingInfo
->>>>>>> upstream/main
 
 
 class ShardingConfig(BaseModel):
     """Configuration for sharding the model."""
 
-<<<<<<< HEAD
-    tp_transforms: List[TPShardingInfo] = Field(default_factory=list)
-    bmm_transforms: List[BMMShardingInfo] = Field(default_factory=list)
-    ep_transforms: List[EPShardingInfo] = Field(default_factory=list)
-=======
     factory_source: ShardingConfigSource = Field(default=ShardingConfigSource.UNKNOWN)
     rank: int = Field(default=0)
     world_size: int = Field(default=1)
@@ -928,4 +827,3 @@ def _append_simple_shard(
                 )
             )
     sharding_config.tp_transforms.extend(tp_shards)
->>>>>>> upstream/main

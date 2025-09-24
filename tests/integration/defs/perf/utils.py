@@ -19,26 +19,17 @@ import io
 import os
 import re
 import subprocess
-<<<<<<< HEAD
-=======
 import time
->>>>>>> upstream/main
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional
 
-<<<<<<< HEAD
-from _pytest.nodes import Item
-from _pytest.python import Function
-from defs.trt_test_alternative import check_output, print_error, print_info
-=======
 import requests
 from _pytest.nodes import Item
 from _pytest.python import Function
 from defs.trt_test_alternative import (check_output, popen, print_error,
                                        print_info)
->>>>>>> upstream/main
 
 from ..common import get_trt_llm_lib_dir, venv_mpi_check_output
 from ..local_venv import PythonVenvRunnerImpl
@@ -111,11 +102,8 @@ class PerfMetricType(str, Enum):
     SEQ_THROUGHPUT = "SEQ_THROUGHPUT"
     SEQ_LATENCY = "SEQ_LATENCY"
     KV_CACHE_SIZE = "KV_CACHE_SIZE"
-<<<<<<< HEAD
-=======
     DISAGG_SERVER_E2EL = "DISAGG_SERVER_E2EL"
     DISAGG_SERVER_TTFT = "DISAGG_SERVER_TTFT"
->>>>>>> upstream/main
 
 
 class PerfScriptTestCmds(NamedTuple):
@@ -323,8 +311,6 @@ class PerfBenchScriptTestCmds(NamedTuple):
         return cmd_str
 
 
-<<<<<<< HEAD
-=======
 class PerfDisaggScriptTestCmds(NamedTuple):
     ctx_cmd: str
     gen_cmd: str
@@ -387,7 +373,6 @@ class PerfDisaggScriptTestCmds(NamedTuple):
         return ["disaggregated server tests, please check config files"]
 
 
->>>>>>> upstream/main
 class AbstractPerfScriptTestClass(abc.ABC):
     """
     Abstract class for all script-based perf tests.
@@ -601,10 +586,6 @@ class AbstractPerfScriptTestClass(abc.ABC):
 
         # Serialize the commands.
         serialized_cmd = self.get_commands().get_cmd_str(cmd_idx)
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
         # Save engine building log + benchmarking log in the csv file.
         raw_result = ""
         if 0 in outputs:

@@ -70,17 +70,6 @@ private:
                 expIdx[ie].score = static_cast<float>(finalScore);
             }
 
-<<<<<<< HEAD
-            // convert back to io_dtype and store the topk expert results in hostData.mPtrExpertIdx
-            for (int ie = 0; ie < param.topK; ++ie)
-            {
-                PackedType si{static_cast<T>(expIdx[ie].score), expIdx[ie].idx};
-                reinterpret_cast<PackedType*>(bufferCast<int8_t>(*this->mPtrExpertIdxHost))[it * param.topK + ie] = si;
-                if (param.getExpWeights)
-                {
-                    bufferCast<T>(*this->mPtrExpertWeightsHost)[it * param.topK + ie]
-                        = static_cast<T>(expIdx[ie].score);
-=======
             // convert back to io_dtype and store the topk expert results in hostData.mPtrTopKPacked
             for (int ie = 0; ie < param.topK; ++ie)
             {
@@ -96,7 +85,6 @@ private:
                 else if (param.getExpWeights)
                 {
                     bufferCast<T>(*this->mPtrTopKWeightsHost)[it * param.topK + ie] = static_cast<T>(expIdx[ie].score);
->>>>>>> upstream/main
                 }
             }
         }
@@ -115,10 +103,6 @@ private:
     {
         RoutingKernelTest<T>::setCommonParams(param, routingData);
         routingData.mDtypeExpW = btg::Dtype::Bfloat16;
-<<<<<<< HEAD
-        routingData.mPtrScores = bufferCast<T>(*this->mPtrScoresDevice);
-        routingData.mPtrExpertIdx = reinterpret_cast<PackedType*>(bufferCast<int8_t>(*this->mPtrExpertIdxDevice));
-=======
 
         routingData.mPtrTopKPacked = reinterpret_cast<PackedType*>(bufferCast<int8_t>(*this->mPtrTopKPackedDevice));
         if (param.useTopKAsInput)
@@ -131,7 +115,6 @@ private:
             routingData.mPtrTopKIds = nullptr;
             routingData.mPtrScores = bufferCast<T>(*this->mPtrScoresDevice);
         }
->>>>>>> upstream/main
     }
 
     void callTestedFunction(
@@ -151,12 +134,8 @@ TYPED_TEST(RoutingLlama4KernelTest, WarpLevelParallelization)
         /*numExperts=*/128, /*topK=*/1,
         /*expertParallelization=*/1, /*expertParallelizationId=*/0,
         /*paddingLog2=*/3, /*localExpertsStrideLog2=*/0,
-<<<<<<< HEAD
-        /*usePdl=*/true, /*getExpWeights=*/true, /*nGroup*/ 0, /*topkGroup*/ 0, /*routedScalingFactor*/ 0.0f,
-=======
         /*usePdl=*/true, /*getExpWeights=*/true, /*useTopKAsInput=*/false,
         /*nGroup*/ 0, /*topkGroup*/ 0, /*routedScalingFactor*/ 0.0f,
->>>>>>> upstream/main
         /*requiredComputeCapability*/ 8);
     this->runTest(param);
 };
@@ -167,11 +146,7 @@ TYPED_TEST(RoutingLlama4KernelTest, ClusterLevelParallelization)
         /*numExperts=*/128, /*topK=*/1,
         /*expertParallelization=*/1, /*expertParallelizationId=*/0,
         /*paddingLog2=*/3, /*localExpertsStrideLog2=*/0,
-<<<<<<< HEAD
-        /*usePdl=*/true, /*getExpWeights=*/true,
-=======
         /*usePdl=*/true, /*getExpWeights=*/true, /*useTopKAsInput=*/false,
->>>>>>> upstream/main
         /*nGroup*/ 0, /*topkGroup*/ 0, /*routedScalingFactor*/ 1.0f, /*requiredComputeCapability*/ 9);
     this->runTest(param);
 };
@@ -182,9 +157,6 @@ TYPED_TEST(RoutingLlama4KernelTest, DeviceLevelParallelization)
         /*numExperts=*/128, /*topK=*/1,
         /*expertParallelization=*/1, /*expertParallelizationId=*/0,
         /*paddingLog2=*/3, /*localExpertsStrideLog2=*/0,
-<<<<<<< HEAD
-        /*usePdl=*/true, /*getExpWeights=*/true,
-=======
         /*usePdl=*/true, /*getExpWeights=*/true, /*useTopKAsInput=*/false,
         /*nGroup*/ 0, /*topkGroup*/ 0, /*routedScalingFactor*/ 1.0f, /*requiredComputeCapability*/ 8);
     this->runTest(param);
@@ -220,7 +192,6 @@ TYPED_TEST(RoutingLlama4KernelTest, DeviceLevelParallelizationTopKAsInput)
         /*expertParallelization=*/1, /*expertParallelizationId=*/0,
         /*paddingLog2=*/3, /*localExpertsStrideLog2=*/0,
         /*usePdl=*/true, /*getExpWeights=*/true, /*useTopKAsInput=*/true,
->>>>>>> upstream/main
         /*nGroup*/ 0, /*topkGroup*/ 0, /*routedScalingFactor*/ 1.0f, /*requiredComputeCapability*/ 8);
     this->runTest(param);
 };

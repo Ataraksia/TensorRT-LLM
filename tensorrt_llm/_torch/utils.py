@@ -8,12 +8,6 @@ from typing import Dict, List
 import torch
 
 from tensorrt_llm._utils import TensorWrapper, convert_to_torch_tensor
-<<<<<<< HEAD
-
-is_torch_compiling_flag = False
-
-aux_stream_name_list = ['Attention', 'MoeShared', 'MoeChunkingOverlap']
-=======
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.math_utils import ceil_div, pad_up
 from tensorrt_llm.quantization.utils import fp4_utils
@@ -26,7 +20,6 @@ aux_stream_name_list = [
     'MoeChunkingOverlap',
     'MoeBalancer',
 ]
->>>>>>> upstream/main
 AuxStreamType = Enum(
     'AuxStreamType',
     aux_stream_name_list,
@@ -89,12 +82,8 @@ def make_weak_ref(x):
 
     if isinstance(x, torch.Tensor):
         return convert_to_torch_tensor(
-<<<<<<< HEAD
-            TensorWrapper(x.data_ptr(), x.dtype, x.shape)) if x.is_cuda else x
-=======
             TensorWrapper(x.data_ptr(), x.dtype, x.shape,
                           x.stride())) if x.is_cuda else x
->>>>>>> upstream/main
     elif isinstance(x, tuple):
         return tuple(make_weak_ref(i) for i in x)
     elif isinstance(x, list):
@@ -111,89 +100,13 @@ def make_weak_ref(x):
 class Fp4QuantizedTensor:
     fp4_tensor: torch.Tensor
     scaling_factor: torch.Tensor
-<<<<<<< HEAD
-=======
     is_sf_swizzled: bool = True
->>>>>>> upstream/main
 
     @property
     def shape(self):
         return self.fp4_tensor.shape
 
 
-<<<<<<< HEAD
-_disable_fp4_allgather = os.getenv("TLLM_DISABLE_FP4_ALLGATHER", "0") == "1"
-
-
-def disable_fp4_allgather():
-    return _disable_fp4_allgather
-
-
-def swizzle_sf(sf: torch.Tensor,
-               row: int,
-               col: int,
-               scaling_vector_size: int = 16):
-    factor = scaling_vector_size * 4
-    num_m_tiles = (row + 128 - 1) // 128
-    num_k_tiles = (col + factor - 1) // factor
-    # SF layout [num_m_tiles, num_k_tiles, 32 (m_tile column major), 4 (m_tile column major), 4(k_tile)]
-    sf_full = torch.zeros(num_m_tiles * 32 * 4,
-                          num_k_tiles * 4,
-                          dtype=sf.dtype,
-                          device=sf.device)
-    sf_full[:row, :(col //
-                    scaling_vector_size)] = sf[:row, :(col //
-                                                       scaling_vector_size)]
-    sf_full_reshaped = sf_full.view(num_m_tiles, 4, 32, num_k_tiles, 4)
-    sf_full_swizzle = sf_full_reshaped.transpose(1, 3)
-    sf_swizzle = sf_full_swizzle.reshape(-1)
-    return sf_swizzle
-
-
-def unswizzle_sf(sf: torch.Tensor,
-                 row: int,
-                 col: int,
-                 scaling_vector_size: int = 16):
-    factor = scaling_vector_size * 4
-    num_m_tiles = (row + 128 - 1) // 128
-    num_k_tiles = (col + factor - 1) // factor
-    # SF layout [num_m_tiles, num_k_tiles, 32 (m_tile column major), 4 (m_tile column major), 4(k_tile)]
-    sf_reshaped = sf.view(num_m_tiles, num_k_tiles, 32, 4, 4)
-    sf_unswizzle = sf_reshaped.transpose(1, 3)
-    sf_unswizzle = sf_unswizzle.reshape(num_m_tiles * 32 * 4, num_k_tiles * 4)
-    sf_unswizzle_sliced = sf_unswizzle[:row, :(col // scaling_vector_size)]
-    return sf_unswizzle_sliced.contiguous()
-
-
-def reswizzle_sf(sf: torch.Tensor,
-                 row: int,
-                 col: int,
-                 scaling_vector_size: int = 16):
-    factor = scaling_vector_size * 4
-    num_m_tiles = (row + 128 - 1) // 128
-    num_k_tiles = (col + factor - 1) // factor
-    partition_size = num_m_tiles * num_k_tiles * 32 * 4 * 4
-    num_partitions = sf.numel() // partition_size
-    sf_reshaped = sf.view(num_partitions, num_m_tiles, num_k_tiles, 32, 4, 4)
-    sf_unswizzle = sf_reshaped.transpose(2, 4)
-    sf_unswizzle = sf_unswizzle.reshape(num_partitions, num_m_tiles * 32 * 4,
-                                        num_k_tiles * 4)
-    total_rows = num_partitions * row
-    num_m_tiles_out = (total_rows + 128 - 1) // 128
-    sf_out = torch.zeros(
-        num_m_tiles_out,
-        4,
-        32,
-        num_k_tiles,
-        4,
-        dtype=sf.dtype,
-        device=sf.device,
-    )
-    sf_out_reshaped = sf_out.view(num_m_tiles_out * 32 * 4, num_k_tiles * 4)
-    sf_out_reshaped[:total_rows] = sf_unswizzle[:, :row].reshape(total_rows, -1)
-    sf_out_swizzle = sf_out.transpose(1, 3).reshape(-1)
-    return sf_out_swizzle
-=======
 def compute_swizzled_sf_shape(row: int, col: int):
     padded_row = pad_up(row, 128)
     padded_col = pad_up(col, 4)
@@ -284,16 +197,12 @@ def _(sf, rows, cols, scaling_vector_size=16):
     total_rows = num_partitions * rows
     sz = pad_up(total_rows, 128) * pad_up(cols, 4)
     return sf.new_empty(sz)
->>>>>>> upstream/main
 
 
 def next_positive_power_of_2(x: int) -> int:
     if x < 1:
         return 1
 
-<<<<<<< HEAD
-    return 1 << (x - 1).bit_length()
-=======
     # Following code is equivalent to 1 << (x - 1).bit_length()
     # But this impl does not contain bit_length() so can be used by torch compile.
     # It can correctly handle 64bit number which should be enough for now.
@@ -305,7 +214,6 @@ def next_positive_power_of_2(x: int) -> int:
     n |= n >> 16
     n |= n >> 32
     return n + 1
->>>>>>> upstream/main
 
 
 def last_positive_power_of_2(x: int) -> int:
@@ -328,11 +236,7 @@ def get_power_of_2_num_tokens_buckets(max_num_tokens) -> List[int]:
         num_token_buckets.append(m)
         m //= 2
 
-<<<<<<< HEAD
-    return tuple(num_token_buckets)
-=======
     return tuple(num_token_buckets[::-1])
->>>>>>> upstream/main
 
 
 def get_last_power_of_2_num_tokens_buckets(max_num_tokens) -> List[int]:
@@ -342,9 +246,6 @@ def get_last_power_of_2_num_tokens_buckets(max_num_tokens) -> List[int]:
     while m >= 1:
         num_token_buckets.append(m)
         m //= 2
-<<<<<<< HEAD
-    return tuple(num_token_buckets)
-=======
     return tuple(num_token_buckets[::-1])
 
 
@@ -354,7 +255,6 @@ def fp4_scale_infer_shape(input_shapes: List[List[int]]):
     out_shape, scale_shape = fp4_utils.get_fp4_shape(input_shapes[0],
                                                      sf_vec_size=16)
     return scale_shape * 2
->>>>>>> upstream/main
 
 
 _enable_piecewise_cuda_graph = True
@@ -368,8 +268,6 @@ def set_piecewise_cuda_graph_flag(enable: bool):
 def get_piecewise_cuda_graph_flag() -> bool:
     global _enable_piecewise_cuda_graph
     return _enable_piecewise_cuda_graph
-<<<<<<< HEAD
-=======
 
 
 @contextlib.contextmanager
@@ -404,4 +302,3 @@ def create_lm_head_tp_mapping(mapping: Mapping) -> Mapping:
         enable_attention_dp=mapping.enable_attention_dp,
         enable_lm_head_tp_in_adp=mapping.enable_lm_head_tp_in_adp,
     )
->>>>>>> upstream/main

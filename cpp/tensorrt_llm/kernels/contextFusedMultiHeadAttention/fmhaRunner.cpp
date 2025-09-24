@@ -84,11 +84,7 @@ FusedMHARunnerV2::FusedMHARunnerV2(MHARunnerFixedParams fixedParams)
     : mFixedParams(fixedParams)
 {
     TLLM_CHECK_WITH_INFO((mSM == kSM_80 || mSM == kSM_86 || mSM == kSM_89 || mSM == kSM_90 || mSM == kSM_100
-<<<<<<< HEAD
-                             || mSM == kSM_120 || mSM == kSM_121),
-=======
                              || mSM == kSM_103 || mSM == kSM_120 || mSM == kSM_121),
->>>>>>> upstream/main
         "Unsupported architecture");
     TLLM_CHECK_WITH_INFO((mFixedParams.dataType == DATA_TYPE_FP16 || mFixedParams.dataType == DATA_TYPE_BF16
                              || mFixedParams.dataType == DATA_TYPE_E4M3),
@@ -351,11 +347,7 @@ void FusedMHARunnerV2::setupLaunchParams(MHARunnerParams runnerParams)
     bool const isSm8x = (mSM == kSM_86 || mSM == kSM_89);
     bool const isSm80 = (mSM == kSM_80);
     bool const isSm89 = (mSM == kSM_89);
-<<<<<<< HEAD
-    bool const isSm100 = (mSM == kSM_100);
-=======
     bool const isSm100f = (mSM == kSM_100 || mSM == kSM_103);
->>>>>>> upstream/main
     bool const isSm120f = (mSM == kSM_120 || mSM == kSM_121);
 
     // Sliding_or_chunked_causal mask.
@@ -424,11 +416,7 @@ void FusedMHARunnerV2::setupLaunchParams(MHARunnerParams runnerParams)
             // flash attention tiled kernel is faster on Ada and Ampere derivatives when head_size>=256
             mLaunchParams.granular_tiling = false;
         }
-<<<<<<< HEAD
-        else if (isSm80 || isSm8x || isSm100 || isSm120f)
-=======
         else if (isSm80 || isSm8x || isSm100f || isSm120f)
->>>>>>> upstream/main
         {
             // otherwise, choose tiled kernel for Ampere/Ada/Gb20x
             mLaunchParams.granular_tiling = true;
@@ -498,15 +486,6 @@ void FusedMHARunnerV2::setupLaunchParams(MHARunnerParams runnerParams)
     }
     else
     {
-<<<<<<< HEAD
-        bool isHopperBF16ContextMLA = (mFixedParams.headSize == mFixedParams.headSizeV + 64) && isSm90
-            && mFixedParams.dataType == DATA_TYPE_BF16 && mFixedParams.headSizeV == 128;
-        mLaunchParams.supportReturnSoftmaxStats = (runnerParams.softmaxStatsPtr != nullptr
-            && mLaunchParams.flash_attention && mLaunchParams.warp_specialization
-            && ((!isHopperBF16ContextMLA
-                    && mLaunchParams.attention_input_layout == AttentionInputLayout::Q_CONTIGUOUS_KV)
-                || (isHopperBF16ContextMLA
-=======
         bool isHopperContextMLA = (mFixedParams.headSize == mFixedParams.headSizeV + 64) && isSm90
             && (mFixedParams.dataType == DATA_TYPE_BF16 || mFixedParams.dataType == DATA_TYPE_E4M3)
             && mFixedParams.headSizeV == 128;
@@ -514,7 +493,6 @@ void FusedMHARunnerV2::setupLaunchParams(MHARunnerParams runnerParams)
             && mLaunchParams.flash_attention && mLaunchParams.warp_specialization
             && ((!isHopperContextMLA && mLaunchParams.attention_input_layout == AttentionInputLayout::Q_CONTIGUOUS_KV)
                 || (isHopperContextMLA
->>>>>>> upstream/main
                     && (mLaunchParams.attention_input_layout == AttentionInputLayout::SEPARATE_Q_K_V))));
     }
 }

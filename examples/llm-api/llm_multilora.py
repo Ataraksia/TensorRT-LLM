@@ -1,13 +1,10 @@
 ### :section Customization
 ### :title Generate text with multiple LoRA adapters
 ### :order 5
-<<<<<<< HEAD
-=======
 
 import argparse
 from typing import Optional
 
->>>>>>> upstream/main
 from huggingface_hub import snapshot_download
 
 from tensorrt_llm import LLM
@@ -15,19 +12,6 @@ from tensorrt_llm.executor import LoRARequest
 from tensorrt_llm.lora_helper import LoraConfig
 
 
-<<<<<<< HEAD
-def main():
-
-    # Download the LoRA adapters from huggingface hub.
-    lora_dir1 = snapshot_download(repo_id="snshrivas10/sft-tiny-chatbot")
-    lora_dir2 = snapshot_download(
-        repo_id="givyboy/TinyLlama-1.1B-Chat-v1.0-mental-health-conversational")
-    lora_dir3 = snapshot_download(repo_id="barissglc/tinyllama-tarot-v1")
-
-    # Currently, we need to pass at least one lora_dir to LLM constructor via build_config.lora_config.
-    # This is necessary because it requires some configuration in the lora_dir to build the engine with LoRA support.
-    lora_config = LoraConfig(lora_dir=[lora_dir1],
-=======
 def main(chatbot_lora_dir: Optional[str], mental_health_lora_dir: Optional[str],
          tarot_lora_dir: Optional[str]):
 
@@ -46,7 +30,6 @@ def main(chatbot_lora_dir: Optional[str], mental_health_lora_dir: Optional[str],
     # Currently, we need to pass at least one lora_dir to LLM constructor via build_config.lora_config.
     # This is necessary because it requires some configuration in the lora_dir to build the engine with LoRA support.
     lora_config = LoraConfig(lora_dir=[chatbot_lora_dir],
->>>>>>> upstream/main
                              max_lora_rank=64,
                              max_loras=3,
                              max_cpu_loras=3)
@@ -67,18 +50,11 @@ def main(chatbot_lora_dir: Optional[str], mental_health_lora_dir: Optional[str],
     for output in llm.generate(prompts,
                                lora_request=[
                                    None,
-<<<<<<< HEAD
-                                   LoRARequest("chatbot", 1, lora_dir1), None,
-                                   LoRARequest("mental-health", 2, lora_dir2),
-                                   None,
-                                   LoRARequest("tarot", 3, lora_dir3)
-=======
                                    LoRARequest("chatbot", 1, chatbot_lora_dir),
                                    None,
                                    LoRARequest("mental-health", 2,
                                                mental_health_lora_dir), None,
                                    LoRARequest("tarot", 3, tarot_lora_dir)
->>>>>>> upstream/main
                                ]):
         prompt = output.prompt
         generated_text = output.outputs[0].text
@@ -94,9 +70,6 @@ def main(chatbot_lora_dir: Optional[str], mental_health_lora_dir: Optional[str],
 
 
 if __name__ == '__main__':
-<<<<<<< HEAD
-    main()
-=======
     parser = argparse.ArgumentParser(
         description="Generate text with multiple LoRA adapters")
     parser.add_argument('--chatbot_lora_dir',
@@ -114,4 +87,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     main(args.chatbot_lora_dir, args.mental_health_lora_dir,
          args.tarot_lora_dir)
->>>>>>> upstream/main

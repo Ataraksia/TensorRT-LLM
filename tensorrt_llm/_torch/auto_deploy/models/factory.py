@@ -1,25 +1,14 @@
 """The model factory interface used by auto-deploy to build custom models."""
 
-<<<<<<< HEAD
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Type
-=======
 import copy
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
->>>>>>> upstream/main
 
 import torch
 import torch.nn as nn
 from torch._prims_common import DeviceLikeType
 
-<<<<<<< HEAD
-from ..custom_ops.attention_interface import CacheConfig
-from ..utils.logger import ad_logger
-
-
-=======
 from ..custom_ops.attention_interface import CacheConfig, DynamicShapeCallback
 from ..utils.logger import ad_logger
 
@@ -31,21 +20,11 @@ class ShardingConfigSource(Enum):
     UNKNOWN = "unknown"
 
 
->>>>>>> upstream/main
 class ModelFactory(ABC):
     """An interface to return and correctly initialize a model from a desired source.
 
     NOTE: we make the assumption that the model can be prompted with a set of input_ids and
     position_ids of shape (batch_size, seq_len) and will return a tensor of shape
-<<<<<<< HEAD
-    (batch_size, seq_len, embedding_size).
-    """
-
-    def __init__(self, model: Optional[str] = None, skip_loading_weights: bool = False, **kwargs):
-        self._model = model
-        self.skip_loading_weights = skip_loading_weights
-        self._prefetched_path: Optional[str] = None
-=======
     (batch_size, seq_len, embedding_size) by default. Individual factories have the ability to
     define additional optional inputs and their (dynamic) shapes.
     """
@@ -70,16 +49,10 @@ class ModelFactory(ABC):
         self._prefetched_tokenizer_path: Optional[str] = None
         self._sharding_config: Dict[str, Any] = {}
         self._sharding_config["source"] = ShardingConfigSource.UNKNOWN
->>>>>>> upstream/main
 
     @property
     def model(self) -> Optional[str]:
         """The model+checkpoint path."""
-<<<<<<< HEAD
-        return self._prefetched_path or self._model
-
-    @abstractmethod
-=======
         return self._prefetched_model_path or self._model
 
     @property
@@ -87,7 +60,6 @@ class ModelFactory(ABC):
         """The tokenizer path."""
         return self._prefetched_tokenizer_path or self._tokenizer or self.model
 
->>>>>>> upstream/main
     def build_model(self, device: str) -> nn.Module:
         """Build the model on the desired device.
 
@@ -103,11 +75,7 @@ class ModelFactory(ABC):
         .. code-block:: python
 
             def forward(
-<<<<<<< HEAD
-                self, input_ids: torch.Tensor, position_ids: torch.Tensor
-=======
                 self, input_ids: torch.Tensor, position_ids: torch.Tensor, *extra_args: torch.Tensor
->>>>>>> upstream/main
             ) -> Sequence[torch.Tensor]: ...
 
         ``logits`` are assumed to be the first output of the model, i.e.,
@@ -120,8 +88,6 @@ class ModelFactory(ABC):
             input_ids.shape == (batch_size, seq_len)
             position_ids.shape == (batch_size, seq_len)
             logits.shape == (batch_size, seq_len, vocab_size)
-<<<<<<< HEAD
-=======
 
         We allow for additional arguments to be passed to the model's forward function as defined by
         the factory.
@@ -167,20 +133,16 @@ class ModelFactory(ABC):
         This is necessary as graph export is going to flatten arguments into a list of tensors and
         by using a strict forward convention we simplify the export behavior and subsequent handling
         of the arguments in the graph module.
->>>>>>> upstream/main
         """
 
     def get_quant_config(self) -> Dict:
         """Returns the quantization config for this model or None if not quantized."""
         return {}
 
-<<<<<<< HEAD
-=======
     def get_sharding_config(self) -> Dict:
         """Returns the sharding config for this model."""
         return self._sharding_config
 
->>>>>>> upstream/main
     def get_cache_config(self) -> CacheConfig:
         """Return the cache configuration for the model.
 
@@ -198,11 +160,6 @@ class ModelFactory(ABC):
         """
         return None
 
-<<<<<<< HEAD
-    def prefetch_checkpoint(self):
-        """Try prefetching checkpoint."""
-        pass
-=======
     def init_processor(self) -> Optional[Any]:
         """Initialize the (multi-modal) processor for the model.
 
@@ -236,7 +193,6 @@ class ModelFactory(ABC):
             The prefetched checkpoint path.
         """
         return model_name_or_path
->>>>>>> upstream/main
 
     def load_or_random_init(self, model: nn.Module, device: DeviceLikeType):
         """Load the checkpoint into the model or randomly initialize the model.
@@ -246,25 +202,6 @@ class ModelFactory(ABC):
                 the same model that is built above but it needs to have a state dict compatible with
                 the model built above.
             device: The device to load the model on.
-<<<<<<< HEAD
-        """
-        ad_logger.info("Loading and initializing weights.")
-        if self.skip_loading_weights:
-            self._load_random_init(model, device)
-        else:
-            self._load_checkpoint(model, device)
-
-    @staticmethod
-    def _to_maybe_empty(model: nn.Module, device: DeviceLikeType):
-        """A mix of ``model.to(device)`` and ``model.to_empty(device)``.
-
-        If a parameter is already initialized, then we will call `to()` on it. Otherwise, we will
-        initialize it with an empty tensor on the given device.
-
-        """
-        model._apply(
-            lambda t: torch.empty_like(t, device=device)
-=======
             load_factoy_model: If True, will load weights for the factory model in addition to main
                 gm. This is useful for the transformers model.
 
@@ -312,25 +249,10 @@ class ModelFactory(ABC):
         model._apply(
             # NOTE (lucaslie): torch.normal is not supported for all dtypes
             lambda t: torch.normal(0.0, 1.0, size=t.shape, device=device).to(t.dtype)
->>>>>>> upstream/main
             if t.device == torch.device("meta")
             else t.to(device)
         )
 
-<<<<<<< HEAD
-    @classmethod
-    def _load_random_init(cls, model: nn.Module, device: DeviceLikeType):
-        """Randomly initialize model."""
-        cls._to_maybe_empty(model, device)
-        state_dict = model.state_dict()
-        for k in state_dict:
-            state_dict[k] = torch.normal(0.0, 1.0, size=state_dict[k].shape, device=device).to(
-                state_dict[k].dtype
-            )
-        model.load_state_dict(state_dict, strict=True, assign=True)
-
-=======
->>>>>>> upstream/main
     @abstractmethod
     def _load_checkpoint(self, model: nn.Module, device: DeviceLikeType):
         """Load the checkpoint into the model.
@@ -342,8 +264,6 @@ class ModelFactory(ABC):
             device: The device to load the model on.
         """
 
-<<<<<<< HEAD
-=======
     def get_example_inputs(self) -> Dict[str, torch.Tensor]:
         """Return a dictionary of example inputs for the model.
 
@@ -373,19 +293,12 @@ class ModelFactory(ABC):
         """
         return {}
 
->>>>>>> upstream/main
 
 class ModelFactoryRegistry:
     _registry: Dict[str, Type[ModelFactory]] = {}
 
     @classmethod
-<<<<<<< HEAD
-    def register(
-        cls: Type[ModelFactory], name: str
-    ) -> Callable[[Type[ModelFactory]], Type[ModelFactory]]:
-=======
     def register(cls, name: str) -> Callable[[Type[ModelFactory]], Type[ModelFactory]]:
->>>>>>> upstream/main
         def inner(fn: Type[ModelFactory]) -> Type[ModelFactory]:
             cls._registry[name] = fn
             return fn
@@ -400,10 +313,7 @@ class ModelFactoryRegistry:
     @classmethod
     def has(cls, model_factory_cls: str) -> bool:
         return model_factory_cls in cls._registry
-<<<<<<< HEAD
-=======
 
     @classmethod
     def entries(cls) -> List[str]:
         return list(cls._registry.keys())
->>>>>>> upstream/main

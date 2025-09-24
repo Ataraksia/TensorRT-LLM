@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-from typing import Any, Optional, Tuple
-
-import torch
-from torch import nn
-from transformers import MistralConfig
-=======
 import dataclasses
 import os
 from typing import Any, Dict, List, Optional, Tuple
@@ -15,34 +8,22 @@ from torch import nn
 from transformers import (AutoProcessor, AutoTokenizer, Mistral3Config,
                           MistralConfig, PretrainedConfig, PreTrainedModel)
 from transformers.activations import ACT2FN
->>>>>>> upstream/main
 
 from tensorrt_llm._torch.attention_backend import AttentionMetadata
 from tensorrt_llm._torch.attention_backend.interface import (
     PositionalEmbeddingParams, RopeParams)
 from tensorrt_llm._torch.model_config import ModelConfig
-<<<<<<< HEAD
-from tensorrt_llm._torch.models.modeling_utils import (DecoderModel,
-                                                       DecoderModelForCausalLM,
-=======
 from tensorrt_llm._torch.models import modeling_pixtral
 from tensorrt_llm._torch.models.modeling_multimodal_utils import (
     find_input_mm_embeds, fuse_input_embeds, get_multimodal_embeddings)
 from tensorrt_llm._torch.models.modeling_utils import (DecoderModel,
                                                        DecoderModelForCausalLM,
                                                        _load_weights_impl,
->>>>>>> upstream/main
                                                        register_auto_model)
 from tensorrt_llm._torch.modules.attention import Attention
 from tensorrt_llm._torch.modules.decoder_layer import DecoderLayer
 from tensorrt_llm._torch.modules.embedding import Embedding
 from tensorrt_llm._torch.modules.gated_mlp import GatedMLP
-<<<<<<< HEAD
-from tensorrt_llm._torch.modules.linear import TensorParallelMode
-from tensorrt_llm._torch.modules.rms_norm import RMSNorm
-from tensorrt_llm._torch.speculative import SpecMetadata
-from tensorrt_llm.functional import PositionEmbeddingType
-=======
 from tensorrt_llm._torch.modules.linear import Linear, TensorParallelMode
 from tensorrt_llm._torch.modules.rms_norm import RMSNorm
 from tensorrt_llm._torch.speculative import SpecMetadata
@@ -63,7 +44,6 @@ _MULTIMODAL_ENV_NAME = "TLLM_MULTIMODAL_DISAGGREGATED"
 # Make this a runtime lookup rather than a module-wide constant for easier unit testing.
 def _is_disagg() -> bool:
     return os.getenv(_MULTIMODAL_ENV_NAME, "0") == "1"
->>>>>>> upstream/main
 
 
 class MistralAttention(Attention):
@@ -127,11 +107,7 @@ class MistralDecoderLayer(DecoderLayer):
 
     def forward(
         self,
-<<<<<<< HEAD
-        position_ids: torch.LongTensor,
-=======
         position_ids: torch.IntTensor,
->>>>>>> upstream/main
         hidden_states: torch.Tensor,
         attn_metadata: AttentionMetadata,
         residual: Optional[torch.Tensor] = None,
@@ -168,10 +144,6 @@ class MistralModel(DecoderModel):
     def __init__(self, model_config: ModelConfig[MistralConfig]):
         super().__init__(model_config)
         config = self.model_config.pretrained_config
-<<<<<<< HEAD
-        self.padding_idx = config.pad_token_id
-=======
->>>>>>> upstream/main
 
         self.embed_tokens = Embedding(
             config.vocab_size,
@@ -196,13 +168,8 @@ class MistralModel(DecoderModel):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: Optional[torch.LongTensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: Optional[torch.IntTensor] = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         spec_metadata: Optional[SpecMetadata] = None,
         lora_params: Optional[Any] = None,
@@ -245,8 +212,6 @@ class MistralForCausalLM(DecoderModelForCausalLM[MistralModel, MistralConfig]):
             hidden_size=model_config.pretrained_config.hidden_size,
             vocab_size=model_config.pretrained_config.vocab_size,
         )
-<<<<<<< HEAD
-=======
 
 
 class Mistral3InputProcessor(BaseMultimodalInputProcessor, InputProcessor):
@@ -697,4 +662,3 @@ def _filter_weights(weights: Dict[str, torch.Tensor],
         name[len(prefix):]: weight
         for name, weight in weights.items() if name.startswith(prefix)
     }
->>>>>>> upstream/main

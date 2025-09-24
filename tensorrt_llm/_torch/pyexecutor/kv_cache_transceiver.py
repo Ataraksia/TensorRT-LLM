@@ -2,11 +2,8 @@ from abc import ABC, abstractmethod
 from os import getenv
 
 import tensorrt_llm
-<<<<<<< HEAD
-=======
 from tensorrt_llm import logger
 from tensorrt_llm._torch.distributed.communicator import Distributed
->>>>>>> upstream/main
 from tensorrt_llm.bindings import WorldConfig
 from tensorrt_llm.bindings.executor import CacheTransceiverConfig
 from tensorrt_llm.mapping import Mapping
@@ -15,15 +12,9 @@ from .llm_request import LlmRequest
 from .resource_manager import KVCacheManager
 
 CacheTransceiverCpp = tensorrt_llm.bindings.internal.batch_manager.CacheTransceiver
-<<<<<<< HEAD
-CommTypeCpp = tensorrt_llm.bindings.internal.batch_manager.CommType
-AttentionTypeCpp = tensorrt_llm.bindings.internal.batch_manager.AttentionType
-CacheTransBufferManagerCpp = tensorrt_llm.bindings.internal.batch_manager.CacheTransBufferManager
-=======
 AttentionTypeCpp = tensorrt_llm.bindings.internal.batch_manager.AttentionType
 CacheTransBufferManagerCpp = tensorrt_llm.bindings.internal.batch_manager.CacheTransBufferManager
 BackendTypeCpp = tensorrt_llm.bindings.executor.CacheTransceiverBackendType
->>>>>>> upstream/main
 
 
 def mapping_to_world_config(mapping: Mapping) -> WorldConfig:
@@ -38,25 +29,6 @@ def mapping_to_world_config(mapping: Mapping) -> WorldConfig:
 
 
 def create_kv_cache_transceiver(
-<<<<<<< HEAD
-        mapping: Mapping, kv_cache_manager: KVCacheManager,
-        attention_type: AttentionTypeCpp,
-        cache_transceiver_config: CacheTransceiverConfig):
-
-    comm_type = None
-    if getenv("TRTLLM_USE_UCX_KVCACHE"):
-        comm_type = CommTypeCpp.UCX
-    elif getenv("TRTLLM_USE_MPI_KVCACHE"):
-        comm_type = CommTypeCpp.MPI
-    cache_transceiver = None
-    if comm_type is not None:
-        cache_transceiver = BindKvCacheTransceiver(mapping, comm_type,
-                                                   kv_cache_manager,
-                                                   attention_type,
-                                                   cache_transceiver_config)
-
-    return cache_transceiver
-=======
         mapping: Mapping, dist: Distributed, kv_cache_manager: KVCacheManager,
         attention_type: AttentionTypeCpp,
         cache_transceiver_config: CacheTransceiverConfig):
@@ -90,7 +62,6 @@ def create_kv_cache_transceiver(
 
     return BindKvCacheTransceiver(mapping, dist, kv_cache_manager,
                                   attention_type, cache_transceiver_config)
->>>>>>> upstream/main
 
 
 class KvCacheTransceiver(ABC):
@@ -122,25 +93,11 @@ class KvCacheTransceiver(ABC):
 
 class BindKvCacheTransceiver(KvCacheTransceiver):
 
-<<<<<<< HEAD
-    def __init__(self, mapping: Mapping, comm_type: CommTypeCpp,
-=======
     def __init__(self, mapping: Mapping, dist: Distributed,
->>>>>>> upstream/main
                  kv_cache_manager: KVCacheManager,
                  attention_type: AttentionTypeCpp,
                  cache_transceiver_config: CacheTransceiverConfig):
         world_config = mapping_to_world_config(mapping)
-<<<<<<< HEAD
-        num_kv_heads_per_layer = kv_cache_manager.num_kv_heads_per_layer
-        head_dim = kv_cache_manager.head_dim
-        tokens_per_block = kv_cache_manager.tokens_per_block
-        dtype = kv_cache_manager.dtype
-
-        self.impl = CacheTransceiverCpp(kv_cache_manager.impl, comm_type,
-                                        num_kv_heads_per_layer, head_dim,
-                                        tokens_per_block, world_config, dtype,
-=======
         total_num_kv_heads_per_layer = kv_cache_manager.total_num_kv_heads_per_layer
         head_dim = kv_cache_manager.head_dim
         tokens_per_block = kv_cache_manager.tokens_per_block
@@ -152,7 +109,6 @@ class BindKvCacheTransceiver(KvCacheTransceiver):
                                         total_num_kv_heads_per_layer, head_dim,
                                         tokens_per_block, world_config,
                                         pp_layer_num_per_pp_rank, dtype,
->>>>>>> upstream/main
                                         attention_type,
                                         cache_transceiver_config)
 
@@ -182,14 +138,7 @@ class CacheTransBufferManager:
                                                max_num_tokens)
 
     @staticmethod
-<<<<<<< HEAD
-    def pre_alloc_buffer_size(max_num_tokens: int,
-                              kv_cache_size_per_token: int):
-        return CacheTransBufferManagerCpp.pre_alloc_buffer_size(
-            max_num_tokens, kv_cache_size_per_token)
-=======
     def pre_alloc_buffer_size(kv_cache_size_per_token: int,
                               cache_transceiver_config: CacheTransceiverConfig):
         return CacheTransBufferManagerCpp.pre_alloc_buffer_size(
             kv_cache_size_per_token, cache_transceiver_config)
->>>>>>> upstream/main

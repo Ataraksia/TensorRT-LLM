@@ -39,25 +39,12 @@ class Logger(metaclass=Singleton):
     PREFIX = "TRT-LLM"
     DEFAULT_LEVEL = "error"
 
-<<<<<<< HEAD
-    ENV_VARIABLE = 'TLLM_LOG_LEVEL'
-    PREFIX = 'TRT-LLM'
-    DEFAULT_LEVEL = 'error'
-
-    INTERNAL_ERROR = '[F]'
-    ERROR = '[E]'
-    WARNING = '[W]'
-    INFO = '[I]'
-    VERBOSE = '[V]'
-    DEBUG = '[D]'
-=======
     INTERNAL_ERROR = "[F]"
     ERROR = "[E]"
     WARNING = "[W]"
     INFO = "[I]"
     VERBOSE = "[V]"
     DEBUG = "[D]"
->>>>>>> upstream/main
 
     def __init__(self):
         environ_severity = os.environ.get(self.ENV_VARIABLE)
@@ -65,12 +52,7 @@ class Logger(metaclass=Singleton):
 
         self.rank: Optional[int] = None
 
-<<<<<<< HEAD
-        min_severity = environ_severity.lower(
-        ) if self._set_from_env else self.DEFAULT_LEVEL
-=======
         min_severity = environ_severity.lower() if self._set_from_env else self.DEFAULT_LEVEL
->>>>>>> upstream/main
         invalid_severity = min_severity not in severity_map
         if invalid_severity:
             min_severity = self.DEFAULT_LEVEL
@@ -81,13 +63,8 @@ class Logger(metaclass=Singleton):
         self._logger.propagate = False
         handler = logging.StreamHandler(stream=sys.stdout)
         handler.setFormatter(
-<<<<<<< HEAD
-            logging.Formatter(fmt='[%(asctime)s] %(message)s',
-                              datefmt='%m/%d/%Y-%H:%M:%S'))
-=======
             logging.Formatter(fmt="[%(asctime)s] %(message)s", datefmt="%m/%d/%Y-%H:%M:%S")
         )
->>>>>>> upstream/main
         self._logger.addHandler(handler)
         self._logger.setLevel(severity_map[min_severity][1])
         self._polygraphy_logger = G_LOGGER
@@ -124,23 +101,13 @@ class Logger(metaclass=Singleton):
         return self._trt_logger
 
     def log(self, severity, *msg):
-<<<<<<< HEAD
-        parts = [f'[{self.PREFIX}]']
-        if self.rank is not None:
-            parts.append(f'[RANK {self.rank}]')
-=======
         parts = [f"[{self.PREFIX}]"]
         if self.rank is not None:
             parts.append(f"[RANK {self.rank}]")
->>>>>>> upstream/main
         parts.append(severity)
         parts.extend(map(str, msg))
         self._func_wrapper(severity)(" ".join(parts))
 
-<<<<<<< HEAD
-    def critical(self, *msg):
-        self.log(self.INTERNAL_ERROR, *msg)
-=======
     def log_once(self, severity, *msg, key):
         assert key is not None, "key is required for log_once"
         if key not in self._appeared_keys:
@@ -152,7 +119,6 @@ class Logger(metaclass=Singleton):
 
     def critical_once(self, *msg, key):
         self.log_once(self.INTERNAL_ERROR, *msg, key=key)
->>>>>>> upstream/main
 
     fatal = critical
     fatal_once = critical_once
@@ -160,17 +126,6 @@ class Logger(metaclass=Singleton):
     def error(self, *msg):
         self.log(self.ERROR, *msg)
 
-<<<<<<< HEAD
-    def warning(self, *msg):
-        self.log(self.WARNING, *msg)
-
-    def info(self, *msg):
-        self.log(self.INFO, *msg)
-
-    def debug(self, *msg):
-        self.log(self.VERBOSE, *msg)
-
-=======
     def error_once(self, *msg, key):
         self.log_once(self.ERROR, *msg, key=key)
 
@@ -192,7 +147,6 @@ class Logger(metaclass=Singleton):
     def debug_once(self, *msg, key):
         self.log_once(self.VERBOSE, *msg, key=key)
 
->>>>>>> upstream/main
     @property
     def level(self) -> str:
         return self._min_severity
@@ -211,14 +165,6 @@ class Logger(metaclass=Singleton):
 
 
 severity_map = {
-<<<<<<< HEAD
-    'internal_error': [trt.Logger.INTERNAL_ERROR, logging.CRITICAL],
-    'error': [trt.Logger.ERROR, logging.ERROR],
-    'warning': [trt.Logger.WARNING, logging.WARNING],
-    'info': [trt.Logger.INFO, logging.INFO],
-    'verbose': [trt.Logger.VERBOSE, logging.DEBUG],
-    'debug': [trt.Logger.VERBOSE, logging.DEBUG],
-=======
     "internal_error": [trt.Logger.INTERNAL_ERROR, logging.CRITICAL],
     "error": [trt.Logger.ERROR, logging.ERROR],
     "warning": [trt.Logger.WARNING, logging.WARNING],
@@ -226,19 +172,10 @@ severity_map = {
     "verbose": [trt.Logger.VERBOSE, logging.DEBUG],
     "debug": [trt.Logger.VERBOSE, logging.DEBUG],
     "trace": [trt.Logger.VERBOSE, logging.DEBUG],
->>>>>>> upstream/main
 }
 
 if G_LOGGER is not None:
     g_logger_severity_map = {
-<<<<<<< HEAD
-        'internal_error': G_LOGGER.CRITICAL,
-        'error': G_LOGGER.ERROR,
-        'warning': G_LOGGER.WARNING,
-        'info': G_LOGGER.INFO,
-        'verbose': G_LOGGER.SUPER_VERBOSE,
-        'debug': G_LOGGER.SUPER_VERBOSE,
-=======
         "internal_error": G_LOGGER.CRITICAL,
         "error": G_LOGGER.ERROR,
         "warning": G_LOGGER.WARNING,
@@ -246,7 +183,6 @@ if G_LOGGER is not None:
         "verbose": G_LOGGER.SUPER_VERBOSE,
         "debug": G_LOGGER.SUPER_VERBOSE,
         "trace": G_LOGGER.SUPER_VERBOSE,
->>>>>>> upstream/main
     }
     for key, value in g_logger_severity_map.items():
         severity_map[key].append(value)

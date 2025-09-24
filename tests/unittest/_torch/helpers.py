@@ -162,8 +162,6 @@ def reference_block_scale_moe_torch(
         results[batch_idx] += final_scales[batch_idx, nth_expert, None] * output
 
     return results.view_as(x)
-<<<<<<< HEAD
-=======
 
 
 class MockPytorchBackendConfig:
@@ -195,4 +193,3 @@ def create_mock_engine(batch_size: int):
         _cuda_graph_mem_pool=None,
         use_mrope=False,
     )
->>>>>>> upstream/main

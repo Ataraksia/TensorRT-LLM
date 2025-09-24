@@ -1,8 +1,5 @@
 import os
-<<<<<<< HEAD
-=======
 import re
->>>>>>> upstream/main
 import sys
 
 import pytest
@@ -3897,8 +3894,6 @@ def test_tiny_llama_ifb_token_counts(
     print_info(
         f"Successfully tested token count functionality for {TOKEN_COUNT_TEST} mode"
     )
-<<<<<<< HEAD
-=======
 
 
 @pytest.mark.skip_less_device_memory(80000)
@@ -4094,4 +4089,3 @@ def test_mistral_small_3_1_24b_pixtral(
 
         assert MATCH.search(
             output), f"Test failed for input: {TEXT=}, {IMAGE=}, {output=}"
->>>>>>> upstream/main

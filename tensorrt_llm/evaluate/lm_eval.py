@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-<<<<<<< HEAD
-=======
 import json
->>>>>>> upstream/main
 import os
 from contextlib import contextmanager
 from typing import Dict, Iterable, List, Optional, Tuple, Union
@@ -26,16 +23,6 @@ import numpy as np
 from tqdm import tqdm
 
 import tensorrt_llm.profiler as profiler
-<<<<<<< HEAD
-
-try:
-    from lm_eval.api.model import TemplateLM
-except ImportError:
-    TemplateLM = object
-
-from .._torch import LLM as PyTorchLLM
-from ..llmapi import LLM, RequestOutput
-=======
 from tensorrt_llm.inputs import prompt_inputs
 
 try:
@@ -50,36 +37,25 @@ from ..inputs import (ConversationMessage, MultimodalDataTracker,
                       add_multimodal_placeholders, convert_image_mode)
 from ..inputs.utils import apply_chat_template as trtllm_apply_chat_template
 from ..llmapi import RequestOutput
->>>>>>> upstream/main
 from ..logger import logger
 from ..sampling_params import SamplingParams
 from .interface import Evaluator
 
-<<<<<<< HEAD
-=======
 # NOTE: lm_eval uses "<image>" as the default image placeholder
 # https://github.com/EleutherAI/lm-evaluation-harness/blob/7f04db12d2f8e7a99a0830d99eb78130e1ba2122/lm_eval/models/hf_vlms.py#L25
 LM_EVAL_DEFAULT_IMAGE_PLACEHOLDER = "<image>"
 
->>>>>>> upstream/main
 
 class LmEvalWrapper(TemplateLM):
 
     def __init__(self,
                  llm: Union[LLM, PyTorchLLM],
-<<<<<<< HEAD
-                 sampling_params: Optional[SamplingParams] = None):
-        super().__init__()
-        self.llm = llm
-        self.sampling_params = sampling_params
-=======
                  sampling_params: Optional[SamplingParams] = None,
                  streaming: bool = False):
         super().__init__()
         self.llm = llm
         self.sampling_params = sampling_params
         self.streaming = streaming
->>>>>>> upstream/main
 
     @property
     def eot_token_id(self) -> int:
@@ -140,9 +116,6 @@ class LmEvalWrapper(TemplateLM):
             prompt, gen_kwargs = request.args
             sampling_params = self._get_sampling_params(gen_kwargs)
             output = self.llm.generate_async(prompt,
-<<<<<<< HEAD
-                                             sampling_params=sampling_params)
-=======
                                              sampling_params=sampling_params,
                                              streaming=self.streaming)
             results.append(output)
@@ -302,7 +275,6 @@ class MultimodalLmEvalWrapper(LmEvalWrapper):
             output = self.llm.generate_async(prompt,
                                              sampling_params=sampling_params,
                                              streaming=self.streaming)
->>>>>>> upstream/main
             results.append(output)
 
         outputs = []
@@ -327,13 +299,9 @@ class LmEvalEvaluator(Evaluator):
                  num_samples: Optional[int] = None,
                  random_seed: int = 0,
                  apply_chat_template: bool = False,
-<<<<<<< HEAD
-                 system_prompt: Optional[str] = None):
-=======
                  fewshot_as_multiturn: bool = False,
                  system_prompt: Optional[str] = None,
                  is_multimodal: bool = False):
->>>>>>> upstream/main
         try:
             import lm_eval
         except ImportError as e:
@@ -341,10 +309,6 @@ class LmEvalEvaluator(Evaluator):
                 f"Evaluation task {self.__class__.__name__} requires `lm_eval`. "
                 "Please install the package first, e.g., `pip install lm_eval`."
             ) from e
-<<<<<<< HEAD
-        super().__init__(random_seed=random_seed,
-                         apply_chat_template=apply_chat_template,
-=======
         import lm_eval.tasks
         self.MULTIMODAL = is_multimodal
         if self.MULTIMODAL:
@@ -355,29 +319,16 @@ class LmEvalEvaluator(Evaluator):
         super().__init__(random_seed=random_seed,
                          apply_chat_template=apply_chat_template,
                          fewshot_as_multiturn=fewshot_as_multiturn,
->>>>>>> upstream/main
                          system_prompt=system_prompt)
         self.task_name = task_name
         self.dataset_path = dataset_path
         self.num_samples = num_samples
 
-<<<<<<< HEAD
-        task_manager = lm_eval.tasks.TaskManager(
-=======
         task_manager = TaskManager(
->>>>>>> upstream/main
             include_path=f"{os.path.dirname(__file__)}/lm_eval_tasks")
         with self._patch_lm_eval():
             self.task_dict = lm_eval.tasks.get_task_dict(
                 task_name, task_manager=task_manager)
-<<<<<<< HEAD
-        # Few-shot random seed
-        self.task_dict[self.task_name].set_fewshot_seed(random_seed)
-        # Shuffle dataset
-        data = self.task_dict[self.task_name].dataset
-        for split in data.keys():
-            data[split] = data[split].shuffle(random_seed)
-=======
 
         # Adopted from https://github.com/EleutherAI/lm-evaluation-harness/blob/7f04db12d2f8e7a99a0830d99eb78130e1ba2122/lm_eval/evaluator.py#L290
         def _adjust_config(task_dict, random_seed):
@@ -403,7 +354,6 @@ class LmEvalEvaluator(Evaluator):
             return adjusted_task_dict
 
         self.task_dict = _adjust_config(self.task_dict, random_seed)
->>>>>>> upstream/main
 
     @contextmanager
     def _patch_lm_eval(self):
@@ -434,15 +384,6 @@ class LmEvalEvaluator(Evaluator):
 
     def evaluate(self,
                  llm: Union[LLM, PyTorchLLM],
-<<<<<<< HEAD
-                 sampling_params: Optional[SamplingParams] = None) -> float:
-        import lm_eval
-        results = lm_eval.evaluate(lm=LmEvalWrapper(llm, sampling_params),
-                                   task_dict=self.task_dict,
-                                   limit=self.num_samples,
-                                   apply_chat_template=self.apply_chat_template,
-                                   system_instruction=self.system_prompt)
-=======
                  sampling_params: Optional[SamplingParams] = None,
                  streaming: bool = False,
                  scores_filter: str = None) -> float:
@@ -455,7 +396,6 @@ class LmEvalEvaluator(Evaluator):
             apply_chat_template=self.apply_chat_template,
             fewshot_as_multiturn=self.fewshot_as_multiturn,
             system_instruction=self.system_prompt)
->>>>>>> upstream/main
         # Normalize scores to range 0~100
         scores = results["results"][self.task_name]
         for metric in scores.keys():
@@ -464,14 +404,6 @@ class LmEvalEvaluator(Evaluator):
         logger.info(
             f"lm-eval {self.task_name} results (scores normalized to range 0~100):\n{lm_eval.utils.make_table(results)}"
         )
-<<<<<<< HEAD
-
-        average_acc = np.mean(
-            [acc for m, acc in scores.items() if "_stderr" not in m])
-        logger.info(
-            f"lm-eval {self.task_name} average accuracy: {average_acc:.2f}")
-        return average_acc
-=======
         if scores_filter is not None:
             result_acc = results["results"][self.task_name][scores_filter]
             logger.info(
@@ -483,26 +415,16 @@ class LmEvalEvaluator(Evaluator):
             logger.info(
                 f"lm-eval {self.task_name} average accuracy: {result_acc:.2f}")
         return result_acc
->>>>>>> upstream/main
 
     @classmethod
     def command_harness(cls, ctx, **kwargs):
         llm: Union[LLM, PyTorchLLM] = ctx.obj
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/main
         evaluator = cls(dataset_path=kwargs.pop("dataset_path", None),
                         num_samples=kwargs.pop("num_samples", None),
                         random_seed=kwargs.pop("random_seed", 0),
                         apply_chat_template=kwargs.pop("apply_chat_template",
                                                        False),
-<<<<<<< HEAD
-                        system_prompt=kwargs.pop("system_prompt", None))
-        sampling_params = SamplingParams(
-            max_tokens=kwargs.pop("max_output_length"),
-            truncate_prompt_tokens=kwargs.pop("max_input_length"))
-=======
                         fewshot_as_multiturn=kwargs.pop("fewshot_as_multiturn",
                                                         False),
                         system_prompt=kwargs.pop("system_prompt", None),
@@ -511,7 +433,6 @@ class LmEvalEvaluator(Evaluator):
             max_tokens=kwargs.pop("max_output_length"),
             truncate_prompt_tokens=kwargs.pop("max_input_length"),
             stop=kwargs.pop("stop", None))
->>>>>>> upstream/main
         evaluator.evaluate(llm, sampling_params)
         llm.shutdown()
 
@@ -541,17 +462,12 @@ class GSM8K(LmEvalEvaluator):
                   is_flag=True,
                   default=False,
                   help="Whether to apply chat template.")
-<<<<<<< HEAD
-    @click.option("--system_prompt",
-                  type=Optional[str],
-=======
     @click.option("--fewshot_as_multiturn",
                   is_flag=True,
                   default=False,
                   help="Apply fewshot as multiturn.")
     @click.option("--system_prompt",
                   type=str,
->>>>>>> upstream/main
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -565,13 +481,10 @@ class GSM8K(LmEvalEvaluator):
     @click.pass_context
     @staticmethod
     def command(ctx, **kwargs) -> None:
-<<<<<<< HEAD
-=======
         if kwargs.get("fewshot_as_multiturn", False):
             assert kwargs.get(
                 "apply_chat_template", False
             ), "apply_chat_template must be True when fewshot_as_multiturn is True"
->>>>>>> upstream/main
         GSM8K.command_harness(ctx, **kwargs)
 
 
@@ -601,11 +514,7 @@ class GPQADiamond(LmEvalEvaluator):
                   default=False,
                   help="Whether to apply chat template.")
     @click.option("--system_prompt",
-<<<<<<< HEAD
-                  type=Optional[str],
-=======
                   type=str,
->>>>>>> upstream/main
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -648,11 +557,7 @@ class GPQAMain(LmEvalEvaluator):
                   default=False,
                   help="Whether to apply chat template.")
     @click.option("--system_prompt",
-<<<<<<< HEAD
-                  type=Optional[str],
-=======
                   type=str,
->>>>>>> upstream/main
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -695,11 +600,7 @@ class GPQAExtended(LmEvalEvaluator):
                   default=False,
                   help="Whether to apply chat template.")
     @click.option("--system_prompt",
-<<<<<<< HEAD
-                  type=Optional[str],
-=======
                   type=str,
->>>>>>> upstream/main
                   default=None,
                   help="System prompt.")
     @click.option("--max_input_length",
@@ -714,8 +615,6 @@ class GPQAExtended(LmEvalEvaluator):
     @staticmethod
     def command(ctx, **kwargs) -> None:
         GPQAExtended.command_harness(ctx, **kwargs)
-<<<<<<< HEAD
-=======
 
 
 class MMMU(LmEvalEvaluator):
@@ -765,4 +664,3 @@ class MMMU(LmEvalEvaluator):
         kwargs[
             "stop"] = "<|endoftext|>"  # NOTE: https://github.com/EleutherAI/lm-evaluation-harness/blob/main/lm_eval/tasks/mmmu/_template_yaml#L10
         MMMU.command_harness(ctx, **kwargs)
->>>>>>> upstream/main

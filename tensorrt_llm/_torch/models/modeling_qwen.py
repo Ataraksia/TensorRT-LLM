@@ -32,11 +32,7 @@ class QwenAttention(Attention):
                 type=PositionEmbeddingType.from_string(
                     config.rope_scaling["type"]),
                 rope=RopeParams.from_config(config),
-<<<<<<< HEAD
-            )
-=======
                 mrope_section=config.rope_scaling.get('mrope_section', None))
->>>>>>> upstream/main
         else:
             pos_embd_params = PositionalEmbeddingParams(
                 type=PositionEmbeddingType.rope_gpt_neox,
@@ -50,10 +46,7 @@ class QwenAttention(Attention):
             bias=True,
             pos_embd_params=pos_embd_params,
             layer_idx=layer_idx,
-<<<<<<< HEAD
-=======
             rope_fusion=not getattr(config, 'disable_fuse_rope', False),
->>>>>>> upstream/main
             dtype=config.torch_dtype,
             dense_bias=False,
             config=model_config,
@@ -91,11 +84,7 @@ class QwenDecoderLayer(DecoderLayer):
 
     def forward(
         self,
-<<<<<<< HEAD
-        position_ids: torch.LongTensor,
-=======
         position_ids: torch.IntTensor,
->>>>>>> upstream/main
         hidden_states: torch.Tensor,
         attn_metadata: AttentionMetadata,
         residual: Optional[torch.Tensor],
@@ -130,10 +119,6 @@ class QwenModel(DecoderModel):
     def __init__(self, model_config: ModelConfig[Qwen2Config]):
         super().__init__(model_config)
         config = self.model_config
-<<<<<<< HEAD
-        self.padding_idx = config.pretrained_config.pad_token_id
-=======
->>>>>>> upstream/main
 
         self.embed_tokens = Embedding(
             config.pretrained_config.vocab_size,
@@ -156,13 +141,8 @@ class QwenModel(DecoderModel):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: Optional[torch.LongTensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: Optional[torch.IntTensor] = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         mrope_config: Optional[Tuple[torch.Tensor, int]] = None,
         **kwargs,
@@ -205,13 +185,8 @@ class Qwen2ForCausalLM(DecoderModelForCausalLM[QwenModel, Qwen2Config]):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: torch.LongTensor = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: torch.IntTensor = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         return_context_logits: bool = False,
         mrope_config: Optional[dict] = None,
@@ -261,13 +236,8 @@ class Qwen2ForProcessRewardModel(DecoderModelForCausalLM[QwenModel,
 
     def forward(self,
                 attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-                input_ids: torch.LongTensor,
-                position_ids: Optional[torch.LongTensor] = None,
-=======
                 input_ids: torch.IntTensor,
                 position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
                 inputs_embeds: Optional[torch.FloatTensor] = None,
                 **kwargs) -> torch.Tensor:
         assert attn_metadata.seq_lens is not None
@@ -310,13 +280,8 @@ class Qwen2ForRewardModel(DecoderModelForCausalLM[QwenModel, Qwen2Config]):
 
     def forward(self,
                 attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-                input_ids: torch.LongTensor,
-                position_ids: Optional[torch.LongTensor] = None,
-=======
                 input_ids: torch.IntTensor,
                 position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
                 inputs_embeds: Optional[torch.FloatTensor] = None,
                 **kwargs) -> torch.Tensor:
         assert attn_metadata.seq_lens is not None

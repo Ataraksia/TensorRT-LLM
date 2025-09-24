@@ -35,13 +35,9 @@ from transformers import (AutoConfig, AutoImageProcessor, AutoModel,
                           PreTrainedModel)
 
 from ..._utils import nvtx_range
-<<<<<<< HEAD
-from ...inputs import (ExtraProcessedInputs, InputProcessor, TextPrompt,
-=======
 from ...inputs import (ExtraProcessedInputs, InputProcessor,
                        MultimodalPlaceholderMetadata,
                        MultimodalPlaceholderPlacement, TextPrompt,
->>>>>>> upstream/main
                        register_input_processor)
 from ...logger import logger
 from ...sampling_params import SamplingParams
@@ -870,15 +866,11 @@ def _apply_chat_template(text, conv, tokenizer):
 
 class VilaInputProcessor(InputProcessor):
 
-<<<<<<< HEAD
-    def __init__(self, model_path, model_config, tokenizer):
-=======
     def __init__(self,
                  model_path,
                  model_config,
                  tokenizer,
                  trust_remote_code: bool = True):
->>>>>>> upstream/main
         self.model_config = model_config
         llm_path, vision_tower_path, mm_projector_path = _get_model_paths(
             self.model_config)
@@ -1112,33 +1104,22 @@ class VilaInputProcessor(InputProcessor):
         input_ids = self.tokenizer(
             text_prompt, return_tensors="pt").input_ids[0].to(self.device)
 
-<<<<<<< HEAD
-=======
         if not mm_data:
             return input_ids.to(torch.int32).tolist(), {}
 
->>>>>>> upstream/main
         mm_tensor, block_sizes = self._preprocess(
             mm_data, mm_processor_kwargs, use_fast=True
         )  # use_fast uses Pytorch GPU preprocessing, otherwise uses PIL CPU preprocessing
         mm_features = self._process(mm_tensor, block_sizes)
         fused_input_ids, mm_features = self._postprocess(input_ids, mm_features)
-<<<<<<< HEAD
-        return fused_input_ids.to(torch.int32).tolist(), {
-            "mm_embedding": mm_features
-=======
         multimodal_data = {}
         multimodal_data["multimodal_embedding"] = mm_features
         return fused_input_ids.to(torch.int32).tolist(), {
             "multimodal_data": multimodal_data
->>>>>>> upstream/main
         }
 
 
 @register_auto_model(VilaConfig.model_architecture)
-<<<<<<< HEAD
-@register_input_processor(VilaInputProcessor)
-=======
 @register_input_processor(
     VilaInputProcessor,
     model_type="llava_llama",
@@ -1149,7 +1130,6 @@ class VilaInputProcessor(InputProcessor):
         },
         placeholder_placement=MultimodalPlaceholderPlacement.BEFORE_TEXT,
     ))
->>>>>>> upstream/main
 class VilaModel(PreTrainedModel):
     config_class = VilaConfig
 
@@ -1186,13 +1166,8 @@ class VilaModel(PreTrainedModel):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: Optional[torch.LongTensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: Optional[torch.IntTensor] = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         return_context_logits: Optional[bool] = False,
         **kwargs,
@@ -1202,16 +1177,6 @@ class VilaModel(PreTrainedModel):
         """
 
         num_context_requests, num_generation_requests = attn_metadata.num_contexts, attn_metadata.num_generations
-<<<<<<< HEAD
-        mm_embed = kwargs.get("multi_modal_data", [])
-
-        assert mm_embed == [] or len(
-            mm_embed
-        ) == num_context_requests, "Number of multimodal features (if provided) should be equal to number of context requests"
-
-        input_ids, inputs_embeds = fuse_input_embeds(
-            self.llm.model.embed_tokens, input_ids, mm_embed)
-=======
         multimodal_params = kwargs.get("multimodal_params", [])
         mm_embeds = []
         if len(multimodal_params) > 0:
@@ -1222,7 +1187,6 @@ class VilaModel(PreTrainedModel):
 
         input_ids, inputs_embeds = fuse_input_embeds(
             self.llm.model.embed_tokens, input_ids, mm_embeds, **kwargs)
->>>>>>> upstream/main
         logits = self.llm.forward(attn_metadata=attn_metadata,
                                   input_ids=input_ids,
                                   position_ids=position_ids,

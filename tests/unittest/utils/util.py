@@ -74,14 +74,11 @@ def getCUDAVersion():
         print(f"Error getting CUDA version: {e}")
 
 
-<<<<<<< HEAD
-=======
 def isSM100Family():
     sm = getSMVersion()
     return sm == 100 or sm == 103
 
 
->>>>>>> upstream/main
 skip_pre_ada = pytest.mark.skipif(
     getSMVersion() < 89,
     reason="This test is not supported in pre-Ada architecture")
@@ -92,11 +89,7 @@ skip_pre_blackwell = pytest.mark.skipif(
     getSMVersion() < 100,
     reason="This test is not supported in pre-Blackwell architecture")
 skip_blackwell = pytest.mark.skipif(
-<<<<<<< HEAD
-    getSMVersion() == 100,
-=======
     getSMVersion() == 100 or getSMVersion() == 103,
->>>>>>> upstream/main
     reason="This test is not supported in Blackwell architecture")
 skip_blackwell_geforce = pytest.mark.skipif(
     getSMVersion() == 120, reason="This test is not supported on SM 120")
@@ -139,14 +132,8 @@ def skip_fp8_pre_ada(use_fp8):
 
 
 def skip_blackwell_for_fmha_tests(context_fmha_type, head_size):
-<<<<<<< HEAD
-    if getSMVersion() == 100 and (head_size not in [32, 64, 128]
-                                  and context_fmha_type
-                                  != ContextFMHAType.disabled):
-=======
     if (isSM100Family()) and (head_size not in [32, 64, 128] and
                               context_fmha_type != ContextFMHAType.disabled):
->>>>>>> upstream/main
         pytest.skip(
             "Context FMHA only supports head sizes [32, 64, 128] currently on blackwell."
         )
@@ -198,16 +185,6 @@ def skip_gpu_memory_less_than(required_memory: int):
     )
 
 
-<<<<<<< HEAD
-skip_gpu_memory_less_than_40gb = skip_gpu_memory_less_than(40 * 1024 * 1024 *
-                                                           1024)
-
-skip_gpu_memory_less_than_80gb = skip_gpu_memory_less_than(80 * 1024 * 1024 *
-                                                           1024)
-
-skip_gpu_memory_less_than_138gb = skip_gpu_memory_less_than(138 * 1024 * 1024 *
-                                                            1024)
-=======
 skip_gpu_memory_less_than_40gb = skip_gpu_memory_less_than(40 * 1000 * 1000 *
                                                            1000)
 
@@ -216,7 +193,6 @@ skip_gpu_memory_less_than_80gb = skip_gpu_memory_less_than(80 * 1000 * 1000 *
 
 skip_gpu_memory_less_than_138gb = skip_gpu_memory_less_than(138 * 1000 * 1000 *
                                                             1000)
->>>>>>> upstream/main
 
 
 def modelopt_installed():

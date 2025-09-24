@@ -1,31 +1,14 @@
 import asyncio
-<<<<<<< HEAD
-import os
-from typing import Any, List, Optional
-=======
 import gc
 import os
 import signal  # Added import
 import subprocess  # nosec B404
 import sys
 from typing import Any, Optional
->>>>>>> upstream/main
 
 import click
 import torch
 import yaml
-<<<<<<< HEAD
-from torch.cuda import device_count
-
-from tensorrt_llm._torch.llm import LLM as PyTorchLLM
-from tensorrt_llm._torch.pyexecutor.config import PyTorchConfig
-from tensorrt_llm.llmapi import (LLM, BuildConfig, CapacitySchedulerPolicy,
-                                 DynamicBatchConfig, KvCacheConfig,
-                                 SchedulerConfig)
-from tensorrt_llm.llmapi.disagg_utils import (CtxGenServerConfig,
-                                              parse_disagg_config_file)
-from tensorrt_llm.llmapi.llm_utils import update_llm_args_with_extra_dict
-=======
 from strenum import StrEnum
 from torch.cuda import device_count
 
@@ -43,17 +26,10 @@ from tensorrt_llm.llmapi.disagg_utils import (MetadataServerConfig, ServerRole,
                                               parse_metadata_server_config_file)
 from tensorrt_llm.llmapi.llm_utils import update_llm_args_with_extra_dict
 from tensorrt_llm.llmapi.mpi_session import find_free_port
->>>>>>> upstream/main
 from tensorrt_llm.llmapi.reasoning_parser import ReasoningParserFactory
 from tensorrt_llm.logger import logger, severity_map
 from tensorrt_llm.serve import OpenAIDisaggServer, OpenAIServer
 
-<<<<<<< HEAD
-
-def get_llm_args(model: str,
-                 tokenizer: Optional[str] = None,
-                 backend: Optional[str] = None,
-=======
 # Global variable to store the Popen object of the child process
 _child_p_global: Optional[subprocess.Popen] = None
 
@@ -98,7 +74,6 @@ def _signal_handler_cleanup_child(signum, frame):
 def get_llm_args(model: str,
                  tokenizer: Optional[str] = None,
                  backend: str = "pytorch",
->>>>>>> upstream/main
                  max_beam_width: int = BuildConfig.max_beam_width,
                  max_batch_size: int = BuildConfig.max_batch_size,
                  max_num_tokens: int = BuildConfig.max_num_tokens,
@@ -111,35 +86,20 @@ def get_llm_args(model: str,
                  num_postprocess_workers: int = 0,
                  trust_remote_code: bool = False,
                  reasoning_parser: Optional[str] = None,
-<<<<<<< HEAD
-=======
                  fail_fast_on_attention_window_too_large: bool = False,
->>>>>>> upstream/main
                  **llm_args_extra_dict: Any):
 
     if gpus_per_node is None:
         gpus_per_node = device_count()
         if gpus_per_node == 0:
             raise ValueError("No GPU devices found on the node")
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
     build_config = BuildConfig(max_batch_size=max_batch_size,
                                max_num_tokens=max_num_tokens,
                                max_beam_width=max_beam_width,
                                max_seq_len=max_seq_len)
-<<<<<<< HEAD
-
-    kv_cache_config = KvCacheConfig(
-        free_gpu_memory_fraction=free_gpu_memory_fraction)
-
-    pytorch_backend_config = PyTorchConfig() if backend == "pytorch" else None
-=======
     kv_cache_config = KvCacheConfig(
         free_gpu_memory_fraction=free_gpu_memory_fraction, )
 
->>>>>>> upstream/main
     dynamic_batch_config = DynamicBatchConfig(
         enable_batch_size_tuning=True,
         enable_max_num_tokens_tuning=False,
@@ -148,25 +108,6 @@ def get_llm_args(model: str,
         capacity_scheduler_policy=CapacitySchedulerPolicy.GUARANTEED_NO_EVICT,
         dynamic_batch_config=dynamic_batch_config,
     )
-<<<<<<< HEAD
-
-    llm_args = {
-        "model": model,
-        "scheduler_config": scheduler_config,
-        "tokenizer": tokenizer,
-        "tensor_parallel_size": tensor_parallel_size,
-        "pipeline_parallel_size": pipeline_parallel_size,
-        "moe_expert_parallel_size": moe_expert_parallel_size,
-        "gpus_per_node": gpus_per_node,
-        "trust_remote_code": trust_remote_code,
-        "build_config": build_config,
-        "kv_cache_config": kv_cache_config,
-        "backend": backend if backend == "pytorch" else None,
-        "pytorch_backend_config": pytorch_backend_config,
-        "_num_postprocess_workers": num_postprocess_workers,
-        "_postprocess_tokenizer_dir": tokenizer or model,
-        "_reasoning_parser": reasoning_parser,
-=======
     backend = backend if backend in ["pytorch", "_autodeploy"] else None
     llm_args = {
         "model":
@@ -207,25 +148,11 @@ def get_llm_args(model: str,
         reasoning_parser,
         "fail_fast_on_attention_window_too_large":
         fail_fast_on_attention_window_too_large,
->>>>>>> upstream/main
     }
 
     return llm_args, llm_args_extra_dict
 
 
-<<<<<<< HEAD
-def launch_server(host: str, port: int, llm_args: dict):
-
-    backend = llm_args["backend"]
-    model = llm_args["model"]
-
-    if backend == 'pytorch':
-        llm = PyTorchLLM(**llm_args)
-    else:
-        llm = LLM(**llm_args)
-
-    server = OpenAIServer(llm=llm, model=model)
-=======
 def launch_server(host: str,
                   port: int,
                   llm_args: dict,
@@ -250,13 +177,10 @@ def launch_server(host: str,
                           model=model,
                           server_role=server_role,
                           metadata_server_cfg=metadata_server_cfg)
->>>>>>> upstream/main
 
     asyncio.run(server(host, port))
 
 
-<<<<<<< HEAD
-=======
 def launch_mm_encoder_server(
     host: str,
     port: int,
@@ -273,7 +197,6 @@ def launch_mm_encoder_server(
     asyncio.run(server(host, port))
 
 
->>>>>>> upstream/main
 @click.command("serve")
 @click.argument("model", type=str)
 @click.option("--tokenizer",
@@ -286,12 +209,6 @@ def launch_mm_encoder_server(
               default="localhost",
               help="Hostname of the server.")
 @click.option("--port", type=int, default=8000, help="Port of the server.")
-<<<<<<< HEAD
-@click.option("--backend",
-              type=click.Choice(["pytorch"]),
-              default=None,
-              help="Set to 'pytorch' for pytorch path. Default is cpp path.")
-=======
 @click.option(
     "--backend",
     type=click.Choice(["pytorch", "trt", "_autodeploy"]),
@@ -299,7 +216,6 @@ def launch_mm_encoder_server(
     help=
     "Set to 'pytorch' for pytorch path and '_autodeploy' for autodeploy path. Default is pytorch path."
 )
->>>>>>> upstream/main
 @click.option('--log_level',
               type=click.Choice(severity_map.keys()),
               default='info',
@@ -371,17 +287,6 @@ def launch_mm_encoder_server(
     default=None,
     help="[Experimental] Specify the parser for reasoning models.",
 )
-<<<<<<< HEAD
-def serve(model: str, tokenizer: Optional[str], host: str, port: int,
-          log_level: str, backend: str, max_beam_width: int,
-          max_batch_size: int, max_num_tokens: int, max_seq_len: int,
-          tp_size: int, pp_size: int, ep_size: Optional[int],
-          cluster_size: Optional[int], gpus_per_node: Optional[int],
-          kv_cache_free_gpu_memory_fraction: float,
-          num_postprocess_workers: int, trust_remote_code: bool,
-          extra_llm_api_options: Optional[str],
-          reasoning_parser: Optional[str]):
-=======
 @click.option("--metadata_server_config_file",
               type=str,
               default=None,
@@ -409,7 +314,6 @@ def serve(
         extra_llm_api_options: Optional[str], reasoning_parser: Optional[str],
         metadata_server_config_file: Optional[str], server_role: Optional[str],
         fail_fast_on_attention_window_too_large: bool):
->>>>>>> upstream/main
     """Running an OpenAI API compatible server
 
     MODEL: model name | HF checkpoint path | TensorRT engine path
@@ -432,13 +336,9 @@ def serve(
         free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction,
         num_postprocess_workers=num_postprocess_workers,
         trust_remote_code=trust_remote_code,
-<<<<<<< HEAD
-        reasoning_parser=reasoning_parser)
-=======
         reasoning_parser=reasoning_parser,
         fail_fast_on_attention_window_too_large=
         fail_fast_on_attention_window_too_large)
->>>>>>> upstream/main
 
     llm_args_extra_dict = {}
     if extra_llm_api_options is not None:
@@ -446,22 +346,6 @@ def serve(
             llm_args_extra_dict = yaml.safe_load(f)
     llm_args = update_llm_args_with_extra_dict(llm_args, llm_args_extra_dict)
 
-<<<<<<< HEAD
-    launch_server(host, port, llm_args)
-
-
-def get_ctx_gen_server_urls(
-        server_configs: List[CtxGenServerConfig]) -> List[str]:
-    ctx_server_urls = []
-    gen_server_urls = []
-    for cfg in server_configs:
-        if cfg.type == "ctx":
-            ctx_server_urls.append(f"http://{cfg.hostname}:{cfg.port}")
-        else:
-            gen_server_urls.append(f"http://{cfg.hostname}:{cfg.port}")
-
-    return ctx_server_urls, gen_server_urls
-=======
     metadata_server_cfg = parse_metadata_server_config_file(
         metadata_server_config_file)
 
@@ -546,7 +430,6 @@ def serve_encoder(model: str, host: str, port: int, log_level: str,
         metadata_server_config_file)
 
     launch_mm_encoder_server(host, port, encoder_args, metadata_server_cfg)
->>>>>>> upstream/main
 
 
 @click.command("disaggregated")
@@ -555,14 +438,11 @@ def serve_encoder(model: str, host: str, port: int, log_level: str,
               type=str,
               default=None,
               help="Specific option for disaggregated mode.")
-<<<<<<< HEAD
-=======
 @click.option("-m",
               "--metadata_server_config_file",
               type=str,
               default=None,
               help="Path to metadata server config file")
->>>>>>> upstream/main
 @click.option("-t",
               "--server_start_timeout",
               type=int,
@@ -573,23 +453,6 @@ def serve_encoder(model: str, host: str, port: int, log_level: str,
               type=int,
               default=180,
               help="Request timeout")
-<<<<<<< HEAD
-def disaggregated(config_file: Optional[str], server_start_timeout: int,
-                  request_timeout: int):
-    """Running server in disaggregated mode"""
-
-    disagg_cfg = parse_disagg_config_file(config_file)
-
-    ctx_server_urls, gen_server_urls = get_ctx_gen_server_urls(
-        disagg_cfg.server_configs)
-
-    server = OpenAIDisaggServer(ctx_servers=ctx_server_urls,
-                                gen_servers=gen_server_urls,
-                                req_timeout_secs=request_timeout,
-                                server_start_timeout_secs=server_start_timeout,
-                                ctx_router_config=disagg_cfg.ctx_router_config,
-                                gen_router_config=disagg_cfg.gen_router_config)
-=======
 @click.option("-l",
               '--log_level',
               type=click.Choice(severity_map.keys()),
@@ -633,7 +496,6 @@ def disaggregated(config_file: Optional[str],
     #   maximum value of `count0` exceeded 3,000,000 during the test.
     if int(os.getenv("TRTLLM_DISAGG_SERVER_DISABLE_GC", "1")):
         gc.disable()
->>>>>>> upstream/main
 
     asyncio.run(server(disagg_cfg.hostname, disagg_cfg.port))
 
@@ -665,28 +527,18 @@ def set_cuda_device():
 def disaggregated_mpi_worker(config_file: Optional[str], log_level: str):
     """Launching disaggregated MPI worker"""
 
-<<<<<<< HEAD
-    set_cuda_device()
-=======
     from tensorrt_llm._utils import mpi_rank
     if os.environ.get(DisaggLauncherEnvs.
                       TLLM_DISAGG_RUN_REMOTE_MPI_SESSION_CLIENT) != "1":
         set_cuda_device()
->>>>>>> upstream/main
     # Importing mpi4py after setting CUDA device. This is needed to war an issue with mpi4py and CUDA
     from mpi4py.futures import MPICommExecutor
 
     from tensorrt_llm._utils import global_mpi_rank, mpi_rank, set_mpi_comm
-<<<<<<< HEAD
-    from tensorrt_llm.llmapi import MpiCommSession
-=======
->>>>>>> upstream/main
     from tensorrt_llm.llmapi.disagg_utils import split_world_comm
 
     disagg_cfg = parse_disagg_config_file(config_file)
 
-<<<<<<< HEAD
-=======
     # Run a server with the underlying LLM invokes a RemoteMPISessionClient
     if os.environ.get(DisaggLauncherEnvs.
                       TLLM_DISAGG_RUN_REMOTE_MPI_SESSION_CLIENT) == "1":
@@ -703,61 +555,37 @@ def disaggregated_mpi_worker(config_file: Optional[str], log_level: str):
         _launch_disaggregated_server(config_file, llm_args)
         return
 
->>>>>>> upstream/main
     is_leader, instance_idx, sub_comm = split_world_comm(
         disagg_cfg.server_configs)
 
     logger.set_level(log_level)
-<<<<<<< HEAD
-    os.environ['TRTLLM_USE_MPI_KVCACHE'] = "1"
-=======
->>>>>>> upstream/main
     set_mpi_comm(sub_comm)
     logger.info(
         f"mpi_session is provided for LLM instance. Global MPI rank: {global_mpi_rank()}, sub-comm MPI rank: {mpi_rank()}"
     )
 
     # Leader ranks will start the trtllm-server using it's own server config
-<<<<<<< HEAD
-    if is_leader:
-=======
     # and start a RemoteMPISessionServer to accept MPI tasks
     if is_leader:
         os.environ[DisaggLauncherEnvs.TLLM_DISAGG_INSTANCE_IDX] = str(
             instance_idx)
->>>>>>> upstream/main
         server_cfg = disagg_cfg.server_configs[instance_idx]
 
         llm_args, llm_args_extra_dict = get_llm_args(**server_cfg.other_args)
         llm_args = update_llm_args_with_extra_dict(llm_args,
                                                    llm_args_extra_dict)
 
-<<<<<<< HEAD
-        mpi_session = MpiCommSession(
-            comm=sub_comm,
-            n_workers=sub_comm.Get_size()) if sub_comm is not None else None
-
-        llm_args["_mpi_session"] = mpi_session
-
-        launch_server(host=server_cfg.hostname,
-                      port=server_cfg.port,
-                      llm_args=llm_args)
-    else:
-=======
         _launch_disaggregated_leader(sub_comm, instance_idx, config_file,
                                      log_level)
 
     else:
         # Common workers
->>>>>>> upstream/main
         with MPICommExecutor(sub_comm) as executor:
             if not is_leader and executor is not None:
                 raise RuntimeError(
                     f"rank{global_mpi_rank()} should not have executor")
 
 
-<<<<<<< HEAD
-=======
 class DisaggLauncherEnvs(StrEnum):
     TLLM_DISAGG_INSTANCE_IDX = "TLLM_DISAGG_INSTANCE_IDX"
     TLLM_DISAGG_RUN_REMOTE_MPI_SESSION_CLIENT = "TLLM_DISAGG_RUN_REMOTE_MPI_SESSION_CLIENT"
@@ -894,7 +722,6 @@ def _launch_disaggregated_leader(sub_comm, instance_idx: int, config_file: str,
         )
 
 
->>>>>>> upstream/main
 class DefaultGroup(click.Group):
     """Custom Click group to allow default command behavior"""
 
@@ -909,12 +736,8 @@ main = DefaultGroup(
     commands={
         "serve": serve,
         "disaggregated": disaggregated,
-<<<<<<< HEAD
-        "disaggregated_mpi_worker": disaggregated_mpi_worker
-=======
         "disaggregated_mpi_worker": disaggregated_mpi_worker,
         "mm_embedding_serve": serve_encoder
->>>>>>> upstream/main
     })
 
 if __name__ == "__main__":

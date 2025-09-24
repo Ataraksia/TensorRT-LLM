@@ -20,14 +20,11 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-<<<<<<< HEAD
-=======
 #ifndef TLLM_GEN_EXPORT_INTERFACE
 #include "trtllm/gen/MmaDecl.h"
 #else
 #include "MmaDecl.h"
 #endif
->>>>>>> upstream/main
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -36,12 +33,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 namespace gemmGatedAct
 {
 
->>>>>>> upstream/main
 namespace trtllm
 {
 namespace gen
@@ -69,28 +63,6 @@ enum class Dtype : uint32_t
     // clang-format off
   Bfloat16 = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/  16u, /*uid*/  0u),
   Bool     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/   1u, /*uid*/  1u),
-<<<<<<< HEAD
-  PadType  = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 1u, /*bits*/   8u, /*uid*/  2u),
-  E2m1     = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   4u, /*uid*/  3u),
-  E2m3     = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   6u, /*uid*/  4u),
-  E3m2     = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   6u, /*uid*/  5u),
-  E4m3     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   8u, /*uid*/  6u),
-  E5m2     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   8u, /*uid*/  7u),
-  Fp16     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/  16u, /*uid*/  8u),
-  Fp32     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/  32u, /*uid*/  9u),
-  Int8     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 1u, /*bits*/   8u, /*uid*/ 10u),
-  Int32    = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 1u, /*bits*/  32u, /*uid*/ 11u),
-  Int64    = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 1u, /*bits*/  64u, /*uid*/ 12u),
-  MxE2m1   = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   4u, /*uid*/ 13u),
-  MxE4m3   = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   8u, /*uid*/ 14u),
-  UE8m0    = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 0u, /*bits*/   8u, /*uid*/ 15u),
-  UInt8    = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/   8u, /*uid*/ 16u),
-  UInt16   = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/  16u, /*uid*/ 17u),
-  UInt32   = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/  32u, /*uid*/ 18u),
-  UInt64   = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/  64u, /*uid*/ 19u),
-  UInt128  = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/ 128u, /*uid*/ 20u),
-  Void     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   0u, /*uid*/ 21u),
-=======
   E2m1     = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   4u, /*uid*/  2u),
   E2m3     = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   6u, /*uid*/  3u),
   E3m2     = TLLM_ENCODE_DTYPE(/*block*/ 1u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   6u, /*uid*/  4u),
@@ -110,7 +82,6 @@ enum class Dtype : uint32_t
   UInt64   = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/  64u, /*uid*/ 18u),
   UInt128  = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 0u, /*int*/ 1u, /*bits*/ 128u, /*uid*/ 19u),
   Void     = TLLM_ENCODE_DTYPE(/*block*/ 0u, /*signed*/ 1u, /*int*/ 0u, /*bits*/   0u, /*uid*/ 20u),
->>>>>>> upstream/main
 // clang-format on
 
 #undef TLLM_ENCODE_DTYPE
@@ -189,10 +160,7 @@ inline std::string dtypeToString(Dtype dtype)
     case Dtype::Int32: return "Int32";
     case Dtype::Int64: return "Int64";
     case Dtype::MxE4m3: return "MxE4m3";
-<<<<<<< HEAD
-=======
     case Dtype::MxE2m1: return "MxE2m1";
->>>>>>> upstream/main
     case Dtype::UE8m0: return "UE8m0";
     case Dtype::UInt8: return "UInt8";
     case Dtype::UInt16: return "UInt16";
@@ -245,10 +213,6 @@ inline Dtype dtypeGetBlockSfType(Dtype dtype)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-} // namespace gen
-} // namespace trtllm
-=======
 inline MmaKind dtypeGetMmaKind(Dtype dtypeA, Dtype dtypeB)
 {
     auto dtypeEltA = dtypeEltType(dtypeA);
@@ -296,4 +260,3 @@ inline MmaKind dtypeGetMmaKind(Dtype dtypeA, Dtype dtypeB)
 } // namespace trtllm
 
 } // namespace gemmGatedAct
->>>>>>> upstream/main

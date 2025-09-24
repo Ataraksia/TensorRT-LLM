@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-from typing import List
-=======
 from typing import List, Optional
->>>>>>> upstream/main
 
 import torch
 
@@ -25,10 +21,7 @@ def _register_fake():
         strategy,
         op,
         eps,
-<<<<<<< HEAD
-=======
         trigger_completion_at_end,
->>>>>>> upstream/main
     ):
         from tensorrt_llm.functional import AllReduceFusionOp
         if op == int(AllReduceFusionOp.NONE):
@@ -62,8 +55,6 @@ def _register_fake():
         else:
             return [torch.empty_like(input)]
 
-<<<<<<< HEAD
-=======
     #MNNVL Allreduce
     @torch.library.register_fake("trtllm::mnnvl_twoshot_allreduce")
     def _(input, buffer, buffer_flags, buffer_size, wait_for_results):
@@ -76,7 +67,6 @@ def _register_fake():
         residual_out = residual.new_empty(residual.shape)
         return [output, residual_out]
 
->>>>>>> upstream/main
     @torch.library.register_fake("trtllm::moe_allreduce")
     def _(residual, norm_weight, device_num_experts, scale_input,
           active_experts_token_input, token_input, workspace, rank, nranks,
@@ -116,8 +106,6 @@ def _register_fake():
             shape, dtype=out_dtype if out_dtype is not None else mat_a.dtype)
         return ret
 
-<<<<<<< HEAD
-=======
     @torch.library.register_fake("trtllm::dsv3_router_gemm_op")
     def _(mat_a, mat_b, bias, out_dtype):
         shape = list(mat_a.shape)
@@ -134,7 +122,6 @@ def _register_fake():
             shape, dtype=out_dtype if out_dtype is not None else mat_a.dtype)
         return ret
 
->>>>>>> upstream/main
     @torch.library.register_fake("trtllm::fp4_gemm")
     def _(
         mat1: torch.Tensor,
@@ -174,100 +161,20 @@ def _register_fake():
     def _(input: torch.Tensor, scale: torch.Tensor):
         return torch.empty_like(input).to(torch.float8_e4m3fn), scale
 
-<<<<<<< HEAD
-    @torch.library.register_fake("trtllm::logits_bitmask")
-    def _(logits: List[torch.Tensor], bitmask: List[torch.Tensor]):
-        pass
-
-=======
->>>>>>> upstream/main
     @torch.library.register_fake("trtllm::fp4_quantize")
     def _(
         input: torch.Tensor,
         global_scale: torch.Tensor,
         sf_vec_size: int,
         sf_use_ue8m0=False,
-<<<<<<< HEAD
-    ):
-        output_shape, scale_shape = fp4_utils.get_fp4_shape(
-            input.shape, sf_vec_size)
-=======
         swizzled_layout=True,
     ):
         output_shape, scale_shape = fp4_utils.get_fp4_shape(
             input.shape, sf_vec_size, swizzled_layout)
->>>>>>> upstream/main
 
         return (input.new_empty(output_shape, dtype=torch.uint8),
                 global_scale.new_empty(scale_shape, dtype=torch.uint8))
 
-<<<<<<< HEAD
-    @torch.library.register_fake("trtllm::moe_comm_prepare_indices")
-    def _(
-        gathered_target_rank_ids: torch.Tensor,
-        real_rank_token_count_cum_sum,
-        max_token_count_per_rank: int,
-        expert_count: int,
-        top_k: int,
-        ep_rank: int,
-        ep_size: int,
-    ):
-        max_send_ranks_per_token = max(ep_size, top_k)
-        local_gather_indices_shape = (max_token_count_per_rank * ep_size, )
-        rank_count_cum_sum_shape = (ep_size, )
-        send_rank_local_indices_shape = (max_token_count_per_rank *
-                                         max_send_ranks_per_token, )
-        recv_rank_local_indices_shape = (max_token_count_per_rank * ep_size, )
-        backward_recv_rank_local_indices_shape = (max_token_count_per_rank *
-                                                  max_send_ranks_per_token, )
-
-        local_gather_indices = gathered_target_rank_ids.new_empty(
-            local_gather_indices_shape, dtype=torch.int32)
-        send_rank_count_cum_sum = gathered_target_rank_ids.new_empty(
-            rank_count_cum_sum_shape, dtype=torch.int32)
-        send_rank_local_indices = gathered_target_rank_ids.new_empty(
-            send_rank_local_indices_shape, dtype=torch.int32)
-        recv_rank_count_cum_sum = gathered_target_rank_ids.new_empty(
-            rank_count_cum_sum_shape, dtype=torch.int32)
-        recv_rank_local_indices = gathered_target_rank_ids.new_empty(
-            recv_rank_local_indices_shape, dtype=torch.int32)
-        backward_recv_rank_local_indices = gathered_target_rank_ids.new_empty(
-            backward_recv_rank_local_indices_shape, dtype=torch.int32)
-
-        return (local_gather_indices, send_rank_count_cum_sum,
-                send_rank_local_indices, recv_rank_count_cum_sum,
-                recv_rank_local_indices, backward_recv_rank_local_indices)
-
-    @torch.library.register_fake("trtllm::moe_local_gather")
-    def _(
-        recv_rank_cum_sum: torch.Tensor,
-        local_gather_indices: torch.Tensor,
-        gathered_expert_ids: torch.Tensor,
-        gathered_scales: torch.Tensor,
-        local_expert_ids: torch.Tensor,
-        local_scales: torch.Tensor,
-        max_token_count_per_rank: int,
-        expert_count: int,
-        top_k: int,
-        ep_rank: int,
-        ep_size: int,
-    ):
-        pass
-
-    @torch.library.register_fake("trtllm::moe_comm")
-    def _(
-        input: torch.Tensor,
-        send_rank_cum_sum: torch.Tensor,
-        send_indices: torch.Tensor,
-        output: torch.Tensor,
-        recv_rank_cum_sum: torch.Tensor,
-        recv_indices: torch.Tensor,
-        all_workspaces: torch.Tensor,
-        ep_rank: int,
-        ep_size: int,
-    ):
-        pass
-=======
     @torch.library.register_fake("trtllm::calculate_nvfp4_global_scale")
     def _(input: torch.Tensor, tokens_per_batch: Optional[torch.Tensor]):
         return input.new_empty((input.shape[:-1], 1), dtype=torch.float32)
@@ -293,7 +200,6 @@ def _register_fake():
                 device=input_tensor.device)
             outputs.append(output_tensor)
         return outputs
->>>>>>> upstream/main
 
     @torch.library.register_fake("trtllm::get_moe_commworkspace_size_per_rank")
     def _(ep_size: int):
@@ -303,8 +209,6 @@ def _register_fake():
     def _(max_sm_count: int):
         pass
 
-<<<<<<< HEAD
-=======
     @torch.library.register_fake("trtllm::moe_load_balance_wait_gpu_stage")
     def _(single_layer_load_balancer_ptr: int):
         return torch.empty((1, ),
@@ -345,7 +249,6 @@ def _register_fake():
           ep_size: int):
         pass
 
->>>>>>> upstream/main
     @torch.library.custom_op("trtllm::group_rms_norm_base",
                              mutates_args=("outputs", ))
     def group_rms_norm_base(
@@ -430,8 +333,6 @@ def _register_fake():
         return torch.empty_like(input,
                                 dtype=torch.float8_e4m3fn), input.new_empty(
                                     sz, dtype=torch.float)
-<<<<<<< HEAD
-=======
 
     @torch.library.register_fake("trtllm::causal_conv1d_fwd")
     def _(
@@ -603,4 +504,3 @@ def _register_fake():
         return router_logits.new_empty(
             sz, dtype=torch.int32), router_logits.new_empty(sz,
                                                             dtype=output_dtype)
->>>>>>> upstream/main

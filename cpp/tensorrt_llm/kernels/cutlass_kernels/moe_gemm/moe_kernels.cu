@@ -3506,8 +3506,6 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, InputType, BackBoneType, Enab
     }
     else
     {
-<<<<<<< HEAD
-=======
         // For NoSmem epilogue schedule, we need to align the output of the GEMM to 256 bits, for gated activation this
         // is automatic if the usual alignment requirement is met
         if (gemm1_config_->epilogue_schedule == cutlass_extensions::EpilogueScheduleType::NO_SMEM
@@ -3528,7 +3526,6 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, InputType, BackBoneType, Enab
                 (int) (256 / sizeof_bits<WeightType>::value));
         }
 
->>>>>>> upstream/main
         // Require at least 128 bits of alignment for MOE GEMM
         TLLM_CHECK_WITH_INFO(hidden_size % (128 / sizeof_bits<WeightType>::value) == 0,
             "Hidden size %d does not meet minimum alignment requirements for MOE GEMM %d", (int) hidden_size,

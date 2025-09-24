@@ -43,13 +43,9 @@ class MLP(nn.Module):
                 weight_mode=WeightMode.VANILLA),
             quant_config=config.get_quant_config(),
             skip_create_weights_in_init=config.skip_create_weights_in_init,
-<<<<<<< HEAD
-            lora=self.up_lora)
-=======
             lora=self.up_lora,
             allreduce_strategy=config.allreduce_strategy,
             force_dynamic_quantization=config.force_dynamic_quantization)
->>>>>>> upstream/main
 
         self.down_lora = LoraLayer([LoraModuleType.MLP_4H_TO_H],
                                    [self.hidden_size])
@@ -62,13 +58,9 @@ class MLP(nn.Module):
             tensor_parallel_mode=TensorParallelMode.ROW,
             quant_config=config.get_quant_config(),
             skip_create_weights_in_init=config.skip_create_weights_in_init,
-<<<<<<< HEAD
-            lora=self.down_lora)
-=======
             lora=self.down_lora,
             allreduce_strategy=config.allreduce_strategy,
             force_dynamic_quantization=config.force_dynamic_quantization)
->>>>>>> upstream/main
 
     def forward(
         self,

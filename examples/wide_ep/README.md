@@ -96,21 +96,6 @@ GPU memory are also on NUMA nodes on GB200 and system can also use that. Bind me
 numactl -m 0,1 <command>
 ```
 
-<<<<<<< HEAD
-### Shared Memory Clean Up on EPLB
-
-To achieve online load balance, all expert weights are stored in shared host memory. 4 ranks on same GB200 node share the same expert weights to save memory. Normally, these shared host memory will be cleaned up at process exit, but they may not get chance to be cleaned if an abnormal exit happens.
-
-In that case, when seeing the following (or similar) error message:
-```
-FileExistsError: [Errno 17] File exists: '/moe_shared_l0_lr0_all'
-```
-you need to manually check `/dev/shm` directory and delete `/dev/shm/moe_shared_*` if any.
-
-### Disaggregated serving related issues
-
-Refer to the [Troubleshooting and FAQ](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/advanced/disaggregated-service.md#troubleshooting-and-faq) section of Disaggregated-Service.
-=======
 ### Shared Memory on EPLB
 
 To achieve online load balancing, all expert weights are stored in shared host memory. Four ranks on the same GB200 node share the same expert weights to save memory.
@@ -143,7 +128,6 @@ rm -f /dev/shm/moe_shared_l0_lr0_all
 ### Disaggregated serving related issues
 
 Refer to the [Troubleshooting and FAQ](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/features/disagg-serving.md#troubleshooting-and-faq) section of Disaggregated-Service.
->>>>>>> upstream/main
 
 ## References
 

@@ -4,14 +4,9 @@ from contextlib import contextmanager, nullcontext
 import pytest
 
 from tensorrt_llm import LLM
-<<<<<<< HEAD
-from tensorrt_llm.llmapi import KvCacheConfig
-from tensorrt_llm.llmapi.llm_args import PeftCacheConfig
-=======
 from tensorrt_llm.executor import GenerationExecutorWorker
 from tensorrt_llm.llmapi import KvCacheConfig
 from tensorrt_llm.llmapi.llm_args import NGramDecodingConfig, PeftCacheConfig
->>>>>>> upstream/main
 from tensorrt_llm.llmapi.tokenizer import TransformersTokenizer
 from tensorrt_llm.metrics import MetricNames
 from tensorrt_llm.sampling_params import SamplingParams
@@ -231,25 +226,9 @@ def test_llm_with_postprocess_parallel_and_result_handler(streaming):
                                                          tp_size=1)
 
 
-<<<<<<< HEAD
-@pytest.mark.parametrize(
-    "enable_mixed_sampler,enable_logprobs",
-    [
-        (False, False),  # Fast path: no mixed sampler, no logits, greedy
-        (True,
-         False),  # Batched strategy path: mixed sampler enabled, same strategy
-        (False,
-         True),  # Per-request path: mixed sampler disabled, logprobs enabled
-    ])
-@pytest.mark.part0
-def test_embedding_bias_with_torch_sampler_strategies(enable_mixed_sampler,
-                                                      enable_logprobs):
-    """Test embedding bias application in all 3 TorchSampler paths: fast, batched strategy, and per-request"""
-=======
 @pytest.mark.part0
 def test_embedding_bias_with_torch_sampler_strategies():
     """Test embedding bias application in TorchSampler."""
->>>>>>> upstream/main
     tokenizer = AutoTokenizer.from_pretrained(llama_model_path)
     biased_word_id = tokenizer.encode("Z", add_special_tokens=False)[-1]
     vocab_size_padded = 32000
@@ -261,22 +240,10 @@ def test_embedding_bias_with_torch_sampler_strategies():
         "embedding_bias": embedding_bias,
     }
 
-<<<<<<< HEAD
-    if enable_logprobs:
-        sampling_kwargs["logprobs"] = 1
-=======
->>>>>>> upstream/main
     # All test cases use greedy sampling for simplicity
 
     sampling_params = SamplingParams(**sampling_kwargs)
 
-<<<<<<< HEAD
-    llm_test_harness(llama_model_path,
-                     prompts, ["Z Z Z Z Z Z"],
-                     sampling_params=sampling_params,
-                     backend="pytorch",
-                     enable_mixed_sampler=enable_mixed_sampler)
-=======
     llm_test_harness(
         llama_model_path,
         prompts,
@@ -284,7 +251,6 @@ def test_embedding_bias_with_torch_sampler_strategies():
         sampling_params=sampling_params,
         backend="pytorch",
     )
->>>>>>> upstream/main
 
 
 def llama_7b_lora_from_dir_test_harness(**llm_kwargs) -> None:
@@ -528,10 +494,7 @@ def test_nemotron_nas_lora() -> None:
 
 
 @skip_gpu_memory_less_than_80gb
-<<<<<<< HEAD
-=======
 @pytest.mark.skip(reason="https://nvbugs/5521949")
->>>>>>> upstream/main
 def test_codellama_fp8_with_bf16_lora() -> None:
     model_dir = f"{llm_models_root()}/codellama/CodeLlama-7b-Instruct-hf/"
     quant_config = QuantConfig(quant_algo=QuantAlgo.FP8,
@@ -592,10 +555,7 @@ def test_codellama_fp8_with_bf16_lora() -> None:
 
 
 @skip_gpu_memory_less_than_80gb
-<<<<<<< HEAD
-=======
 @pytest.mark.skip(reason="https://nvbugs/5521949")
->>>>>>> upstream/main
 def test_bielik_11b_v2_2_instruct_multi_lora() -> None:
     model_dir = f"{llm_models_root()}/Bielik-11B-v2.2-Instruct"
 
@@ -851,8 +811,6 @@ class TestLlmError:
                            match="should not exceed max_num_tokens"):
             ids = [random.randint(10, 100) for _ in range(101)]
             llm.generate([ids])
-<<<<<<< HEAD
-=======
 
 
 class FailingExecutorWorker(GenerationExecutorWorker):
@@ -923,4 +881,3 @@ def test_min_tokens(use_speculative: bool):
 
     assert len(res.outputs) == 1
     assert len(res.outputs[0].token_ids) == output_len
->>>>>>> upstream/main

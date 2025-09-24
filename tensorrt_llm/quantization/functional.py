@@ -614,8 +614,6 @@ def fp8_rowwise_rms_norm(input: Tensor,
                               layer), _create_tensor(layer.get_output(1), layer)
 
 
-<<<<<<< HEAD
-=======
 def fp8_rowwise_layer_norm(input: Tensor,
                            normalized_shape: Union[int, Tuple[int]],
                            weight: Optional[Tensor] = None,
@@ -693,7 +691,6 @@ def fp8_rowwise_layer_norm(input: Tensor,
                               layer), _create_tensor(layer.get_output(1), layer)
 
 
->>>>>>> upstream/main
 def fused_layernorm(
         input: Tensor,
         normalized_shape: Union[int, Tuple[int]],
@@ -953,29 +950,18 @@ def symmetric_quantize_last_axis_of_batched_matrix(weight, quant_mode):
     return qweight, scale
 
 
-<<<<<<< HEAD
-def preprocess_weights_for_mixed_gemm(tensor: torch.Tensor,
-                                      quant_mode: torch.dtype,
-                                      act_dtype: torch.dtype,
-                                      sm_: int = -1) -> torch.Tensor:
-=======
 def preprocess_weights_for_mixed_gemm(
         tensor: torch.Tensor,
         quant_mode: torch.dtype,
         act_dtype: torch.dtype,
         sm_: int = -1,
         do_weight_interleave: bool = True) -> torch.Tensor:
->>>>>>> upstream/main
     sm_ = sm_ if sm_ > 0 else get_sm_version()
     if len(tensor.shape) == 2:
         tensor = tensor.unsqueeze(0)
     elif sm_ >= 90:
         sm_ = 80
-<<<<<<< HEAD
-    if sm_ >= 120:
-=======
     if sm_ > 90:
->>>>>>> upstream/main
         sm_ = 80
 
     permutation_map = {
@@ -1004,22 +990,12 @@ def preprocess_weights_for_mixed_gemm(
     assert (num_rows % B_ROWS_PER_MMA == 0)
     assert (num_cols % MMA_SHAPE_N == 0)
 
-<<<<<<< HEAD
-    row_idx_list = [
-        (row_idx // B_ROWS_PER_MMA) * B_ROWS_PER_MMA +
-        permutation_map[f"{BITS_PER_ELT_A}_{BITS_PER_ELT_B}"][row_idx %
-                                                              B_ROWS_PER_MMA]
-        for row_idx in range(num_rows)
-    ]
-    tensor = tensor[:, row_idx_list, :]
-=======
     if do_weight_interleave:
         row_idx_list = [(row_idx // B_ROWS_PER_MMA) * B_ROWS_PER_MMA +
                         permutation_map[f"{BITS_PER_ELT_A}_{BITS_PER_ELT_B}"][
                             row_idx % B_ROWS_PER_MMA]
                         for row_idx in range(num_rows)]
         tensor = tensor[:, row_idx_list, :]
->>>>>>> upstream/main
 
     # subbyte_transpose
     original_shape = tensor.shape
@@ -1035,40 +1011,6 @@ def preprocess_weights_for_mixed_gemm(
     else:
         tensor = tensor.permute(0, 2, 1).reshape(original_shape)
 
-<<<<<<< HEAD
-    # interleave_column_major_tensor
-    interleave = BITS_PER_ELT_A // BITS_PER_ELT_B
-    if interleave > 1 and sm_ < 90:
-        rows_per_tile = 128 * 8 // BITS_PER_ELT_A
-        elts_in_int32 = 32 // BITS_PER_ELT_B
-
-        assert (num_rows % elts_in_int32 == 0)
-        assert (num_rows % rows_per_tile == 0)
-
-        tensor = tensor.reshape(num_experts, -1, interleave,
-                                num_rows // rows_per_tile,
-                                rows_per_tile * 4 // elts_in_int32)
-        tensor = tensor.permute(0, 1, 3, 2, 4).reshape(original_shape)
-
-    # add_bias_and_interleave_quantized_tensor_inplace
-    if BITS_PER_ELT_B == 8:
-        tensor += -256 * (tensor > 127).byte() + 128
-        tensor = tensor.reshape(-1, 4)[:, [0, 2, 1, 3]].reshape(tensor.shape)
-    elif BITS_PER_ELT_B == 4:
-        tensor = tensor.view(torch.uint8)
-        high_tensor = (tensor >> 4).unsqueeze(-1)
-        low_tensor = ((tensor << 4) >> 4).unsqueeze(-1)
-        new_tensor = torch.cat([low_tensor, high_tensor],
-                               dim=-1).reshape(tensor.shape[0], tensor.shape[1],
-                                               -1)
-        new_tensor = new_tensor.reshape(
-            -1, 8)[:, [0, 2, 4, 6, 1, 3, 5, 7]].reshape(new_tensor.shape)
-        new_tensor += -16 * (new_tensor > 7).byte() + 8
-        new_tensor = new_tensor[:, :, 0::2] + new_tensor[:, :, 1::2] * 16
-        tensor = new_tensor.view(torch.int8)
-    else:
-        raise NotImplementedError
-=======
     if do_weight_interleave:
         # interleave_column_major_tensor
         interleave = BITS_PER_ELT_A // BITS_PER_ELT_B
@@ -1103,13 +1045,10 @@ def preprocess_weights_for_mixed_gemm(
             tensor = new_tensor.view(torch.int8)
         else:
             raise NotImplementedError
->>>>>>> upstream/main
 
     return tensor.squeeze(0).contiguous()
 
 
-<<<<<<< HEAD
-=======
 def get_weight_scale_interleave_factor(interleaved_dim: int,
                                        group_size: int = 128) -> int:
     # Calculate the weight_scale interleave factor for W4A8 groupwise MoE quant
@@ -1129,7 +1068,6 @@ def get_weight_scale_interleave_factor(interleaved_dim: int,
     return factor
 
 
->>>>>>> upstream/main
 def validate_group_size(layer):
     # TODO: Remove this function and its usage after W4A8-AWQ with group_size = 64 is implemented.
     W4A8_AWQ = 8

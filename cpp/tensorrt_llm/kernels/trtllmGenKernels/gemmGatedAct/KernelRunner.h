@@ -28,13 +28,8 @@ namespace kernels
 
 struct TrtllmGenGemmGatedActRunnerOptions
 {
-<<<<<<< HEAD
-    trtllm::gen::Dtype eltType;
-    trtllm::gen::Dtype outputType;
-=======
     gemmGatedAct::trtllm::gen::Dtype eltType;
     gemmGatedAct::trtllm::gen::Dtype outputType;
->>>>>>> upstream/main
     bool deepSeekFp8{false};
     bool transposeMmaOutput{false};
 };

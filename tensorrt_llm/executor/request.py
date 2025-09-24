@@ -5,18 +5,12 @@ from typing import List, Optional, Union
 import numpy as np
 import torch
 
-<<<<<<< HEAD
-from ..disaggregated_params import DisaggregatedParams
-from ..llmapi.llm_utils import KvCacheRetentionConfig
-from ..sampling_params import SamplingParams
-=======
 from tensorrt_llm.inputs.multimodal import MultimodalParams
 
 from ..disaggregated_params import DisaggregatedParams
 from ..llmapi.llm_utils import KvCacheRetentionConfig
 from ..sampling_params import SamplingParams
 from ..scheduling_params import SchedulingParams
->>>>>>> upstream/main
 from .postproc_worker import PostprocParams
 
 __all__ = [
@@ -32,21 +26,15 @@ class LoRARequest:
     lora_name: str
     lora_int_id: int
     lora_path: str = ""
-<<<<<<< HEAD
-=======
     lora_ckpt_source: str = "hf"
->>>>>>> upstream/main
 
     def __post_init__(self):
         if self.lora_path is not None and not os.path.exists(self.lora_path):
             raise ValueError(f"lora_path ({self.lora_path}) does not exist.")
-<<<<<<< HEAD
-=======
         if self.lora_ckpt_source not in ["hf", "nemo"]:
             raise ValueError(
                 f"lora_ckpt_source must be 'hf' or 'nemo', got '{self.lora_ckpt_source}'"
             )
->>>>>>> upstream/main
 
     @property
     def adapter_id(self):
@@ -60,13 +48,10 @@ class LoRARequest:
     def path(self):
         return self.lora_path
 
-<<<<<<< HEAD
-=======
     @property
     def ckpt_source(self):
         return self.lora_ckpt_source
 
->>>>>>> upstream/main
 
 @dataclass(slots=True)
 class PromptAdapterRequest:
@@ -107,13 +92,6 @@ class GenerationRequest:
         lora_request: Optional[LoRARequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         streaming: bool = False,
-<<<<<<< HEAD
-        multimodal_embedding: Optional[list] = None,
-        mrope_config: Optional[dict] = None,
-        kv_cache_retention_config: Optional[KvCacheRetentionConfig] = None,
-        disaggregated_params: Optional[DisaggregatedParams] = None,
-        postproc_params: Optional[PostprocParams] = None,
-=======
         kv_cache_retention_config: Optional[KvCacheRetentionConfig] = None,
         disaggregated_params: Optional[DisaggregatedParams] = None,
         postproc_params: Optional[PostprocParams] = None,
@@ -121,7 +99,6 @@ class GenerationRequest:
         scheduling_params: Optional[SchedulingParams] = None,
         cache_salt_id: Optional[int] = None,
         arrival_time: Optional[float] = None,
->>>>>>> upstream/main
     ):
         if isinstance(prompt_token_ids, list):
             self.prompt_token_ids = prompt_token_ids
@@ -135,23 +112,13 @@ class GenerationRequest:
                 f"prompt_token_ids ({prompt_token_ids}) should be an instance of torch.Tensor, np.ndarray or list"
             )
 
-<<<<<<< HEAD
-=======
         # NOTE: Exercise caution when adding memory intense attributes, because the current implementation might lead to leaks without manual cleanup.
         # Refer to https://github.com/NVIDIA/TensorRT-LLM/pull/5029#discussion_r2141859873 for details.
->>>>>>> upstream/main
         self.sampling_params = sampling_params
         self.postproc_params = postproc_params
         self.lora_request = lora_request
         self.prompt_adapter_request = prompt_adapter_request
         self.streaming = streaming
-<<<<<<< HEAD
-        self.multimodal_embedding = multimodal_embedding
-        self.mrope_config = mrope_config
-        self.kv_cache_retention_config = kv_cache_retention_config
-        self.id: Optional[int] = None
-        self.disaggregated_params = disaggregated_params
-=======
         self.multimodal_params = multimodal_params
         self.kv_cache_retention_config = kv_cache_retention_config
         self.id: Optional[int] = None
@@ -159,7 +126,6 @@ class GenerationRequest:
         self.scheduling_params = scheduling_params
         self.cache_salt_id = cache_salt_id
         self.arrival_time = arrival_time
->>>>>>> upstream/main
 
     def set_id(self, id):
         assert self.id is None, f"Request ID is already set: {self.id}"

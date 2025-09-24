@@ -220,13 +220,10 @@ struct RoutingKernelTestParam
     bool getExpWeights{true};
 
     int requiredComputeCapability{9};
-<<<<<<< HEAD
-=======
 
     // Check the input parameters
     bool useTopKAsInput{false};
 
->>>>>>> upstream/main
     // Special for renormalize routing method
     bool doSoftmaxBeforeTopK{false};
     bool normTopkProb{true};
@@ -250,13 +247,8 @@ struct RoutingKernelTestParam
     // Constructor with all parameters
     RoutingKernelTestParam(RoutingMethodType routingMethod, int32_t numTokens, int32_t numExperts, uint32_t topK,
         int32_t expertParallelization = 1, int32_t expertParallelizationId = 0, int32_t paddingLog2 = 3,
-<<<<<<< HEAD
-        int32_t localExpertsStrideLog2 = 0, bool usePdl = true, bool getExpWeights = true, int32_t nGroup = 1,
-        int32_t topkGroup = 1, float routedScalingFactor = 1.0f, int requiredComputeCapability = 9)
-=======
         int32_t localExpertsStrideLog2 = 0, bool usePdl = true, bool getExpWeights = true, bool useTopKAsInput = false,
         int32_t nGroup = 1, int32_t topkGroup = 1, float routedScalingFactor = 1.0f, int requiredComputeCapability = 9)
->>>>>>> upstream/main
         : routingMethod(routingMethod)
         , numTokens(numTokens)
         , numExperts(numExperts)
@@ -265,10 +257,7 @@ struct RoutingKernelTestParam
         , localExpertsStrideLog2(localExpertsStrideLog2)
         , usePdl(usePdl)
         , getExpWeights(getExpWeights)
-<<<<<<< HEAD
-=======
         , useTopKAsInput(useTopKAsInput)
->>>>>>> upstream/main
         , nGroup(nGroup)
         , topkGroup(topkGroup)
         , routedScalingFactor(routedScalingFactor)
@@ -409,13 +398,8 @@ protected:
         routingData.mPtrPermutedIdxSize = bufferCast<int32_t>(*mPtrPermutedIdxSizeDevice);
         routingData.mPtrExpandedIdxToPermutedIdx = bufferCast<int32_t>(*mPtrExpandedIdxToPermutedIdxDevice);
         routingData.mPtrPermutedIdxToTokenIdx = bufferCast<int32_t>(*mPtrPermutedIdxToTokenIdxDevice);
-<<<<<<< HEAD
-        routingData.mPtrExpertWeights = bufferCast<T>(*mPtrExpertWeightsDevice);
-        routingData.mPtrExpertIdx = reinterpret_cast<PackedType*>(bufferCast<int8_t>(*mPtrExpertIdxDevice));
-=======
         routingData.mPtrTopKWeights = bufferCast<T>(*mPtrTopKWeightsDevice);
         routingData.mPtrTopKPacked = reinterpret_cast<PackedType*>(bufferCast<int8_t>(*mPtrTopKPackedDevice));
->>>>>>> upstream/main
 
         // Set grouped gemm launch config buffers
         routingData.mPtrCtaIdxXyToBatchIdx = bufferCast<int32_t>(*mPtrCtaIdxXyToBatchIdxDevice);
@@ -434,11 +418,7 @@ protected:
 
     struct cudaDeviceProp mDeviceProp;
 
-<<<<<<< HEAD
-    // optional: if `nullptr`, `mPtrExpertIdx` must be provided.
-=======
     // optional: if `nullptr`, `mPtrTopKPacked` must be provided.
->>>>>>> upstream/main
     // If it is given, it represents the scores without sigmoid activation for
     // each token and expert.
     // note: if it is provided, we always re-compute the top1 scores
@@ -451,10 +431,6 @@ protected:
     // the least significant 16 bits represent the index of the chosen expert (unsigned).
     // note: this is required if the number of tokens is large.
     // dim: [mNumTokens, mTopK]
-<<<<<<< HEAD
-    TensorPtr mPtrExpertIdxHost;
-    TensorPtr mPtrExpertIdxDevice;
-=======
     TensorPtr mPtrTopKPackedHost;
     TensorPtr mPtrTopKPackedDevice;
 
@@ -468,7 +444,6 @@ protected:
     // Note: this might be reused as input when we take topk_ids as input.
     TensorPtr mPtrTopKWeightsHost;
     TensorPtr mPtrTopKWeightsDevice;
->>>>>>> upstream/main
 
     // note: at least one of the optional outputs below must be provided
     // optional: only used as an intermediate buffer when the number of tokens is large.
@@ -486,14 +461,7 @@ protected:
     // dim: [mNumTokens * mTopK + (mNumExperts << mPaddingLog2) - mNumExperts]
     TensorPtr mPtrPermutedIdxToTokenIdxHost;
     TensorPtr mPtrPermutedIdxToTokenIdxDevice;
-<<<<<<< HEAD
-    // optional: if `nullptr`, it is not filled
-    // dim: [mNumTokens, mTopK]
-    TensorPtr mPtrExpertWeightsHost;
-    TensorPtr mPtrExpertWeightsDevice;
-=======
 
->>>>>>> upstream/main
     //
     // Grouped Gemm Launch Config Buffers
     //

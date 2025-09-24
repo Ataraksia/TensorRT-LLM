@@ -109,49 +109,20 @@ void GuidedDecoder::build(ScheduledRequests const& scheduledRequests)
                     }
                     case executor::GuidedDecodingParams::GuideType::kREGEX:
                     {
-<<<<<<< HEAD
-                        auto const& grammar = xgrammar::Grammar::FromRegex(guide.value());
-                        mXGrammarMatchers.at(seqSlot)
-                            = std::make_shared<xgrammar::GrammarMatcher>(mXGrammarCompiler->CompileGrammar(grammar));
-=======
                         mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
                             mXGrammarCompiler->CompileRegex(guide.value()));
->>>>>>> upstream/main
                         break;
                     }
                     case executor::GuidedDecodingParams::GuideType::kEBNF_GRAMMAR:
                     {
-<<<<<<< HEAD
-                        auto const& grammar = xgrammar::Grammar::FromEBNF(guide.value());
-                        mXGrammarMatchers.at(seqSlot)
-                            = std::make_shared<xgrammar::GrammarMatcher>(mXGrammarCompiler->CompileGrammar(grammar));
-=======
                         mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
                             mXGrammarCompiler->CompileGrammar(guide.value()));
->>>>>>> upstream/main
                         break;
                     }
                     case executor::GuidedDecodingParams::GuideType::kSTRUCTURAL_TAG:
                     {
-<<<<<<< HEAD
-                        auto const& structuralTagParametersJson = nlohmann::json::parse(guide.value());
-                        auto const& structuralTagItemsJson
-                            = structuralTagParametersJson.at("structures").template get<std::vector<nlohmann::json>>();
-                        std::vector<xgrammar::StructuralTagItem> structuralTagItems;
-                        for (auto const& s : structuralTagItemsJson)
-                        {
-                            structuralTagItems.emplace_back(
-                                xgrammar::StructuralTagItem{s.at("begin").template get<std::string>(),
-                                    s.at("schema").dump(), s.at("end").template get<std::string>()});
-                        }
-                        auto const& triggers
-                            = structuralTagParametersJson.at("triggers").template get<std::vector<std::string>>();
-                        mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
-                            mXGrammarCompiler->CompileStructuralTag(structuralTagItems, triggers));
-=======
                         mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
                             mXGrammarCompiler->CompileStructuralTag(guide.value()));
->>>>>>> upstream/main
                         break;
                     }
                     default:

@@ -4,17 +4,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import torch
-<<<<<<< HEAD
-from parameterized import parameterized
-from transformers import AutoConfig
-from transformers.dynamic_module_utils import get_class_from_dynamic_module
-from transformers.generation.utils import NEED_SETUP_CACHE_CLASSES_MAPPING
-=======
 import transformers
 from parameterized import parameterized
 from transformers import AutoConfig
 from transformers.dynamic_module_utils import get_class_from_dynamic_module
->>>>>>> upstream/main
 from utils.llm_data import llm_models_root
 
 import tensorrt_llm
@@ -27,12 +20,9 @@ from tensorrt_llm._torch.pyexecutor.resource_manager import KVCacheManager
 from tensorrt_llm.bindings.executor import KvCacheConfig
 from tensorrt_llm.mapping import Mapping
 
-<<<<<<< HEAD
-=======
 # Setup NEED_SETUP_CACHE_CLASSES_MAPPING to an empty dict for modeling_nemotron_nas.py
 transformers.generation.utils.NEED_SETUP_CACHE_CLASSES_MAPPING = dict()
 
->>>>>>> upstream/main
 NEMOTRON_NAS_MINI_CONFIG = {
     "architectures": ["DeciLMForCausalLM"],
     "attention_bias":
@@ -405,12 +395,8 @@ class TestNemotronNAS(unittest.TestCase):
         # This line populates the "variable" field in the NEED_SETUP_CACHE_CLASSES_MAPPING dict
         hf_nemotron_nas._prepare_generation_config(None)
         # And this line is the only way to access the only concrete Cache class DeciLMForCausalLM accepts
-<<<<<<< HEAD
-        VariableCache = NEED_SETUP_CACHE_CLASSES_MAPPING["variable"]
-=======
         VariableCache = transformers.generation.utils.NEED_SETUP_CACHE_CLASSES_MAPPING[
             "variable"]
->>>>>>> upstream/main
 
         model_config = ModelConfig(pretrained_config=nemotron_nas_config,
                                    attn_backend=backend)

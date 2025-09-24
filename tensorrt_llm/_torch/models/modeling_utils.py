@@ -1,9 +1,6 @@
 import contextlib
 import math
-<<<<<<< HEAD
-=======
 import os
->>>>>>> upstream/main
 import time
 from dataclasses import dataclass
 from typing import Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
@@ -15,28 +12,16 @@ from torch.utils._pytree import tree_any_only
 from tqdm import tqdm
 
 from tensorrt_llm.lora_manager import HfLoraLoader
-<<<<<<< HEAD
-from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models.convert_utils import split_matrix_tp
 
 from ...logger import logger
-from ...mapping import Mapping
-=======
-from tensorrt_llm.models.convert_utils import split_matrix_tp
-
-from ...logger import logger
->>>>>>> upstream/main
 from ...models.modeling_utils import QuantConfig
 from ..attention_backend import AttentionMetadata
 from ..distributed.communicator import pp_recv, pp_send
 from ..model_config import ModelConfig, TConfig
 from ..modules.attention import Attention
 from ..modules.embedding import Embedding, LMHead
-<<<<<<< HEAD
-from ..modules.fused_moe import FusedMoE
-=======
 from ..modules.fused_moe import MoE, VanillaMoE
->>>>>>> upstream/main
 from ..modules.linear import Linear, TensorParallelMode, WeightMode
 from ..modules.logits_processor import LogitsProcessor
 from ..modules.rms_norm import RMSNorm
@@ -109,17 +94,9 @@ class MetaInitMode(TorchDispatchMode):
         return func(*args, **kwargs)
 
 
-<<<<<<< HEAD
-def duplicate_kv_weight(weight: torch.Tensor, head_dim: int,
-                        tensor_parallel_size: int):
-
-    num_kv_heads = weight.shape[0] // head_dim
-
-=======
 def duplicate_kv_weight(weight: torch.Tensor, num_kv_heads: int,
                         tensor_parallel_size: int):
 
->>>>>>> upstream/main
     if num_kv_heads >= tensor_parallel_size:
         assert num_kv_heads % tensor_parallel_size == 0
         return weight
@@ -131,13 +108,6 @@ def duplicate_kv_weight(weight: torch.Tensor, num_kv_heads: int,
     if weight.ndim == 1:
         return weight.repeat_interleave(reps)
 
-<<<<<<< HEAD
-    # weight
-    weight = weight.reshape(num_kv_heads, head_dim,
-                            -1)[:, None, :, :].expand(num_kv_heads, reps,
-                                                      head_dim, weight.shape[1])
-    return weight.reshape(num_kv_heads * reps * head_dim, -1).clone().detach()
-=======
     # weight and scale
     assert weight.shape[0] % num_kv_heads == 0
     size_per_kv_head = weight.shape[0] // num_kv_heads
@@ -147,7 +117,6 @@ def duplicate_kv_weight(weight: torch.Tensor, num_kv_heads: int,
                                                       weight.shape[1])
     return weight.reshape(num_kv_heads * reps * size_per_kv_head,
                           -1).clone().detach()
->>>>>>> upstream/main
 
 
 def iter_modules(
@@ -273,13 +242,8 @@ class DecoderModel(nn.Module, metaclass=PPInitCaller):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: torch.LongTensor = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: torch.IntTensor = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         lora_params: Optional[dict] = None,
         **kwargs,
@@ -388,25 +352,11 @@ class DecoderModelForCausalLM(nn.Module,
         self.pp_size = config.mapping.pp_size
         self.has_custom_lm_head = False
 
-<<<<<<< HEAD
-        if config.mapping.enable_attention_dp:
-=======
         if config.mapping.enable_attention_dp and not config.mapping.enable_lm_head_tp_in_adp:
->>>>>>> upstream/main
             self.lm_head = LMHead(
                 vocab_size,
                 hidden_size,
                 dtype=config.pretrained_config.torch_dtype,
-<<<<<<< HEAD
-                mapping=Mapping(
-                    world_size=1,
-                    tp_size=1,
-                    rank=0,
-                ),
-                tensor_parallel_mode=None,
-                gather_output=False,
-=======
->>>>>>> upstream/main
             )
         else:
             # TODO(zhenhuanc): Currently lm_head Linear will not accept QuantConfig
@@ -414,13 +364,6 @@ class DecoderModelForCausalLM(nn.Module,
             if (hasattr(config, 'lora_config')
                     and config.lora_config is not None
                     and len(config.lora_config.lora_dir) == 1):
-<<<<<<< HEAD
-                lora_loader = HfLoraLoader(config.lora_config.lora_dir)
-                if lora_loader.lm_head is not None and lora_loader.vocab_size != 0:
-                    weight = lora_loader.lm_head
-                    self.has_custom_lm_head = True
-                    vocab_size = lora_loader.vocab_size
-=======
                 # Only check for custom lm_head in HF LoRA, not NeMo
                 if config.lora_config.lora_ckpt_source == "hf":
                     lora_loader = HfLoraLoader(config.lora_config.lora_dir)
@@ -428,7 +371,6 @@ class DecoderModelForCausalLM(nn.Module,
                         weight = lora_loader.lm_head
                         self.has_custom_lm_head = True
                         vocab_size = lora_loader.vocab_size
->>>>>>> upstream/main
 
             self.lm_head = LMHead(
                 vocab_size,
@@ -479,20 +421,11 @@ class DecoderModelForCausalLM(nn.Module,
 
         self.model.__pp_init__()
 
-<<<<<<< HEAD
-    def __post_init__(self):
-        # 1. mixed precision
-        quant_config_dict = self.model_config.quant_config_dict
-        if quant_config_dict is not None:
-            for name, module in self.named_modules():
-                if isinstance(module, FusedMoE):
-=======
     def apply_layerwise_quant_config(self):
         quant_config_dict = self.model_config.quant_config_dict
         if quant_config_dict is not None:
             for name, module in self.named_modules():
                 if isinstance(module, (MoE, VanillaMoE)):
->>>>>>> upstream/main
                     for n, q in quant_config_dict.items():
                         # all linear layers inside FusedMoE share the same quant config
                         if name in n:
@@ -524,21 +457,6 @@ class DecoderModelForCausalLM(nn.Module,
                         if name + '.q_proj' in n:
                             module.quant_config = q
                             break
-<<<<<<< HEAD
-                elif hasattr(module, 'fused_a'):
-                    # DeepseekV3Attention
-                    for n, q in quant_config_dict.items():
-                        # reuse q_proj quant config as the attention quant config
-                        if name + '.fused_a' in n:
-                            module.quant_config = q
-                            break
-
-        # 2. skip quant for modules in QuantConfig.exclude_modules.
-        # kv_cache_quant_algo takes precedence over exclude_modules.
-        # kv_cache_quant_algo, if not None, is set for non-Attention
-        # modules too, which is the same practice as when there's no
-        # exclude_modules.
-=======
                 elif hasattr(module, 'kv_a_proj_with_mqa'):
                     # DeepseekV3Attention
                     for n, q in quant_config_dict.items():
@@ -555,7 +473,6 @@ class DecoderModelForCausalLM(nn.Module,
         modules too, which is the same practice as when there's no
         exclude_modules.
         """
->>>>>>> upstream/main
         quant_config = self.model_config.quant_config
         kv_cache_quant_algo = None
         if quant_config:
@@ -565,10 +482,6 @@ class DecoderModelForCausalLM(nn.Module,
         if quant_config is not None:
             if quant_config.exclude_modules is not None:
                 for name, module in self.named_modules():
-<<<<<<< HEAD
-                    is_excluded = quant_config.is_module_excluded_from_quantization(
-                        name)
-=======
                     candidates = [name]
                     if isinstance(module, Linear):
                         weight_mode = module.weights_loading_config.weight_mode
@@ -590,18 +503,14 @@ class DecoderModelForCausalLM(nn.Module,
                     is_excluded = any(
                         quant_config.is_module_excluded_from_quantization(n)
                         for n in candidates)
->>>>>>> upstream/main
                     if is_excluded and getattr(module, "quant_config",
                                                None) is not None:
                         module.quant_config = new_config
 
-<<<<<<< HEAD
-=======
     def __post_init__(self):
         self.apply_layerwise_quant_config()
         self.apply_quant_config_exclude_modules()
 
->>>>>>> upstream/main
         for _, module in self.named_modules():
             if callable(getattr(module, "create_weights", None)):
                 module.create_weights()
@@ -617,13 +526,8 @@ class DecoderModelForCausalLM(nn.Module,
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: torch.LongTensor = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: torch.IntTensor = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         return_context_logits: bool = False,
         spec_metadata: Optional[SpecMetadata] = None,
@@ -647,10 +551,6 @@ class DecoderModelForCausalLM(nn.Module,
             return_context_logits,
         )
 
-<<<<<<< HEAD
-    def load_weights(self, weights: Dict):
-        _load_weights_impl(self, weights)
-=======
     def load_weights(self,
                      weights: Dict,
                      weight_mapper: Optional["BaseWeightMapper"] = None,
@@ -670,7 +570,6 @@ class DecoderModelForCausalLM(nn.Module,
                                   weight_mapper,
                                   skip_modules,
                                   preload_weight_modules=preload_weight_modules)
->>>>>>> upstream/main
 
     def infer_max_seq_len(self) -> int:
         # Modified from tensorrt_llm/builder.py _init_max_seq_len
@@ -683,10 +582,6 @@ class DecoderModelForCausalLM(nn.Module,
 
         # Step 1: Find the upper bound of max_seq_len
         inferred_max_seq_len = 2048
-<<<<<<< HEAD
-        if getattr(self.config, 'max_position_embeddings', None) is not None:
-            inferred_max_seq_len = self.config.max_position_embeddings
-=======
         max_position_embeddings = getattr(self.config,
                                           'max_position_embeddings', None)
         if max_position_embeddings is None and hasattr(self.config,
@@ -695,7 +590,6 @@ class DecoderModelForCausalLM(nn.Module,
                                               'max_position_embeddings', None)
         if max_position_embeddings is not None:
             inferred_max_seq_len = max_position_embeddings
->>>>>>> upstream/main
 
         # Step 2: Scale max_seq_len with rotary scaling
         if rope_factor != 1:
@@ -710,14 +604,11 @@ class DecoderModelForCausalLM(nn.Module,
 
 
 MODEL_CLASS_MAPPING = {}
-<<<<<<< HEAD
-=======
 MODEL_CLASS_VISION_ENCODER_MAPPING = {}
 MODEL_CLASS_MAPPER_MAPPING = {}
 MODEL_CLASS_CHECKPOINT_WEIGHT_LOADER_DEFAULT_MAPPING = {}
 MODEL_CLASS_CONFIG_LOADER_DEFAULT_MAPPING = {}
 CHECKPOINT_LOADER_FORMAT_DEFAULT_MAPPING = {}
->>>>>>> upstream/main
 
 
 def register_auto_model(name: str):
@@ -729,8 +620,6 @@ def register_auto_model(name: str):
     return decorator
 
 
-<<<<<<< HEAD
-=======
 def register_vision_encoder(
     vision_encoder_cls: Type[nn.Module],
     vlm_base_model: Optional[Type[nn.Module]] = None,
@@ -816,7 +705,6 @@ def get_config_loader(name: str) -> Type["BaseConfigLoader"]:
     return MODEL_CLASS_CONFIG_LOADER_DEFAULT_MAPPING[name]
 
 
->>>>>>> upstream/main
 def get_model_architecture(
         model_config: TConfig) -> Tuple[Type[nn.Module], str]:
     cls = None
@@ -835,10 +723,6 @@ def get_model_architecture(
 def rename_weights_with_regex(pattern_mapping: Dict[str, str], weights: Dict):
     """
     Rename weight keys according to regex pattern matching.
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
     Args:
         pattern_mapping: A dictionary mapping regex patterns to replacement strings. The key is HF name pattern, and the value is corresponding TRT-LLM name pattern.
             The patterns will be used to match keys in the weights dict and replace
@@ -851,10 +735,6 @@ def rename_weights_with_regex(pattern_mapping: Dict[str, str], weights: Dict):
                 r'(.*?)out_proj(.*)': r'\1o_proj\2'
             }
         weights: A dictionary of weights
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
     Returns:
         A dictionary of weights with renamed keys
     """
@@ -885,11 +765,6 @@ def rename_weights_with_regex(pattern_mapping: Dict[str, str], weights: Dict):
     return renamed_weights
 
 
-<<<<<<< HEAD
-def _load_weights_impl(model: Union[nn.Module, DecoderModelForCausalLM],
-                       weights: Dict,
-                       params_map: Optional[Dict[str, str]] = None):
-=======
 def filter_weights(prefix, weights: Dict):
     result = {}
     for k, v in weights.items():
@@ -945,7 +820,6 @@ def _load_weights_impl(model: Union[nn.Module, DecoderModelForCausalLM],
     # TODO smor- this method is here as a temporary solution to load weights.
     # Once checkpoint format is unified, this method will be removed.
 
->>>>>>> upstream/main
     if not hasattr(model, 'model_config') or not isinstance(
             model.model_config, ModelConfig):
         raise ValueError("model must have a model_config attribute")
@@ -957,37 +831,15 @@ def _load_weights_impl(model: Union[nn.Module, DecoderModelForCausalLM],
         logger.info(f"Renamed weights with params_map: {params_map}")
 
     tp_size = 1 if model.model_config.mapping.enable_attention_dp else model.model_config.mapping.tp_size
-<<<<<<< HEAD
-    head_dim = getattr(
-        model.config, "head_dim",
-        model.config.hidden_size // model.config.num_attention_heads)
-
-    def filter_weights(prefix, weights: Dict):
-        result = {}
-        for k, v in weights.items():
-            if k.startswith(prefix):
-                new_k = k[len(prefix) + 1:]
-                result[new_k] = v
-        return result
-=======
     num_kv_heads = model.config.num_key_value_heads if hasattr(
         model.config, 'num_key_value_heads'
     ) and model.config.num_key_value_heads is not None else model.config.num_attention_heads
->>>>>>> upstream/main
 
     params_map = {
         'qkv_proj': ['q_proj', 'k_proj', 'v_proj'],
         'gate_up_proj': ['gate_proj', 'up_proj']
     }
 
-<<<<<<< HEAD
-    for name, module in tqdm(list(model.named_modules()),
-                             desc="Loading weights"):
-        if len(module._parameters) > 0:
-            # skip load weights if tie word embeddings is enabled and layer is lm_head
-            if model.config.tie_word_embeddings and name.startswith("lm_head"):
-                continue
-=======
     def load_single_module(name, module):
         if len(module._parameters) > 0:
             # skip load weights if module is in skip_modules
@@ -997,47 +849,26 @@ def _load_weights_impl(model: Union[nn.Module, DecoderModelForCausalLM],
             # skip load weights if tie word embeddings is enabled and layer is lm_head
             if model.config.tie_word_embeddings and name.startswith("lm_head"):
                 return
->>>>>>> upstream/main
 
             # Skip loading weights for embedding and lm_head if LoRA is enabled and has custom values
             if hasattr(model, "model") and hasattr(
                     model.model, 'has_custom_embed_tokens'
             ) and model.model.has_custom_embed_tokens and name == "model.embed_tokens":
-<<<<<<< HEAD
-                continue
-            if hasattr(model, 'has_custom_lm_head'
-                       ) and model.has_custom_lm_head and name == "lm_head":
-                continue
-=======
                 return
             if hasattr(model, 'has_custom_lm_head'
                        ) and model.has_custom_lm_head and name == "lm_head":
                 return
->>>>>>> upstream/main
 
             names = name.split('.')
             # WAR: better solution is that llama has its own load_weights function.
             if names[-1] == 'next_layer_layernorm':
-<<<<<<< HEAD
-                continue
-=======
                 return
->>>>>>> upstream/main
             if names[-1] in params_map:
                 module_weights = []
                 for new_name in params_map[names[-1]]:
                     fw = filter_weights('.'.join(names[:-1] + [new_name]),
                                         weights)
                     if new_name in ['k_proj', 'v_proj']:
-<<<<<<< HEAD
-                        fw = {
-                            k:
-                            duplicate_kv_weight(weight=v[:],
-                                                head_dim=head_dim,
-                                                tensor_parallel_size=tp_size)
-                            if k in ["weight", "bias"] else v
-                            for k, v in fw.items()
-=======
                         num_kv_heads_list = [num_kv_heads
                                              ] * len(fw) if isinstance(
                                                  num_kv_heads,
@@ -1050,7 +881,6 @@ def _load_weights_impl(model: Union[nn.Module, DecoderModelForCausalLM],
                                 tensor_parallel_size=tp_size)
                             if k in ["weight", "bias"] else v
                             for i, (k, v) in enumerate(fw.items())
->>>>>>> upstream/main
                         }
 
                     module_weights.append(fw)
@@ -1063,8 +893,6 @@ def _load_weights_impl(model: Union[nn.Module, DecoderModelForCausalLM],
                     for n, p in module._parameters.items():
                         if p is not None:
                             p.data.copy_(module_weights[n][:])
-<<<<<<< HEAD
-=======
 
     if os.environ.get("TRT_LLM_DISABLE_LOAD_WEIGHTS_IN_PARALLEL",
                       "True") in ["True", "true", "1", "yes", "y"]:
@@ -1161,4 +989,3 @@ def _load_weights_impl_v2(model: Union[nn.Module, DecoderModelForCausalLM],
         args_list = [(name, module) for name, module in model.named_modules()
                      if name not in serial_load_modules]
         run_concurrently(load_single_module, args_list, pbar=pbar)
->>>>>>> upstream/main

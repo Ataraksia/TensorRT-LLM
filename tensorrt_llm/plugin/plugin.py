@@ -554,11 +554,7 @@ class PluginConfig(metaclass=PluginConfigMeta):
     def set_fp8_rowwise_quant_plugins(self, dtype: str = "auto"):
         self.fp8_rowwise_gemm_plugin = dtype
         self.rmsnorm_quantization_plugin = dtype
-<<<<<<< HEAD
-        # self.layernorm_quantization_plugin = dtype
-=======
         self.layernorm_quantization_plugin = dtype
->>>>>>> upstream/main
         self.quantize_per_token_plugin = True
         self.quantize_tensor_plugin = True
         return self
@@ -685,11 +681,7 @@ class CustomAllReduceHelper:
               Then, each instance of allreduce will reference that tensor automatically.
     """
     POINTERS_PER_RANK = 7
-<<<<<<< HEAD
-    POINTERS_OF_COUNTER = 2
-=======
     POINTERS_OF_COUNTER = 3
->>>>>>> upstream/main
 
     def __init__(self) -> None:
         self.workspace: Optional[Tensor] = None
@@ -748,19 +740,11 @@ class CustomAllReduceHelper:
         ipc_buffers_pong = IpcMemory(mapping, ipc_buffers_size,
                                      is_p2p_supported)
         ipc_barriers_in = IpcMemory(
-<<<<<<< HEAD
-            mapping, IpcMemory.IPC_BARRIERS_SIZE_PER_GPU * mapping.tp_size * 2,
-            is_p2p_supported)
-        ipc_barriers_out = IpcMemory(
-            mapping, IpcMemory.IPC_BARRIERS_SIZE_PER_GPU * mapping.tp_size * 2,
-            is_p2p_supported)
-=======
             mapping, IpcMemory.IPC_BARRIERS_SIZE_PER_GPU * mapping.tp_size * 2 *
             mapping.tp_size, is_p2p_supported)
         ipc_barriers_out = IpcMemory(
             mapping, IpcMemory.IPC_BARRIERS_SIZE_PER_GPU * mapping.tp_size * 2 *
             mapping.tp_size, is_p2p_supported)
->>>>>>> upstream/main
         lamport_buffers_size = 1 if force_deterministic else size * mapping.tp_size
         lamport_buffers_0 = IpcMemory(mapping, lamport_buffers_size,
                                       is_p2p_supported)
@@ -778,11 +762,6 @@ class CustomAllReduceHelper:
                 lamport_buffers_size,
             )
         buffers = [
-<<<<<<< HEAD
-            ipc_buffers_ping, ipc_buffers_pong, ipc_barriers_in,
-            ipc_barriers_out, lamport_buffers_0, lamport_buffers_1,
-            lamport_buffers_2
-=======
             ipc_buffers_ping,
             ipc_buffers_pong,
             ipc_barriers_in,
@@ -793,19 +772,14 @@ class CustomAllReduceHelper:
             # Start from 1 since 0 represents released state for barrier at the beginning of the all_reduce.
             # The last element is the barrier flag counter.
             torch.tensor([1, 1, 0], dtype=torch.int64, device="cuda")
->>>>>>> upstream/main
         ]
 
         return buffers, torch.tensor(
             ipc_buffers_ping.serialize() + ipc_buffers_pong.serialize() +
             ipc_barriers_in.serialize() + ipc_barriers_out.serialize() +
             lamport_buffers_0.serialize() + lamport_buffers_1.serialize() +
-<<<<<<< HEAD
-            lamport_buffers_2.serialize() + [0] + [0],
-=======
             lamport_buffers_2.serialize() + [buffers[-1].data_ptr()] +
             [buffers[-1][1:].data_ptr()] + [buffers[-1][2:].data_ptr()],
->>>>>>> upstream/main
             dtype=torch.int64,
             device="cpu")
 

@@ -101,11 +101,7 @@ class NemotronDecoderLayer(DecoderLayer):
 
     def forward(
         self,
-<<<<<<< HEAD
-        position_ids: torch.LongTensor,
-=======
         position_ids: torch.IntTensor,
->>>>>>> upstream/main
         hidden_states: torch.Tensor,
         attn_metadata: AttentionMetadata,
         **kwargs,
@@ -136,10 +132,6 @@ class NemotronModel(DecoderModel):
     def __init__(self, model_config: ModelConfig[NemotronConfig]):
         super().__init__(model_config)
         config = self.model_config.pretrained_config
-<<<<<<< HEAD
-        self.padding_idx = config.pad_token_id
-=======
->>>>>>> upstream/main
 
         self.embed_tokens = Embedding(
             config.vocab_size,
@@ -159,13 +151,8 @@ class NemotronModel(DecoderModel):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
-<<<<<<< HEAD
-        input_ids: Optional[torch.LongTensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-=======
         input_ids: Optional[torch.IntTensor] = None,
         position_ids: Optional[torch.IntTensor] = None,
->>>>>>> upstream/main
         inputs_embeds: Optional[torch.FloatTensor] = None,
         **kwargs,
     ) -> torch.Tensor:

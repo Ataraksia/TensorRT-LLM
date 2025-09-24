@@ -5,13 +5,9 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Generator, List, Mapping, Union
 
-<<<<<<< HEAD
-from .controller import Controller, ParallelProcess, ScaffoldingOutput
-=======
 from .controller import Controller, ParallelProcess
 from .result import ScaffoldingResult
 from .task import Task
->>>>>>> upstream/main
 from .worker import Worker
 
 
@@ -23,58 +19,12 @@ class ScaffoldingRequest:
     result: "ScaffoldingResult"
 
 
-<<<<<<< HEAD
-class ScaffoldingResult:
-
-    def __init__(self):
-        self._done = False
-        self.aqueue = asyncio.Queue()
-        self.output = None
-        self.task_collections = None
-
-    def set_output(self, output: ScaffoldingOutput):
-        self.aqueue.put_nowait(output)
-
-    def set_task_collections(self, task_collections: Mapping[str,
-                                                             "TaskCollection"]):
-        self.task_collections = task_collections
-
-    async def aresult_step(self):
-        # TODO: error handling or raise exception?
-        self.output = await self.aqueue.get()
-        if self.output is None:
-            raise Exception("ScaffoldingLlm execution failed")
-        self._done = True
-
-    def result(self) -> "ScaffoldingResult":
-        if not self._done:
-            loop = asyncio.get_event_loop()
-            asyncio.run_coroutine_threadsafe(self.aresult(), loop).result()
-        return self
-
-    async def aresult(self) -> "ScaffoldingResult":
-        while not self._done:
-            await self.aresult_step()
-
-        return self
-
-    def __await__(self):
-        return self.aresult().__await__()
-
-
-=======
->>>>>>> upstream/main
 class ScaffoldingLlm:
 
     def __init__(
             self,
             prototype_controller: Controller,
-<<<<<<< HEAD
-            workers: Mapping[
-                str, Worker],  # map of role of Crontroller to a worker instance
-=======
             workers: Mapping[str, Worker],  # map of role to worker instance
->>>>>>> upstream/main
     ):
         self.prototype_controller = prototype_controller
         self.workers = workers
@@ -84,10 +34,7 @@ class ScaffoldingLlm:
         self.task_queue = asyncio.Queue()
         self.main_loop_stop_event = asyncio.Event()
         self.shutdown_event = asyncio.Event()
-<<<<<<< HEAD
-=======
         self.streaming_event = asyncio.Event()
->>>>>>> upstream/main
         if self.own_loop:
             self._run_main_loop_thread()
         else:
@@ -115,85 +62,6 @@ class ScaffoldingLlm:
             return asyncio.new_event_loop()
         return None
 
-<<<<<<< HEAD
-    async def _main_loop_async_func(self):
-
-        async def handle_controller_generator(gen: Generator):
-            for obj in gen:
-                if isinstance(obj, ParallelProcess):
-                    await handle_parallel_process(obj)
-                else:
-                    task_list = obj
-                    async_tasks = []
-                    for task in task_list:
-                        task_worker_tag = task.worker_tag
-                        assert task_worker_tag in self.workers.keys()
-                        worker = self.workers[task_worker_tag]
-                        async_tasks.append(
-                            asyncio.create_task(worker.run_task(task)))
-                    await asyncio.gather(*async_tasks)
-
-        async def handle_parallel_process(request: ParallelProcess):
-            async_tasks = []
-            for sub_gen in request.sub_gens:
-                async_task = asyncio.create_task(
-                    handle_controller_generator(sub_gen))
-                async_tasks.append(async_task)
-            await asyncio.gather(*async_tasks)
-
-        async def handle_single_request(request: ScaffoldingRequest):
-            # warp to a generator without return value
-            def controller_generator_wrapper(request: ScaffoldingRequest):
-                scaffolding_output = yield from request.controller.generate(
-                    request.prompt, **request.kwargs)
-                if self.output_task_collection:
-                    request.result.set_task_collections(
-                        request.controller.task_collections)
-                request.result.set_output(scaffolding_output)
-
-            try:
-                gen = controller_generator_wrapper(request)
-                await handle_controller_generator(gen)
-            except Exception as e:
-                # Catch the exception and set output to avoid the user thread to be hang
-                print('scaffoldingLlm handle request exception:', str(e))
-                traceback.print_exc()
-                request.result.set_output(None)
-                raise e
-            finally:
-                self.running_req_count -= 1
-                maybe_schedule()
-
-        def schedule_request(request: ScaffoldingRequest):
-            asyncio.create_task(handle_single_request(request))
-            self.running_req_count += 1
-
-        def maybe_schedule(request: ScaffoldingRequest = None):
-            if self.shutdown_event.is_set():
-                return
-
-            if request is not None:
-                self.pending_queue.append(request)
-
-            while self.running_req_count < self.max_parallel_requests and len(
-                    self.pending_queue) > 0:
-                first_request = self.pending_queue.popleft()
-                schedule_request(first_request)
-
-        async def handle_event():
-            while True:
-                item = await self.task_queue.get()
-                if item is None:
-                    return
-                elif isinstance(item, ScaffoldingRequest):
-                    maybe_schedule(item)
-                else:
-                    raise ValueError(
-                        f'type of task_queue item ({type(item)}) is not supported'
-                    )
-
-        handle_event_task = asyncio.create_task(handle_event())
-=======
     async def _handle_controller_generator(self,
                                            gen: Generator,
                                            request: ScaffoldingRequest = None):
@@ -288,7 +156,6 @@ class ScaffoldingLlm:
     async def _main_loop_async_func(self):
         """Main async loop function with reduced complexity."""
         handle_event_task = asyncio.create_task(self._handle_event_loop())
->>>>>>> upstream/main
         await handle_event_task
         self.main_loop_stop_event.set()
 
@@ -305,11 +172,7 @@ class ScaffoldingLlm:
         self.main_loop_thread.start()
 
     def generate_async(self, prompt: str) -> ScaffoldingResult:
-<<<<<<< HEAD
-        result = ScaffoldingResult()
-=======
         result = ScaffoldingResult(self.streaming_event)
->>>>>>> upstream/main
 
         async def put_request():
             request = ScaffoldingRequest(

@@ -13,12 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # # Force resource release after test
-<<<<<<< HEAD
-
-=======
 import os
 import sys
->>>>>>> upstream/main
 import traceback
 from typing import Any
 
@@ -106,8 +102,6 @@ def pytest_sessionstart(session):
 
 
 @pytest.fixture(autouse=True)
-<<<<<<< HEAD
-=======
 def cuda_error_early_quit(capfd):
     """
     Fixture to handle CUDA error.
@@ -135,7 +129,6 @@ def cuda_error_early_quit(capfd):
 
 
 @pytest.fixture(autouse=True)
->>>>>>> upstream/main
 def torch_empty_cache() -> None:
     """
     Automatically empty the torch CUDA cache before each test, to reduce risk of OOM errors.

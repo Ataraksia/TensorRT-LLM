@@ -1,8 +1,4 @@
 import re
-<<<<<<< HEAD
-from collections import Counter
-=======
->>>>>>> upstream/main
 from typing import List
 
 
@@ -62,18 +58,6 @@ def get_majority_result(
     result_extractor=lambda x: x,
     result_validator=lambda x: True,
 ):
-<<<<<<< HEAD
-    valid_answers_and_results = [(result, result_extractor(result))
-                                 for result in results
-                                 if result_validator(result) is True
-                                 and result_extractor(result) is not None]
-    if len(valid_answers_and_results) == 0:
-        return None, None
-
-    majority_result = Counter(valid_answers_and_results).most_common(1)[0][0]
-    # return result and extracted result
-    return majority_result[0], majority_result[1]
-=======
     extract_answers = [result_extractor(result) for result in results]
     valid_answers = [
         result for result in extract_answers
@@ -90,24 +74,11 @@ def get_majority_result(
         filter(lambda x: x[1] == majority_answer,
                enumerate(extract_answers)))[0]
     return majority_index, majority_answer
->>>>>>> upstream/main
 
 
 def get_digit_majority_vote_result(results: List[str]) -> str:
 
     def is_digit(result: str):
-<<<<<<< HEAD
-        extracted_answer = extract_answer_from_boxed(result)
-        if extracted_answer is None:
-            return False
-        return extracted_answer.isdigit()
-
-    vote_result = get_majority_result(
-        results,
-        result_extractor=extract_answer_from_boxed,
-        result_validator=is_digit)[0]
-    return vote_result if vote_result else results[0]
-=======
         return result.isdigit()
 
     index, extract_answer = get_majority_result(
@@ -115,4 +86,3 @@ def get_digit_majority_vote_result(results: List[str]) -> str:
         result_extractor=extract_answer_from_boxed,
         result_validator=is_digit)
     return (index, extract_answer) if extract_answer else (0, None)
->>>>>>> upstream/main

@@ -5,11 +5,7 @@ from typing import Tuple, Type
 from pydantic import Field
 from torch.fx import GraphModule
 
-<<<<<<< HEAD
-from ...models.factory import ModelFactory
-=======
 from ...models import ModelFactory, hf
->>>>>>> upstream/main
 from ...shim.interface import CachedSequenceInterface
 from ..interface import (
     BaseTransform,
@@ -24,27 +20,20 @@ class BuildModelConfig(TransformConfig):
     """Configuration for the build model transform."""
 
     device: str = Field(default="meta", description="The device to build the model on.")
-<<<<<<< HEAD
-=======
     use_strict_forward: bool = Field(
         default=True,
         description="If True, the forward pass will be patched to use a strict positional-only list"
         " of arguments. If False, the default with **kwargs can be used.",
     )
->>>>>>> upstream/main
 
 
 @TransformRegistry.register("build_model")
 class BuildModel(BaseTransform):
-<<<<<<< HEAD
-    """A simple wrapper transform to build a model via the model factory."""
-=======
     """A simple wrapper transform to build a model via the model factory build_model method.
 
     This transform will build the model via the ``build_model`` method of the model factory on the
     meta device (or the set device) and not load the weights.
     """
->>>>>>> upstream/main
 
     config: BuildModelConfig
 
@@ -62,12 +51,9 @@ class BuildModel(BaseTransform):
         # build the model
         model = factory.build_model(self.config.device)
 
-<<<<<<< HEAD
-=======
         assert self.config.use_strict_forward, "Only strict forward is supported."
         factory._set_strict_forward(model)
 
->>>>>>> upstream/main
         # as wrapper to satisfy the interface we will register the model as a submodule
         gm.add_module("factory_model", model)
 
@@ -75,8 +61,6 @@ class BuildModel(BaseTransform):
         info = TransformInfo(skipped=False, num_matches=1, is_clean=True, has_valid_shapes=True)
 
         return gm, info
-<<<<<<< HEAD
-=======
 
 
 @TransformRegistry.register("build_and_load_factory_model")
@@ -122,4 +106,3 @@ class BuildAndLoadFactoryModel(BuildModel):
         info = TransformInfo(skipped=False, num_matches=1, is_clean=True, has_valid_shapes=True)
 
         return gm, info
->>>>>>> upstream/main

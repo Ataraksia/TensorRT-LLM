@@ -1,15 +1,9 @@
-<<<<<<< HEAD
-=======
 import threading
 from contextlib import contextmanager
->>>>>>> upstream/main
 from typing import Any, Callable, Optional
 
 import torch
 
-<<<<<<< HEAD
-from ..pyexecutor.cuda_graph_runner import is_graph_capturing
-=======
 
 class do_multi_stream_local(threading.local):
 
@@ -36,7 +30,6 @@ def with_multi_stream(enable: bool):
         yield
     finally:
         set_do_multi_stream(prev_do_multi_stream)
->>>>>>> upstream/main
 
 
 def maybe_execute_in_parallel(
@@ -64,15 +57,9 @@ def maybe_execute_in_parallel(
         tuple[Any, Any]: the return values of fn0() and fn1()
     """
 
-<<<<<<< HEAD
-    do_multi_stream = is_graph_capturing() and aux_stream is not None
-
-    if do_multi_stream:
-=======
     multi_stream = do_multi_stream() and aux_stream is not None
 
     if multi_stream:
->>>>>>> upstream/main
         event0.record()
         result0 = fn0()
 

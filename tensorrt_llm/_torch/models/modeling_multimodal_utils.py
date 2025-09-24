@@ -17,11 +17,7 @@
 # and s2wrapper: https://github.com/bfshi/scaling_on_scales
 
 import math
-<<<<<<< HEAD
-from typing import List, Optional, Tuple
-=======
 from typing import Any, Dict, List, Optional, Tuple
->>>>>>> upstream/main
 
 import torch
 import torch.nn.functional as F
@@ -30,8 +26,6 @@ from PIL import Image
 from torchvision.transforms import Normalize, Resize, ToTensor
 
 from tensorrt_llm._torch.modules.embedding import Embedding
-<<<<<<< HEAD
-=======
 from tensorrt_llm.inputs.multimodal import MultimodalParams
 from tensorrt_llm.logger import logger
 
@@ -287,36 +281,21 @@ def filter_mm_token_from_input_ids(
     text_token_indices = torch.where(text_token_mask)[0]
     mm_token_indices = torch.where(mm_token_mask)[0]
     return text_token_indices, mm_token_indices
->>>>>>> upstream/main
 
 
 def fuse_input_embeds(
     embedding_layer: Embedding,
-<<<<<<< HEAD
-    input_ids: torch.LongTensor,
-    mm_embeds: List[torch.Tensor],
-    mm_token_ids: Optional[torch.LongTensor] = None,
-=======
     input_ids: torch.IntTensor,
     mm_embeds: List[torch.Tensor],
     mm_token_ids: Optional[torch.IntTensor] = None,
     text_token_indices: Optional[torch.IntTensor] = None,
     mm_token_indices: Optional[torch.IntTensor] = None,
     **kwargs,
->>>>>>> upstream/main
 ) -> Tuple[Optional[torch.FloatTensor], Optional[torch.FloatTensor]]:
     """
     Fuse text and multimodal embeddings. input_ids is [text_total_length + mm_total_length] and mm_embed is [mm_total_length, hidden_dim]. We just need to fuse them into [text_total_length + mm_total_length, hidden_dim] by slice-and-assign to the corresponding entries.
 
     Args:
-<<<<<<< HEAD
-        input_ids: shape [text_total_length + mm_total_length], flattened from List[(text_length1 + mm_total_length1), ..., (text_lengthi + mm_total_lengthi)]. For LLM model, the requests are inflight batched together, but the input_ids are flattened with padding removed. By the slice condition < vocab_size, we can easily separate text / multimodal tokens and naturally batched the LLM embedding lookup
-        mm_embed: List[(mm_total_length1, hidden_dim), ..., (mm_total_lengthi, hidden_dim)].
-        mm_token_ids: possible token ids for multimodal tokens, if known. If not known and set to None, it is assumed that the multimodal tokens are out-of-vocabulary tokens i.e. the `input_ids` contains tokens >= vocab_size that represent the multimodal tokens.
-    Returns:
-        - If (1) JIT test run, (2) non-multimodal run, i.e. all text-only requests, either context or generation phase (3) multimodal run, all requests in generation phase --> there is no multimodal data, return only the input_ids
-        - If (4) multimodal run, mixed batch of context and generation requests, each context request has a multimodal feature --> return only the fused input_embeds of shape [total length, hidden_dim]. For text tokens, LLM embedding layer has already run.
-=======
         embedding_layer: embedding layer of the model.
         input_ids: shape [text_total_length + mm_total_length], flattened from List[(text_length1 + mm_total_length1), ..., (text_lengthi + mm_total_lengthi)]. For LLM model, the requests are inflight batched together, but the input_ids are flattened with padding removed. By the slice condition < vocab_size, we can easily separate text / multimodal tokens and naturally batched the LLM embedding lookup
         mm_embeds: List[(mm_total_length1, hidden_dim), ..., (mm_total_lengthi, hidden_dim)].
@@ -327,33 +306,12 @@ def fuse_input_embeds(
     Note:
         - Precedence: If kwargs provide indices (text_token_indices and mm_token_indices), those are used. If any one of them is not provided, fallback to filtering method. Sentinel-/OOV-based filtering (e.g., tokens >= vocab_size) is used only when neither index tensor and mm_token_ids is provided.
         - This function may involve host-device synchronization if indices are not provided and filtering is performed. See filter_mm_token_from_input_ids for details.
->>>>>>> upstream/main
     """
     if len(mm_embeds) == 0:
         return input_ids, None
 
     mm_embed = torch.cat(mm_embeds, dim=0)
 
-<<<<<<< HEAD
-    if mm_token_ids is None:
-        # NOTE:
-        # If mm_token_ids is None, it is assumed that the multimodal
-        # tokens are out-of-vocab tokens i.e. the `input_ids` contains
-        # tokens >= vocab_size that represent the multimodal tokens.
-        # Since mm_token_ids is be unbounded in this case,
-        # using torch.isin() may not be performant.
-        # This provides a more performant alternative while keeping
-        # the flexibility of still specifying all possible mm_token_ids,
-        # if the user wants to.
-        vocab_size = embedding_layer.num_embeddings
-        mm_token_mask = input_ids >= vocab_size
-        text_token_mask = input_ids < vocab_size
-    else:
-        mm_token_mask = torch.isin(input_ids, mm_token_ids)
-        text_token_mask = ~mm_token_mask
-    text_token_indices = torch.where(text_token_mask)[0]
-    mm_token_indices = torch.where(mm_token_mask)[0]
-=======
     # TODO: support the case where only one index tensor is provided, the other is derived as the complement (try to avoid implicit host-device synchronization)
     if text_token_indices is None or mm_token_indices is None:
         # NOTE: This function involves host-device synchronization due to torch.where() used in filter_mm_token_from_input_ids.
@@ -368,7 +326,6 @@ def fuse_input_embeds(
             f"but received {mm_embed.shape[0]} image embeddings. "
             "This is likely due to KV cache reuse, chunk prefill, or other optimizations that "
             "cause token count mismatches within the inference batch.")
->>>>>>> upstream/main
 
     text_embed = embedding_layer(input_ids[text_token_indices])
     input_embeds = torch.empty(input_ids.shape[0],
@@ -376,12 +333,7 @@ def fuse_input_embeds(
                                device=text_embed.device,
                                dtype=text_embed.dtype)
 
-<<<<<<< HEAD
-    input_embeds[text_token_indices, :] = text_embed.to(
-        dtype=input_embeds.dtype, device=input_embeds.device)
-=======
     input_embeds[text_token_indices, :] = text_embed
->>>>>>> upstream/main
     input_embeds[mm_token_indices, :] = mm_embed.to(dtype=input_embeds.dtype,
                                                     device=input_embeds.device)
 

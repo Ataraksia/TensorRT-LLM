@@ -20,10 +20,7 @@ import linecache
 import math
 import os
 import struct
-<<<<<<< HEAD
-=======
 import tempfile
->>>>>>> upstream/main
 import trace
 import weakref
 from contextlib import contextmanager
@@ -36,10 +33,7 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 import numpy as np
 import nvtx
 from mpi4py import MPI
-<<<<<<< HEAD
-=======
 from mpi4py.util import pkl5
->>>>>>> upstream/main
 from packaging import version
 
 # isort: off
@@ -187,8 +181,6 @@ _str_to_binding_dtype_dict = dict(
     bool=DataType.BOOL,
     fp8=DataType.FP8,
 )
-<<<<<<< HEAD
-=======
 _binding_to_str_dtype = {v: k for k, v in _str_to_binding_dtype_dict.items()}
 
 _binding_dtype_bits = {
@@ -219,7 +211,6 @@ def get_size_in_bytes(num_elements: int, dtype: DataType):
     total_num_bits = _binding_dtype_bits[dtype] * num_elements
     assert total_num_bits % 8 == 0, f"Total number of bits {total_num_bits} must be divisible by 8"
     return total_num_bits // 8
->>>>>>> upstream/main
 
 
 def str_dtype_to_binding(dtype):
@@ -480,11 +471,7 @@ def dim_resolve_negative(dim, ndim):
 # mpi4py only exports MPI_COMM_TYPE_SHARED, so we define OMPI_COMM_TYPE_HOST here
 OMPI_COMM_TYPE_HOST = 9
 
-<<<<<<< HEAD
-comm = MPI.COMM_WORLD
-=======
 comm = pkl5.Intracomm(MPI.COMM_WORLD)
->>>>>>> upstream/main
 
 
 def set_mpi_comm(new_comm):
@@ -497,13 +484,10 @@ def mpi_comm():
 
 
 local_comm = mpi_comm().Split_type(split_type=OMPI_COMM_TYPE_HOST)
-<<<<<<< HEAD
-=======
 
 
 def local_mpi_comm():
     return local_comm
->>>>>>> upstream/main
 
 
 def mpi_rank():
@@ -544,10 +528,6 @@ def mpi_barrier():
         mpi_comm().Barrier()
 
 
-<<<<<<< HEAD
-def mpi_broadcast(obj, root=0):
-    return mpi_comm().bcast(obj, root) if ENABLE_MULTI_DEVICE else obj
-=======
 def local_mpi_barrier():
     if ENABLE_MULTI_DEVICE:
         local_comm.Barrier()
@@ -555,7 +535,6 @@ def local_mpi_barrier():
 
 def mpi_broadcast(obj, root=0):
     return mpi_comm().bcast(obj, root) if is_multi_device_enable() else obj
->>>>>>> upstream/main
 
 
 def mpi_allgather(obj):
@@ -583,8 +562,6 @@ def mpi_recv(buf, source, tag):
     if ENABLE_MULTI_DEVICE:
         return mpi_comm().Recv(buf, source, tag=tag)
     return None
-<<<<<<< HEAD
-=======
 
 
 def mpi_send_object(obj, dest, tag=0):
@@ -602,7 +579,6 @@ def mpi_recv_object(source, tag):
     if ENABLE_MULTI_DEVICE:
         return mpi_comm().recv(source=source, tag=tag)
     return None
->>>>>>> upstream/main
 
 
 def pad_vocab_size(vocab_size, tp_size):
@@ -715,8 +691,6 @@ def get_sm_version():
     return prop.major * 10 + prop.minor
 
 
-<<<<<<< HEAD
-=======
 @lru_cache(maxsize=1)
 def is_sm_100f(sm_version=None):
     if sm_version is None:
@@ -724,7 +698,6 @@ def is_sm_100f(sm_version=None):
     return sm_version == 100 or sm_version == 103
 
 
->>>>>>> upstream/main
 def is_trace_enabled(env_var: str):
     value = os.environ.get(env_var, "-1")
     if value == "ALL":
@@ -739,10 +712,6 @@ def trace_func(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-<<<<<<< HEAD
-        import dill  # nosec B403
-=======
->>>>>>> upstream/main
 
         def globaltrace(frame, why, arg):
             if why == "call":
@@ -771,12 +740,7 @@ def trace_func(func):
             return localtrace
 
         ignoredirs = [
-<<<<<<< HEAD
-            os.path.dirname(package.__file__)
-            for package in [os, torch, trace, dill]
-=======
             os.path.dirname(package.__file__) for package in [os, torch, trace]
->>>>>>> upstream/main
         ]
         tracer = trace.Trace(trace=1, count=0, ignoredirs=ignoredirs)
         rank = global_mpi_rank()
@@ -865,8 +829,6 @@ class QuantModeWrapper:
         return self.objs[index]
 
 
-<<<<<<< HEAD
-=======
 PYTHON_DEFAULT_GC_THRESHOLDS = gc.get_threshold()
 
 
@@ -887,7 +849,6 @@ def customized_gc_thresholds(gen0_threshold: Optional[int] = None):
             )
 
 
->>>>>>> upstream/main
 @contextmanager
 def _null_context_manager():
     yield
@@ -975,19 +936,13 @@ class TensorWrapper:
         data_ptr: int,
         dtype: Union[torch.dtype, str, np.dtype, trt.DataType],
         shape: Sequence[int],
-<<<<<<< HEAD
-=======
         strides: Optional[Sequence[int]] = None,
->>>>>>> upstream/main
     ):
         assert isinstance(data_ptr, int)
         self._data_ptr = data_ptr
         self.dtype = dtype
         self.shape = shape
-<<<<<<< HEAD
-=======
         self.strides = strides
->>>>>>> upstream/main
 
     def data_ptr(self):
         return self._data_ptr
@@ -1023,12 +978,6 @@ class TensorWrapper:
     @property
     def __cuda_array_interface__(self):
         return {
-<<<<<<< HEAD
-            "shape": self.shape,
-            "typestr": torch_dtype_to_np_typestr(self.dtype),
-            "data": (self.data_ptr() if self.numel() > 0 else 0, False),
-            "version": 3,
-=======
             "shape":
             self.shape,
             "typestr":
@@ -1040,7 +989,6 @@ class TensorWrapper:
             ] if self.strides is not None else None,
             "version":
             3,
->>>>>>> upstream/main
         }
 
     @staticmethod
@@ -1097,12 +1045,6 @@ class KVCacheEventSerializer:
         if event_serialize_func is None:
             raise ValueError(f"Unknown KVCache event data type: {event_type}")
 
-<<<<<<< HEAD
-        return {
-            "event_id": event.event_id,
-            "data": event_serialize_func(event.data),
-        }
-=======
         json_str = {
             "event_id": event.event_id,
             "data": event_serialize_func(event.data),
@@ -1112,7 +1054,6 @@ class KVCacheEventSerializer:
             json_str["attention_dp_rank"] = event.attention_dp_rank
 
         return json_str
->>>>>>> upstream/main
 
     @staticmethod
     def _created_to_json(data):
@@ -1184,8 +1125,6 @@ class KVCacheEventSerializer:
             "token_id": data.token_id,
             "token_extra_id": data.token_extra_id
         }
-<<<<<<< HEAD
-=======
 
 
 def is_multi_device_enable():
@@ -1211,4 +1150,3 @@ def set_prometheus_multiproc_dir() -> object:
         os.environ["PROMETHEUS_MULTIPROC_DIR"] = prometheus_multiproc_dir.name
     logger.info(
         f"PROMETHEUS_MULTIPROC_DIR: {os.environ['PROMETHEUS_MULTIPROC_DIR']}")
->>>>>>> upstream/main

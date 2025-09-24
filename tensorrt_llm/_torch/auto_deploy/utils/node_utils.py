@@ -8,10 +8,6 @@ import torch
 from torch._ops import OpOverload, OpOverloadPacket
 from torch.fx import Graph, GraphModule, Node
 
-<<<<<<< HEAD
-from ..custom_ops.quant import QUANT_OPS
-=======
->>>>>>> upstream/main
 from .logger import ad_logger
 
 try:
@@ -28,12 +24,8 @@ except ImportError:
     modelopt_quantize_op = None
     modelopt_dynamic_block_quantize_op = None
 
-<<<<<<< HEAD
-OperatorLike = Union[OpOverloadPacket, OpOverload, Callable]
-=======
 OpOrOverload = Union[OpOverloadPacket, OpOverload]
 OperatorLike = Union[OpOrOverload, Callable]
->>>>>>> upstream/main
 
 
 @dataclass
@@ -114,45 +106,18 @@ def get_quantization_params_from_linear_node(linear_op: torch.fx.node.Node):
     return input_params, weight_params, output_params
 
 
-<<<<<<< HEAD
-def is_match(node: Node, names_to_skip: List[str]):
-    if names_to_skip is None:
-        return False
-    for n in names_to_skip:
-        module_stack = node.meta.get("nn_module_stack", None)
-        if module_stack is None:
-            return False
-        module_stack = list(module_stack.keys())
-        if n in module_stack[-1]:
-            return True
-    return False
-
-
-def extract_param_names_from_lin_node(mm_node: Node) -> Tuple[str, Optional[str]]:
-    """Extracts the name of the parameter associated with the given matmul node.
-
-    Args:
-        mm_node: Matmul node in the graph.
-    """
-    # List of nodes allowed in between a get_attr node and the matmul node
-    allowed_ops = {torch.ops.aten.to.dtype}
-=======
 def extract_weight_node(mm_node: Node) -> int:
     """Extracts the weight node from the given linear or BMM node. We assume torch.bmm(activation, weight)"""
->>>>>>> upstream/main
 
     def find_get_attr_node(node: Node) -> Node:
         """Recursively traverse inputs of allowed nodes to find a node with 'get_attr' op."""
         # If node is a get_attr node return node
-<<<<<<< HEAD
-=======
         # List of nodes allowed in between a get_attr node and the matmul node
         allowed_ops = {
             torch.ops.aten.to.dtype,
             torch.ops.aten.view.default,
         }
 
->>>>>>> upstream/main
         if node.op == "get_attr":
             return node
 
@@ -166,22 +131,11 @@ def extract_weight_node(mm_node: Node) -> int:
                 return result
         return None
 
-<<<<<<< HEAD
-    assert is_linear_op(mm_node, include_quantization=True), (
-        f"Expecting linear node, Found: {mm_node}"
-    )
-    # second arg is the weight
-=======
->>>>>>> upstream/main
     weight_node = mm_node.args[1]
     # for modelopt quantized graph, there will be a quantize_op
     _, weight_params, _ = get_quantization_params_from_linear_node(mm_node)
     weight_node = weight_params.input_node if weight_params else weight_node
 
-<<<<<<< HEAD
-    # Find the get_attr node for the weight node so that it can be slice.
-    weight_node = find_get_attr_node(weight_node)
-=======
     return find_get_attr_node(weight_node)
 
 
@@ -198,7 +152,6 @@ def extract_param_names_from_lin_node(mm_node: Node) -> Tuple[str, Optional[str]
         mm_node: Matmul node in the graph.
     """
     weight_node = extract_weight_node(mm_node)
->>>>>>> upstream/main
 
     assert weight_node, "Cannot identify weight parameter of linear node."
 
@@ -249,9 +202,6 @@ def is_op(node: Node, ops: Union[OperatorLike, Iterable[OperatorLike]]) -> bool:
     return is_match
 
 
-<<<<<<< HEAD
-def is_linear_op(node: Node, include_quantization: bool = False) -> bool:
-=======
 def filtered_nodes(
     nodes: Iterable[Node],
     target: Union[Callable[[Node], bool], Union[OperatorLike, Iterable[OperatorLike]]] = None,
@@ -298,28 +248,12 @@ def filtered_nodes(
 
 
 def is_linear_op(node: Node) -> bool:
->>>>>>> upstream/main
     """Check if the node is a linear op.
 
     Using this function is preferred over `is_op` for linear ops to ensure all variants are covered.
     """
     lin_ops = {
         torch.ops.aten.linear,
-<<<<<<< HEAD
-        torch.ops.linear.simple,
-    }
-
-    if include_quantization:
-        lin_ops.update(QUANT_OPS)
-    return is_op(node, lin_ops)
-
-
-def is_dist_op(node: Node) -> bool:
-    """Check if the node is a distributed op."""
-    dist_ops = {
-        torch.ops.dist.all_gather,
-        torch.ops.dist.all_reduce,
-=======
         torch.ops.auto_deploy.torch_linear_simple,
     }
 
@@ -346,7 +280,6 @@ def is_dist_op(node: Node) -> bool:
     dist_ops = {
         torch.ops.auto_deploy.torch_dist_all_gather,
         torch.ops.auto_deploy.torch_dist_all_reduce,
->>>>>>> upstream/main
     }
     return is_op(node, dist_ops)
 
@@ -417,11 +350,7 @@ def identify_regions_between_residuals(gm: GraphModule) -> List[Node]:
     # sanity check: we expect at most two users for any residual node
     res_nodes_more_users = [n for n in boundary_nodes[2:] if len(n.users) > 2]
     if res_nodes_more_users:
-<<<<<<< HEAD
-        ad_logger.warning(f"Unexpected # of users for residuals: {res_nodes_more_users}")
-=======
         ad_logger.debug(f"Unexpected # of users for residuals: {res_nodes_more_users}")
->>>>>>> upstream/main
 
     # add output node to boundary nodes
     boundary_nodes.append(output_node)
@@ -466,8 +395,6 @@ def extract_output_tuple(node: Node, count: int = 2):
         )
         results.append(user_node)
     return results
-<<<<<<< HEAD
-=======
 
 
 def extract_op_args(node: Node, *arg_names):
@@ -508,4 +435,3 @@ def extract_op_args(node: Node, *arg_names):
         raise RuntimeError(f"Could not find a value for '{name}' on op {op}")
 
     return [_get(n) for n in arg_names]
->>>>>>> upstream/main

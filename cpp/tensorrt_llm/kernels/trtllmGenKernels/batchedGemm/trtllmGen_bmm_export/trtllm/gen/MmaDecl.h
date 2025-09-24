@@ -16,14 +16,11 @@
  */
 #pragma once
 
-<<<<<<< HEAD
-=======
 #include "CommonUtils.h"
 #include <cassert>
 #include <cstdint>
 #include <string>
 
->>>>>>> upstream/main
 namespace batchedGemm
 {
 
@@ -92,8 +89,6 @@ inline std::string mmaKindToString(MmaKind mmaKind)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-<<<<<<< HEAD
-=======
 // function to get the TMEM column stride per group (i.e., 64 K elements)
 inline int32_t getTmemColStridePerGroup(int32_t tileMn, int32_t mmaK)
 {
@@ -104,7 +99,6 @@ inline int32_t getTmemColStridePerGroup(int32_t tileMn, int32_t mmaK)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
->>>>>>> upstream/main
 } // namespace gen
 } // namespace trtllm
 

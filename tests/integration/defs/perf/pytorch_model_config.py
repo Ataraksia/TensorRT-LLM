@@ -17,11 +17,6 @@
 Model pytorch yaml config for trtllm-bench perf tests
 """
 
-<<<<<<< HEAD
-from tensorrt_llm.llmapi import KvCacheConfig
-
-=======
->>>>>>> upstream/main
 
 def recursive_update(d, u):
     for k, v in u.items():
@@ -56,8 +51,6 @@ def get_model_yaml_config(model_label: str,
     # Pattern-based configurations for models matching specific substrings
     # This allows for flexible configuration of models based on naming patterns
     pattern_configs = [
-<<<<<<< HEAD
-=======
         # Deepseek default cases
         {
             'patterns': 'deepseek_r1',
@@ -65,7 +58,6 @@ def get_model_yaml_config(model_label: str,
                 'enable_attention_dp': True,
             }
         },
->>>>>>> upstream/main
         # DeepSeek R1 models with MTP speculative decoding
         {
             'patterns': [
@@ -106,8 +98,6 @@ def get_model_yaml_config(model_label: str,
                 }
             }
         },
-<<<<<<< HEAD
-=======
         # Deepseek R1 model with chunked prefill
         {
             'patterns': [
@@ -123,7 +113,6 @@ def get_model_yaml_config(model_label: str,
                 'enable_chunked_prefill': True,
             }
         },
->>>>>>> upstream/main
         # Deepseek_v3_lite_cases
         {
             'patterns':
@@ -136,16 +125,6 @@ def get_model_yaml_config(model_label: str,
                 }
             }
         },
-<<<<<<< HEAD
-        # Deepseek default cases
-        {
-            'patterns': 'deepseek_r1',
-            'config': {
-                'enable_attention_dp': True,
-            }
-        },
-=======
->>>>>>> upstream/main
         # Llama Nemotron models with attention_dp disabled to prevent hangs
         {
             'patterns': [
@@ -193,16 +172,6 @@ def get_model_yaml_config(model_label: str,
                 'llama_v4_maverick_17b_128e_instruct_fp8'
             ],
             'config': {
-<<<<<<< HEAD
-                'use_cuda_graph':
-                True,
-                'cuda_graph_padding_enabled':
-                True,
-                'cuda_graph_batch_sizes': [
-                    1, 2, 4, 8, 16, 32, 64, 128, 256, 384, 512, 1024, 2048,
-                    4096, 8192
-                ]
-=======
                 'cuda_graph_config': {
                     'enable_padding':
                     True,
@@ -251,7 +220,6 @@ def get_model_yaml_config(model_label: str,
                 },
                 'stream_interval': 10,
                 'num_postprocess_workers': 4
->>>>>>> upstream/main
             }
         }
     ]
@@ -268,12 +236,6 @@ def get_model_yaml_config(model_label: str,
 
     # lora-specific change for pytorch
     if 'pytorch' in model_label and 'loras' in model_label:
-<<<<<<< HEAD
-        lora_config = {
-            'lora_config': {
-                'lora_dir': lora_dirs if lora_dirs is not None else [],
-                'max_lora_rank': 64
-=======
         # Derive the requested number of adapters from model_label (segment like "loras:X")
         lora_count = 1
         for part in model_label.split('-'):
@@ -287,31 +249,15 @@ def get_model_yaml_config(model_label: str,
                 'max_lora_rank': 64,
                 'max_loras': lora_count,
                 'max_cpu_loras': lora_count,
->>>>>>> upstream/main
             }
         }
         if 'phi_4_multimodal_instruct' in model_label:
             lora_config['lora_config']['lora_target_modules'] = [
-<<<<<<< HEAD
-                "attn_qkv", "attn_dense", "mlp_h_to_4h", "mlp_4h_to_h"
-=======
                 "attn_qkv", "attn_dense", "mlp_gate_up", "mlp_4h_to_h"
->>>>>>> upstream/main
             ]
             lora_config['lora_config']['trtllm_modules_to_hf_modules'] = {
                 "attn_qkv": "qkv_proj",
                 "attn_dense": "o_proj",
-<<<<<<< HEAD
-                "mlp_h_to_4h": "gate_up_proj",
-                "mlp_4h_to_h": "down_proj"
-            }
-            lora_config['lora_config']['max_lora_rank'] = 320
-        base_config.update(lora_config)
-
-    kv_cache_config = base_config.get('kv_cache_config', KvCacheConfig())
-    if 'kv_cache_dtype' in base_config:
-        kv_cache_config.dtype = base_config.pop('kv_cache_dtype', 'auto')
-=======
                 "mlp_gate_up": "gate_up_proj",
                 "mlp_4h_to_h": "down_proj"
             }
@@ -324,7 +270,6 @@ def get_model_yaml_config(model_label: str,
     if 'kv_cache_dtype' in base_config:
         kv_cache_dtype = base_config.pop('kv_cache_dtype', 'auto')
         kv_cache_config['dtype'] = kv_cache_dtype
->>>>>>> upstream/main
         base_config.update({'kv_cache_config': kv_cache_config})
 
     return base_config

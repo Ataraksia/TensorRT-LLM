@@ -1,9 +1,5 @@
 from collections import defaultdict
-<<<<<<< HEAD
-from typing import Optional, Tuple
-=======
 from typing import Dict, List, Optional, Tuple
->>>>>>> upstream/main
 
 import torch
 from torch.fx import GraphModule, Node
@@ -11,12 +7,7 @@ from torch.fx import GraphModule, Node
 from ...models.factory import ModelFactory
 from ...shim.interface import CachedSequenceInterface
 from ...utils.cuda_mem_tracker import cuda_memory_tracker
-<<<<<<< HEAD
-from ...utils.node_utils import bfs, identify_regions_between_residuals, is_linear_op, is_op
-from ...utils.quantization_utils import get_scales_and_type_from_node
-=======
 from ...utils.node_utils import bfs, identify_regions_between_residuals, is_op
->>>>>>> upstream/main
 from ..interface import BaseTransform, SharedConfig, TransformInfo, TransformRegistry
 
 
@@ -134,35 +125,6 @@ def _find_lowest_common_ancessor(nodes: list[Node]) -> Optional[Node]:
     return common
 
 
-<<<<<<< HEAD
-def _extract_linear_parameters(linear_node: Node) -> tuple[Node, torch.Tensor, Optional[dict], str]:
-    """
-    Given a linear op node, extract the input tensor node, weight tensor,
-    any quantization scales (if the op is quantized), and return a weight type.
-
-    For a torch.ops.auto_deploy.torch_linear_simple.default op:
-      - Returns (input_node, weight, None, "simple")
-
-    For a torch.ops.auto_deploy.torch_quant_fp8_linear op:
-      - Returns (input_node, weight, {"input_scale": input_scale, "weight_scale": weight_scale}, "fp8")
-       For a torch.ops.auto_deploy.torch_quant_fp4_linear op:
-      - Returns (input_node, weight, {"input_scale": input_scale, "weight_scale": weight_scale, "alpha": alpha}, "fp4")
-    """
-    input_node = linear_node.args[0]
-    if is_op(linear_node, torch.ops.auto_deploy.torch_linear_simple):
-        weight = linear_node.args[1]
-        return input_node, weight, None, ""
-    elif {
-        is_op(linear_node, torch.ops.auto_deploy.torch_quant_fp4_linear)
-        or is_op(linear_node, torch.ops.auto_deploy.torch_quant_fp8_linear),
-    }:
-        weight = linear_node.args[1]
-        scales, quant_type = get_scales_and_type_from_node(linear_node)
-        return input_node, weight, scales or {}, quant_type
-
-
-def _match_expert_compute_pattern(start_boundary: Node, end_boundary: Node):
-=======
 def _extract_linear_parameters(
     linear_node: Node,
     target_op,
@@ -199,7 +161,6 @@ def _match_expert_compute_pattern(
     target_op,
     scale_arg_indices: Dict[str, int],
 ):
->>>>>>> upstream/main
     """
     Match the expert compute pattern between the given boundaries.
 
@@ -213,11 +174,7 @@ def _match_expert_compute_pattern(
     This function supports both:
       - torch.ops.auto_deploy.torch_linear_simple.default ops, and
       - torch.ops.auto_deploy.torch_quant_fp8_linear ops (also extracts quantization scales).
-<<<<<<< HEAD
-      - torch.ops.auto_deploy.torch_quant_fp4_linear ops (also extracts quantization scales).
-=======
       - torch.ops.auto_deploy.torch_quant_nvfp4_linear ops (also extracts quantization scales).
->>>>>>> upstream/main
 
     Returns:
         A tuple:
@@ -233,21 +190,12 @@ def _match_expert_compute_pattern(
     pattern_input_nodes, pattern_output_nodes = [], []
     expert_weights = defaultdict(list)
     expert_scales = defaultdict(list)
-<<<<<<< HEAD
-    weight_type = "simple"  # default
-=======
->>>>>>> upstream/main
 
     nodes = list(start_boundary.graph.nodes)
     region_nodes = nodes[nodes.index(start_boundary) + 1 : nodes.index(end_boundary)]
 
     for node in region_nodes:
-<<<<<<< HEAD
-        # Accept both simple and quantized linear ops.
-        if not is_linear_op(node, include_quantization=True):
-=======
         if not is_op(node, target_op):
->>>>>>> upstream/main
             continue
 
         final_linear = node
@@ -269,33 +217,18 @@ def _match_expert_compute_pattern(
         if silu_node is None:
             continue
 
-<<<<<<< HEAD
-        if not (silu_node.args and is_linear_op(silu_node.args[0], include_quantization=True)):
-=======
         if not (silu_node.args and is_op(silu_node.args[0], target_op)):
->>>>>>> upstream/main
             continue
         linear_w1_node = silu_node.args[0]
 
         # The other branch should be a linear op (w3 branch).
         linear_w3_node = arg_b if arg_a is silu_node else arg_a
-<<<<<<< HEAD
-        if not is_linear_op(linear_w3_node, include_quantization=True):
-=======
         if not is_op(linear_w3_node, target_op):
->>>>>>> upstream/main
             continue
         if not (linear_w1_node.args and linear_w3_node.args):
             continue
 
         # Extract parameters from each linear op.
-<<<<<<< HEAD
-        input_node_w1, weight_w1, quant_params_w1, wt_type_w1 = _extract_linear_parameters(
-            linear_w1_node
-        )
-        _, weight_w3, quant_params_w3, wt_type_w3 = _extract_linear_parameters(linear_w3_node)
-        _, weight_w2, quant_params_w2, wt_type_w2 = _extract_linear_parameters(final_linear)
-=======
         input_node_w1, weight_w1, s_w1 = _extract_linear_parameters(
             linear_w1_node, target_op, scale_arg_indices
         )
@@ -303,47 +236,16 @@ def _match_expert_compute_pattern(
             linear_w3_node, target_op, scale_arg_indices
         )
         _, weight_w2, s_w2 = _extract_linear_parameters(final_linear, target_op, scale_arg_indices)
->>>>>>> upstream/main
 
         if None in (weight_w1, weight_w3, weight_w2):
             continue
 
-<<<<<<< HEAD
-        # Ensure the weight type is consistent across branches.
-        if wt_type_w1 != wt_type_w3 or wt_type_w1 != wt_type_w2:
-            continue
-        weight_type = wt_type_w1
-
-=======
->>>>>>> upstream/main
         pattern_input_nodes.append(input_node_w1)
         pattern_output_nodes.append(final_linear)
         expert_weights["w1"].append(weight_w1)
         expert_weights["w3"].append(weight_w3)
         expert_weights["w2"].append(weight_w2)
 
-<<<<<<< HEAD
-        # TODO: sanity check that all experts have same weight type
-        if weight_type == "fp8":
-            expert_scales["w1_input_scale"].append(quant_params_w1["input_scale"])
-            expert_scales["w1_weight_scale"].append(quant_params_w1["weight_scale"])
-            expert_scales["w3_input_scale"].append(quant_params_w3["input_scale"])
-            expert_scales["w3_weight_scale"].append(quant_params_w3["weight_scale"])
-            expert_scales["w2_input_scale"].append(quant_params_w2["input_scale"])
-            expert_scales["w2_weight_scale"].append(quant_params_w2["weight_scale"])
-        elif weight_type == "fp4":
-            expert_scales["w1_input_scale"].append(quant_params_w1["input_scale"])
-            expert_scales["w1_weight_scale"].append(quant_params_w1["weight_scale"])
-            expert_scales["w1_alpha"].append(quant_params_w1["alpha"])
-            expert_scales["w3_input_scale"].append(quant_params_w3["input_scale"])
-            expert_scales["w3_weight_scale"].append(quant_params_w3["weight_scale"])
-            expert_scales["w3_alpha"].append(quant_params_w3["alpha"])
-            expert_scales["w2_input_scale"].append(quant_params_w2["input_scale"])
-            expert_scales["w2_weight_scale"].append(quant_params_w2["weight_scale"])
-            expert_scales["w2_alpha"].append(quant_params_w2["alpha"])
-
-    return pattern_input_nodes, pattern_output_nodes, expert_weights, expert_scales, weight_type
-=======
         # Collect scales per-branch with keys "w{1|2|3}_<scale_key>"
         for key, node_scale in s_w1.items():
             expert_scales[f"w1_{key}"].append(node_scale)
@@ -353,7 +255,6 @@ def _match_expert_compute_pattern(
             expert_scales[f"w2_{key}"].append(node_scale)
 
     return pattern_input_nodes, pattern_output_nodes, expert_weights, expert_scales
->>>>>>> upstream/main
 
 
 def _find_final_hidden_state_node(
@@ -460,10 +361,6 @@ def _remove_dead_inplace_nodes_in_region(
         return False
 
 
-<<<<<<< HEAD
-@TransformRegistry.register("match_moe_pattern")
-class MatchMoePattern(BaseTransform):
-=======
 class MatchMoePattern(BaseTransform):
     """Base MoE pattern matcher; subclasses specify linear and fused MoE ops and scale layouts."""
 
@@ -482,7 +379,6 @@ class MatchMoePattern(BaseTransform):
         """Order of scale keys to emit into fused MoE op (e.g., ['input_scale','weight_scale',...])."""
         raise NotImplementedError
 
->>>>>>> upstream/main
     def _apply(
         self,
         gm: GraphModule,
@@ -497,14 +393,11 @@ class MatchMoePattern(BaseTransform):
 
         num_moe_patterns = 0
 
-<<<<<<< HEAD
-=======
         lin_op = self.target_op()
         scale_idx = self.scale_arg_indices()
         scale_keys = self.scale_keys()
         fused_moe = self.moe_op()
 
->>>>>>> upstream/main
         for start_boundary, end_boundary in zip(boundary_nodes[:-1], boundary_nodes[1:]):
             # Step 1: Identify Expert Compute pattern
             (
@@ -512,17 +405,12 @@ class MatchMoePattern(BaseTransform):
                 pattern_output_nodes,
                 expert_weights,
                 expert_scales,
-<<<<<<< HEAD
-                weight_type,
-            ) = _match_expert_compute_pattern(start_boundary, end_boundary)
-=======
             ) = _match_expert_compute_pattern(
                 start_boundary,
                 end_boundary,
                 target_op=lin_op,
                 scale_arg_indices=scale_idx,
             )
->>>>>>> upstream/main
             if not expert_weights:
                 continue
             # TODO: naming convention to verify the order of the weight nodes
@@ -563,60 +451,6 @@ class MatchMoePattern(BaseTransform):
                 w2_list = expert_weights["w2"]
                 w3_list = expert_weights["w3"]
 
-<<<<<<< HEAD
-                if weight_type == "fp8":
-                    fused_moe_node = graph.call_function(
-                        torch.ops.auto_deploy.torch_quant_fp8_moe,
-                        args=(
-                            hidden_states,
-                            selected_experts,
-                            normalized_routing_weights,
-                            w1_list,
-                            w2_list,
-                            w3_list,
-                            expert_scales["w1_input_scale"],
-                            expert_scales["w2_input_scale"],
-                            expert_scales["w3_input_scale"],
-                            expert_scales["w1_weight_scale"],
-                            expert_scales["w2_weight_scale"],
-                            expert_scales["w3_weight_scale"],
-                        ),
-                    )
-                elif weight_type == "fp4":
-                    fused_moe_node = graph.call_function(
-                        torch.ops.auto_deploy.torch_quant_fp4_moe,
-                        args=(
-                            hidden_states,
-                            selected_experts,
-                            normalized_routing_weights,
-                            w1_list,
-                            w2_list,
-                            w3_list,
-                            expert_scales["w1_input_scale"],
-                            expert_scales["w2_input_scale"],
-                            expert_scales["w3_input_scale"],
-                            expert_scales["w1_weight_scale"],
-                            expert_scales["w2_weight_scale"],
-                            expert_scales["w3_weight_scale"],
-                            expert_scales["w1_alpha"],
-                            expert_scales["w2_alpha"],
-                            expert_scales["w3_alpha"],
-                        ),
-                    )
-                else:
-                    fused_moe_node = graph.call_function(
-                        torch.ops.auto_deploy.torch_moe,
-                        args=(
-                            hidden_states,
-                            selected_experts,
-                            normalized_routing_weights,
-                            w1_list,
-                            w2_list,
-                            w3_list,
-                        ),
-                    )
-
-=======
                 fused_args = [
                     hidden_states,
                     selected_experts,
@@ -638,7 +472,6 @@ class MatchMoePattern(BaseTransform):
 
                 fused_moe_node = graph.call_function(fused_moe, args=tuple(fused_args))
 
->>>>>>> upstream/main
             final_hidden_state_node.replace_all_uses_with(fused_moe_node)
             graph.erase_node(final_hidden_state_node)
 
@@ -653,8 +486,6 @@ class MatchMoePattern(BaseTransform):
         return gm, info
 
 
-<<<<<<< HEAD
-=======
 @TransformRegistry.register("match_moe_pattern")
 class MatchSimpleMoePattern(MatchMoePattern):
     """Match and fuse simple (unquantized) MoE subgraph."""
@@ -706,7 +537,6 @@ class MatchNVFP4MoePattern(MatchMoePattern):
         return ["input_scale", "weight_scale", "alpha"]
 
 
->>>>>>> upstream/main
 @TransformRegistry.register("fuse_moe")
 class FuseMoe(BaseTransform):
     """

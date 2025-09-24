@@ -16,11 +16,7 @@ properties:
     annotation: int
     default: inspect._empty
   logprobs_diff:
-<<<<<<< HEAD
-    annotation: List[float]
-=======
     annotation: list[dict[int, tensorrt_llm.executor.result.Logprob]] | List[float]
->>>>>>> upstream/main
     default: inspect._empty
   text_diff:
     annotation: str

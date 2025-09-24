@@ -60,10 +60,7 @@ __device__ PackedT packedNegativeInfinity()
     }
     return *reinterpret_cast<PackedT*>(packed);
 }
-<<<<<<< HEAD
-=======
 } // namespace
->>>>>>> upstream/main
 
 template <typename T, typename PackedT, int32_t kBitsPerThread>
 __global__ void __launch_bounds__(kThreadsPerBlock) logitsBitmaskKernel(
@@ -122,12 +119,8 @@ void logitsBitmaskDispatchToBitsPerThread(
     T** logits, uint32_t const** bitmask, int32_t batchSize, int32_t vocabSizePadded, cudaStream_t stream)
 {
     int constexpr kAlignment = sizeof(PackedT) / sizeof(T);
-<<<<<<< HEAD
-    int32_t const numBlocksPerRow = ceilDiv(2048 / kThreadsPerBlock * 128, batchSize);
-=======
     static int const smCount = tensorrt_llm::common::getMultiProcessorCount();
     int32_t const numBlocksPerRow = ceilDiv(2048 / kThreadsPerBlock * smCount, batchSize);
->>>>>>> upstream/main
     int32_t const numBitsPerThread = ceilDiv(vocabSizePadded, kThreadsPerBlock * numBlocksPerRow);
     int32_t bitmaskSize = ceilDiv(vocabSizePadded, kBitsPerMaskElement);
 
@@ -154,10 +147,6 @@ void logitsBitmaskDispatchToBitsPerThread(
         logitsBitmaskKernel<T, PackedT, 32><<<grid, block, 0, stream>>>(logits, bitmask, vocabSizePadded, bitmaskSize);
     }
 }
-<<<<<<< HEAD
-} // namespace
-=======
->>>>>>> upstream/main
 
 template <typename T>
 void invokeLogitsBitmask(
@@ -191,8 +180,6 @@ template void invokeLogitsBitmask<half>(
 template void invokeLogitsBitmask<__nv_bfloat16>(
     __nv_bfloat16** logits, uint32_t const** bitmask, int32_t batchSize, int32_t vocabSizePadded, cudaStream_t stream);
 #endif
-<<<<<<< HEAD
-=======
 
 template <typename T, typename PackedT, int32_t kBitsPerThread>
 __global__ void __launch_bounds__(kThreadsPerBlock) contiguousLogitsBitmaskKernel(T* __restrict__ logits,
@@ -342,6 +329,5 @@ template void invokeContiguousLogitsBitmask<__nv_bfloat16>(__nv_bfloat16* logits
     cudaStream_t stream);
 #endif
 
->>>>>>> upstream/main
 } // namespace kernels
 } // namespace tensorrt_llm

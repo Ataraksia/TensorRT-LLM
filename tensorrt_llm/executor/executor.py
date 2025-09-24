@@ -13,39 +13,25 @@ from typing import (TYPE_CHECKING, AsyncIterable, Generator, List, Optional,
 import numpy as np
 import torch
 
-<<<<<<< HEAD
-from tensorrt_llm.logger import logger, set_level
-from tensorrt_llm.lora_manager import LoraConfig
-=======
 from tensorrt_llm.inputs.multimodal import MultimodalParams
 from tensorrt_llm.logger import logger, set_level
 from tensorrt_llm.lora_helper import LoraConfig
->>>>>>> upstream/main
 
 from .._utils import mpi_world_size
 from ..bindings import executor as tllm
 from ..builder import Engine
 from ..disaggregated_params import DisaggregatedParams
-<<<<<<< HEAD
-from ..llmapi.llm_utils import KvCacheRetentionConfig
-from ..llmapi.mpi_session import (MpiSession, external_mpi_comm_available,
-                                  need_spawn_mpi_workers)
-=======
 from ..llmapi.llm_args import BaseLlmArgs, KvCacheConnectorConfig
 from ..llmapi.llm_utils import KvCacheRetentionConfig
 from ..llmapi.mpi_session import (MpiSession, external_mpi_comm_available,
                                   need_spawn_mpi_workers)
 from ..llmapi.tokenizer import TokenizerBase
->>>>>>> upstream/main
 from ..llmapi.utils import (AsyncQueue, enable_llm_debug,
                             enable_worker_single_process_for_tp1, print_colored,
                             print_colored_debug)
 from ..sampling_params import (BatchedLogitsProcessor, LogprobParams,
                                SamplingParams)
-<<<<<<< HEAD
-=======
 from ..scheduling_params import SchedulingParams
->>>>>>> upstream/main
 from .ipc import FusedIpcQueue
 from .postproc_worker import PostprocParams, PostprocWorkerConfig
 from .request import GenerationRequest, LoRARequest, PromptAdapterRequest
@@ -53,13 +39,8 @@ from .result import GenerationResult, IterationResult
 from .utils import IntraProcessQueue, ProcessPoolExecutorSession, RequestError
 
 if TYPE_CHECKING:
-<<<<<<< HEAD
-    from .proxy import ExecutorBindingsProxy
-    from .worker import ExecutorBindingsWorker
-=======
     from .proxy import GenerationExecutorProxy
     from .worker import GenerationExecutorWorker
->>>>>>> upstream/main
 
 __all__ = [
     "GenerationExecutor",
@@ -131,21 +112,6 @@ class GenerationExecutor(ABC):
         pass
 
     def generate_async(
-<<<<<<< HEAD
-            self,
-            prompt_token_ids: List[int],
-            sampling_params: SamplingParams,
-            query_token_ids: Optional[Union[torch.Tensor, np.ndarray,
-                                            list]] = None,
-            lora_request: Optional[LoRARequest] = None,
-            prompt_adapter_request: Optional[PromptAdapterRequest] = None,
-            streaming: bool = False,
-            multimodal_embedding: Optional[list] = None,
-            mrope_config: Optional[dict] = None,
-            kv_cache_retention_config: Optional[KvCacheRetentionConfig] = None,
-            disaggregated_params: Optional[DisaggregatedParams] = None,
-            postproc_params: Optional[PostprocParams] = None
-=======
         self,
         prompt_token_ids: List[int],
         sampling_params: SamplingParams,
@@ -160,7 +126,6 @@ class GenerationExecutor(ABC):
         scheduling_params: Optional[SchedulingParams] = None,
         cache_salt_id: Optional[int] = None,
         arrival_time: Optional[float] = None,
->>>>>>> upstream/main
     ) -> GenerationResult:
         """Generate output for the given prompt token ids in the asynchronous mode.
         Asynchronous generation accepts single prompt only.
@@ -173,21 +138,6 @@ class GenerationExecutor(ABC):
         if postproc_params:
             postproc_params.postproc_args.num_prompt_tokens = len(
                 prompt_token_ids)
-<<<<<<< HEAD
-        result = self.submit(
-            GenerationRequest(
-                prompt_token_ids,
-                sampling_params=sampling_params,
-                postproc_params=postproc_params,
-                query_token_ids=query_token_ids,
-                lora_request=lora_request,
-                prompt_adapter_request=prompt_adapter_request,
-                streaming=streaming,
-                multimodal_embedding=multimodal_embedding,
-                mrope_config=mrope_config,
-                kv_cache_retention_config=kv_cache_retention_config,
-                disaggregated_params=disaggregated_params))
-=======
         request = GenerationRequest(
             prompt_token_ids,
             sampling_params=sampling_params,
@@ -206,7 +156,6 @@ class GenerationExecutor(ABC):
         # release memory in time
         if hasattr(request, "multimodal_params"):
             del request.multimodal_params
->>>>>>> upstream/main
         return result
 
     def generate(
@@ -329,12 +278,9 @@ class GenerationExecutor(ABC):
             # We can catch some exceptions here.
             raise e
 
-<<<<<<< HEAD
-=======
     def is_shutdown(self) -> bool:
         return self.doing_shutdown
 
->>>>>>> upstream/main
     @abstractmethod
     def shutdown(self):
         pass
@@ -414,12 +360,6 @@ class GenerationExecutor(ABC):
         postproc_worker_config: Optional[PostprocWorkerConfig] = None,
         is_llm_executor: Optional[bool] = None,
         lora_config: Optional[LoraConfig] = None,
-<<<<<<< HEAD
-    ) -> Union["ExecutorBindingsProxy", "ExecutorBindingsWorker"]:
-        # local imports to avoid cyclic importing
-        from .proxy import ExecutorBindingsProxy
-        from .worker import ExecutorBindingsWorker
-=======
         kv_connector_config: Optional[KvCacheConnectorConfig] = None,
         hf_model_dir: Optional[Path] = None,
         tokenizer: Optional[TokenizerBase] = None,
@@ -428,7 +368,6 @@ class GenerationExecutor(ABC):
         # local imports to avoid cyclic importing
         from .proxy import GenerationExecutorProxy
         from .worker import GenerationExecutorWorker
->>>>>>> upstream/main
 
         if world_size == 0:
             world_size = mpi_world_size()
@@ -451,12 +390,9 @@ class GenerationExecutor(ABC):
             "engine": engine,
             "executor_config": executor_config,
             "batched_logits_processor": batched_logits_processor,
-<<<<<<< HEAD
-=======
             "hf_model_dir": hf_model_dir,
             "tokenizer": tokenizer,
             "llm_args": llm_args,
->>>>>>> upstream/main
         }
 
         if lora_config:
@@ -469,21 +405,13 @@ class GenerationExecutor(ABC):
         if spawn_workers or (mpirun_launch and reuse_mpi_comm):
             if reuse_mpi_comm:
                 assert mpi_session is not None, "reuse_mpi_comm requires an external MPI session"
-<<<<<<< HEAD
-            return ExecutorBindingsProxy(
-=======
             return GenerationExecutorProxy(
->>>>>>> upstream/main
                 worker_kwargs,
                 model_world_size=model_world_size,
                 mpi_session=mpi_session,
                 postproc_worker_config=postproc_worker_config,
-<<<<<<< HEAD
-                is_llm_executor=is_llm_executor)
-=======
                 is_llm_executor=is_llm_executor,
                 kv_connector_config=kv_connector_config)
->>>>>>> upstream/main
 
         # WAR: For the performance of gathering logits, we use single process worker
         # for TP1 to avoid the large overhead of IPC.
@@ -493,56 +421,35 @@ class GenerationExecutor(ABC):
             logger.warning(
                 "Using single process worker for TP1, this may hurt streaming generation performance."
             )
-<<<<<<< HEAD
-            return ExecutorBindingsWorker(**worker_kwargs,
-                                          is_llm_executor=is_llm_executor)
-=======
             return GenerationExecutorWorker(
                 **worker_kwargs,
                 is_llm_executor=is_llm_executor,
                 kv_connector_config=kv_connector_config)
->>>>>>> upstream/main
 
         # For single-gpu case:
         # Partition the workload to multiple process for streaming performance.
         # While this requires uses to protect their entrypoint to
         # `if __name__ == "__main__":`.
         if not platform.system() == 'Windows':
-<<<<<<< HEAD
-            return ExecutorBindingsProxy(
-=======
             return GenerationExecutorProxy(
->>>>>>> upstream/main
                 worker_kwargs,
                 model_world_size=model_world_size,
                 mpi_session=None,  # use mpi4py
                 postproc_worker_config=postproc_worker_config,
-<<<<<<< HEAD
-                is_llm_executor=is_llm_executor)
-=======
                 is_llm_executor=is_llm_executor,
                 kv_connector_config=kv_connector_config)
->>>>>>> upstream/main
         else:
             ctx = multiprocessing.get_context("spawn")
             # The ProcessPoolExecutorSession is used to support Windows, as mpi4py cannot.
             mpi_session = ProcessPoolExecutorSession(n_workers=1,
                                                      mp_context=ctx)
-<<<<<<< HEAD
-            return ExecutorBindingsProxy(
-=======
             return GenerationExecutorProxy(
->>>>>>> upstream/main
                 worker_kwargs,
                 model_world_size=model_world_size,
                 mpi_session=mpi_session,
                 postproc_worker_config=postproc_worker_config,
-<<<<<<< HEAD
-                is_llm_executor=is_llm_executor)
-=======
                 is_llm_executor=is_llm_executor,
                 kv_connector_config=kv_connector_config)
->>>>>>> upstream/main
 
     def wait_first_completed(
         self, futures: List[GenerationResult]

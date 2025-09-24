@@ -26,12 +26,9 @@ add_gtest(mixtureOfExpertsTest mixtureOfExpertsTest.cu)
 
 # If we are using oss cutlass, build an explicit internal test
 if(USING_OSS_CUTLASS_MOE_GEMM)
-<<<<<<< HEAD
-=======
   target_compile_definitions(mixtureOfExpertsTest
                              PUBLIC USING_OSS_CUTLASS_MOE_GEMM)
 
->>>>>>> upstream/main
   add_gtest(mixtureOfExpertsInternalTest mixtureOfExpertsTest.cu)
   remove_compile_definition(mixtureOfExpertsInternalTest
                             USING_OSS_CUTLASS_MOE_GEMM)

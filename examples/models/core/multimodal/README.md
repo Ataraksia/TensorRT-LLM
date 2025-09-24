@@ -12,10 +12,7 @@ We first describe three runtime modes for running multimodal models and how to r
 - [CogVLM](#cogvlm)
 - [Deplot](#deplot)
 - [Fuyu](#fuyu)
-<<<<<<< HEAD
-=======
 - [Gemma3](#gemma3)
->>>>>>> upstream/main
 - [InternLM-XComposer2](#internlm-xcomposer2)
 - [InternVL2](#internvl2)
 - [Kosmos-2](#kosmos-2)
@@ -356,8 +353,6 @@ Currently, CogVLM only support bfloat16 precision.
         --engine_dir tmp/trt_engines/${MODEL_NAME}/fp16/1-gpu
     ```
 
-<<<<<<< HEAD
-=======
 ## Gemma3
 
 **NOTE: We only support Gemma3 VLMs in Pytorch workflow.**
@@ -427,7 +422,6 @@ trtllm-serve ${MODEL_NAME}/ \
 Currently supported Gemma3 variants: 4B, 12B, 27B
 
 
->>>>>>> upstream/main
 ## InternLM-XComposer2
 
 **NOTE: We only support InternLM-XComposer-VL-7b for now**

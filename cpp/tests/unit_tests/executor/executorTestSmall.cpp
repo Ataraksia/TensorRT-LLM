@@ -11,10 +11,7 @@
 
 #include <random>
 #include <tuple>
-<<<<<<< HEAD
-=======
 #include <unordered_map>
->>>>>>> upstream/main
 
 namespace tensorrt_llm::testing
 {
@@ -205,8 +202,6 @@ INSTANTIATE_TEST_SUITE_P(Float, DecoderFloatTest, paramGenerator,
         return nameStringStream.str();
     });
 
-<<<<<<< HEAD
-=======
 // Helper function to test calculateCacheSizePerToken with given parameters.
 std::map<runtime::SizeType32, runtime::SizeType32> calculateCacheSizePerTokenHelper(
     std::vector<runtime::SizeType32> const& maxAttentionWindowVec, runtime::SizeType32 kvFactor = 2,
@@ -291,5 +286,4 @@ TEST(TrtInflightBatchingTest, CalculateCacheSizePerTokenForDisagg)
     }
 }
 
->>>>>>> upstream/main
 } // namespace tensorrt_llm::testing

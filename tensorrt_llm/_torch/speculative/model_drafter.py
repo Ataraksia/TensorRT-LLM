@@ -9,17 +9,6 @@ from tensorrt_llm._utils import nvtx_range
 from tensorrt_llm.logger import logger
 
 from ..pyexecutor.guided_decoder import GuidedDecoder
-<<<<<<< HEAD
-from ..pyexecutor.llm_request import (LlmRequest, LlmRequestState,
-                                      get_draft_token_length)
-from ..pyexecutor.resource_manager import BaseResourceManager, ResourceManager
-from ..pyexecutor.sampler import Sampler, SampleState, TorchSampler
-from ..pyexecutor.scheduler import ScheduledRequests
-from ..pyexecutor.seq_slot_manager import SeqSlotManager
-from .drafter import Drafter
-
-if TYPE_CHECKING:
-=======
 from ..pyexecutor.handle_logits import HandleLogits
 from ..pyexecutor.llm_request import LlmRequest, LlmRequestState
 from ..pyexecutor.resource_manager import BaseResourceManager, ResourceManager
@@ -31,7 +20,6 @@ from .drafter import Drafter
 
 if TYPE_CHECKING:
     from ...llmapi.llm_args import DecodingBaseConfig
->>>>>>> upstream/main
     from ..pyexecutor.model_engine import ModelEngine
     from .interface import SpeculativeDecodingMode
 
@@ -43,11 +31,7 @@ def get_draft_model_prompt(spec_dec_mode: SpeculativeDecodingMode,
     Can be used to modify prompts for speculative algorithms that need to update tokens
     before drafting.
     """
-<<<<<<< HEAD
-    if spec_dec_mode.is_eagle3():
-=======
     if spec_dec_mode.is_eagle3() or spec_dec_mode.is_mtp_eagle():
->>>>>>> upstream/main
         # EAGLE3 always throws away the first token when processing draft inputs
         return input_tokens[1:]
     return input_tokens
@@ -72,11 +56,7 @@ class ModelDrafter(Drafter):
         if draft_model_engine is None:
             raise ValueError("draft_model_engine cannot be None")
         if max_draft_tokens < 0:
-<<<<<<< HEAD
-            raise ValueError(f"max_draft_tokens must be >= 0")
-=======
             raise ValueError("max_draft_tokens must be >= 0")
->>>>>>> upstream/main
 
         # Model and resource management
         self.draft_model_engine = draft_model_engine
@@ -88,26 +68,6 @@ class ModelDrafter(Drafter):
         self.max_draft_tokens = max_draft_tokens
         # Sampling
         self.sampler = sampler
-<<<<<<< HEAD
-        self._request_draft_logits = False
-        if isinstance(sampler, TorchSampler):
-            self._request_draft_logits = sampler.enable_mixed_sampler
-        self.guided_decoder = guided_decoder
-
-    def _create_draft_request(self, request: LlmRequest,
-                              input_tokens: Optional[List]) -> LlmRequest:
-        """Create a draft request with common parameters."""
-        return LlmRequest(input_tokens=input_tokens,
-                          request_id=request.py_request_id,
-                          max_new_tokens=request.py_max_new_tokens,
-                          sampling_config=request.sampling_config,
-                          guided_decoding_params=request.guided_decoding_params,
-                          target_seq_slot=request.py_seq_slot,
-                          return_perf_metrics=request.return_perf_metrics,
-                          is_streaming=False,
-                          is_draft=True,
-                          return_generation_logits=self._request_draft_logits)
-=======
         self.guided_decoder = guided_decoder
 
         self.use_static_draft_loop = draft_model_engine.model_is_wrapped
@@ -134,7 +94,6 @@ class ModelDrafter(Drafter):
             # NB: self.sampler is shared with PyExecutor
             return_generation_logits=self.sampler.should_provide_draft_probs(
                 request))
->>>>>>> upstream/main
 
     def _initialize_draft_tokens(self, request: LlmRequest) -> Tuple[int, int]:
         """Initialize draft token tracking for a request."""
@@ -196,15 +155,10 @@ class ModelDrafter(Drafter):
             assert num_draft_tokens == 0
             return self._create_context_request(request, input_tokens)
 
-<<<<<<< HEAD
-        # No tokens accepted - generation request
-        elif num_accepted_tokens == 0:
-=======
         # No tokens accepted - generation request. This only applies to speculation algorithms
         # that need to recompute KV cache for accepted tokens like eagle3.
         elif num_accepted_tokens == 0 or not self.spec_config.spec_dec_mode.needs_kv_cache_recompute(
         ):
->>>>>>> upstream/main
             return self._create_generation_request(request, input_tokens)
 
         # Tokens accepted - chunked context request
@@ -264,13 +218,10 @@ class ModelDrafter(Drafter):
                 self._add_to_draft_batch(draft_batch, new_request, request)
 
             for request in scheduled_requests.generation_requests:
-<<<<<<< HEAD
-=======
                 if request.state == LlmRequestState.GENERATION_COMPLETE:
                     # Skip generation complete requests. This could happen when enabling overlap scheduler.
                     continue
 
->>>>>>> upstream/main
                 if request.py_draft_pages_allocated == 0:
                     # No space for draft tokens
                     continue
@@ -296,34 +247,6 @@ class ModelDrafter(Drafter):
             traceback.print_exc()
             raise e
 
-<<<<<<< HEAD
-    def _should_disable_cuda_graph(
-            self, previous_batch: Optional[SampleState]) -> bool:
-        """Check if CUDA graph should be disabled for the current forward pass."""
-        if previous_batch is not None:
-            return False
-        return self.spec_config.spec_dec_mode.needs_kv_cache_recompute()
-
-    def _forward_draft_model(
-            self,
-            draft_batch: ScheduledRequests,
-            resource_manager: ResourceManager,
-            previous_batch: Optional[SampleState] = None) -> Dict[str, Any]:
-        """Forward pass through the draft model."""
-        if self._should_disable_cuda_graph(previous_batch):
-            with self.draft_model_engine.no_cuda_graph():
-                outputs = self.draft_model_engine.forward(
-                    draft_batch, resource_manager)
-        else:
-            new_tensors_device = previous_batch.device if previous_batch else None
-            outputs = self.draft_model_engine.forward(
-                draft_batch,
-                resource_manager,
-                new_tensors_device=new_tensors_device)
-
-        # Handle d2t data if available
-        if hasattr(self.draft_model_engine.model.model, 'd2t'):
-=======
     def _should_disable_cuda_graph(self, is_first_draft_token: bool) -> bool:
         """Check if CUDA graph should be disabled for the current forward pass."""
         if not is_first_draft_token:
@@ -356,20 +279,10 @@ class ModelDrafter(Drafter):
         # in their implementations.
         if not self.use_static_draft_loop and hasattr(
                 self.draft_model_engine.model.model, 'd2t'):
->>>>>>> upstream/main
             outputs['d2t'] = self.draft_model_engine.model.model.d2t.data
 
         return outputs
 
-<<<<<<< HEAD
-    def _sample_async(self, draft_batch: ScheduledRequests,
-                      outputs: Dict[str, Any]) -> Optional[SampleState]:
-        """Sample tokens from draft model outputs."""
-        try:
-            if self.sampler is not None:
-                return self.sampler.sample_async(draft_batch, outputs)
-            return None
-=======
     def sample_async(self, draft_batch: ScheduledRequests,
                      outputs: Dict[str, Any]) -> Optional[SampleState]:
         """Sample tokens from draft model outputs."""
@@ -388,18 +301,12 @@ class ModelDrafter(Drafter):
 
             return self.sampler.sample_async(draft_batch, outputs,
                                              num_context_logits_prefix_sum)
->>>>>>> upstream/main
         except Exception as e:
             logger.error(f"Error in sampling: {str(e)}")
             return None
 
-<<<<<<< HEAD
-    def _update_request_states(self,
-                               scheduled_requests: ScheduledRequests) -> None:
-=======
     def update_request_states(self,
                               scheduled_requests: ScheduledRequests) -> None:
->>>>>>> upstream/main
         """Update request states after processing."""
         for request in scheduled_requests.context_requests:
             if request.state != LlmRequestState.GENERATION_COMPLETE:
@@ -407,20 +314,11 @@ class ModelDrafter(Drafter):
             if request.context_remaining_length == 0:
                 request.state = LlmRequestState.GENERATION_IN_PROGRESS
 
-<<<<<<< HEAD
-    def _update_requests(self, sample_state: SampleState) -> None:
-        """Update requests with sample state."""
-        if self.sampler is not None:
-            self.sampler.update_requests(sample_state)
-
-    def _process_decoded_tokens(
-=======
     def update_requests(self, sample_state: SampleState) -> None:
         """Update requests with sample state."""
         self.sampler.update_requests(sample_state)
 
     def process_decoded_tokens(
->>>>>>> upstream/main
             self, draft_batch: ScheduledRequests,
             req_id_to_old_request: Dict[int, LlmRequest]) -> List[LlmRequest]:
         """Process decoded tokens and determine which requests to continue processing."""
@@ -434,12 +332,7 @@ class ModelDrafter(Drafter):
                 continue
 
             target_model_req.py_draft_tokens.append(req.get_last_tokens(0))
-<<<<<<< HEAD
-            if self._request_draft_logits:
-                target_model_req.py_draft_logits = req.py_result.generation_logits
-=======
             target_model_req.py_draft_logits = req.py_result.generation_logits  # forwards Nones
->>>>>>> upstream/main
             if req.state != LlmRequestState.GENERATION_COMPLETE and len(
                     target_model_req.py_draft_tokens
             ) < target_model_req.py_draft_pages_allocated:
@@ -449,24 +342,6 @@ class ModelDrafter(Drafter):
 
         return new_requests
 
-<<<<<<< HEAD
-    def _pad_to_max_draft_tokens(self,
-                                 scheduled_requests: ScheduledRequests) -> None:
-        """Pad draft tokens to maximum length for all generation requests."""
-        for req in scheduled_requests.generation_requests:
-            max_draft_tokens = self.max_draft_tokens
-            num_draft_tokens = get_draft_token_length(req)
-            req.py_draft_tokens.extend(
-                0 for _ in range(max_draft_tokens - num_draft_tokens))
-
-    def _execute_guided_decoder(self,
-                                scheduled_batch: ScheduledRequests,
-                                logits: torch.Tensor,
-                                d2t: Optional[torch.Tensor] = None):
-        if self.guided_decoder is not None:
-            self.guided_decoder.build(scheduled_batch)
-            self.guided_decoder.execute(scheduled_batch, logits, d2t=d2t)
-=======
     def should_forward_draft_model(self,
                                    scheduled_batch: ScheduledRequests) -> bool:
         """
@@ -797,7 +672,6 @@ class ModelDrafter(Drafter):
             num_draft_reqs, draft_sample_state)
 
         return target_inputs, previous_draft_state, draft_batch
->>>>>>> upstream/main
 
     @nvtx_range("prepare_draft_tokens")
     def prepare_draft_tokens(
@@ -819,67 +693,6 @@ class ModelDrafter(Drafter):
             raise ValueError("Resource manager is required")
 
         try:
-<<<<<<< HEAD
-            draft_batch = self._prepare_draft_batch(scheduled_requests)
-
-            if draft_batch.batch_size == 0:
-                return
-
-            self.draft_seq_slot_manager.prepare_resources(draft_batch)
-
-            req_id_to_old_request = {
-                req.py_request_id: req
-                for req in scheduled_requests.all_requests()
-            }
-
-            # Initial forward pass
-            outputs = self._forward_draft_model(draft_batch, resource_manager)
-            self._execute_guided_decoder(draft_batch,
-                                         outputs['logits'],
-                                         d2t=outputs.get('d2t'))
-            sample_state = self._sample_async(draft_batch, outputs)
-            previous_batch = sample_state
-
-            self._update_request_states(draft_batch)
-
-            # Convert context requests to generation requests
-            draft_batch.generation_requests = draft_batch.context_requests + draft_batch.generation_requests
-            draft_batch.context_requests = []
-
-            # Generate remaining draft tokens iteratively
-            for i in range(self.max_draft_tokens - 1):
-                if len(draft_batch.generation_requests) == 0:
-                    break
-
-                outputs = self._forward_draft_model(draft_batch,
-                                                    resource_manager,
-                                                    previous_batch)
-                if previous_batch is not None:
-                    self._update_requests(previous_batch)
-                self._execute_guided_decoder(draft_batch,
-                                             outputs['logits'],
-                                             d2t=outputs.get('d2t'))
-                sample_state = self._sample_async(draft_batch, outputs)
-                self._update_request_states(draft_batch)
-                if previous_batch is not None:
-                    new_requests = self._process_decoded_tokens(
-                        previous_batch.scheduled_requests,
-                        req_id_to_old_request)
-                else:
-                    new_requests = []
-                draft_batch.generation_requests = new_requests
-                previous_batch = sample_state
-
-            # Final cleanup
-            if previous_batch is not None:
-                self._update_requests(previous_batch)
-                self._process_decoded_tokens(previous_batch.scheduled_requests,
-                                             req_id_to_old_request)
-            self._pad_to_max_draft_tokens(scheduled_requests)
-
-            if self.guided_decoder is not None:
-                self.guided_decoder.rollback_draft_tokens(scheduled_requests)
-=======
             draft_batch, req_id_to_old_request = self._setup_draft_batch_and_resources(
                 scheduled_requests)
             if draft_batch is None:
@@ -912,7 +725,6 @@ class ModelDrafter(Drafter):
             if previous_draft_state is not None:
                 self.process_dynamic_draft_outputs(previous_draft_state,
                                                    req_id_to_old_request)
->>>>>>> upstream/main
 
         except Exception as e:
             traceback.print_exc()

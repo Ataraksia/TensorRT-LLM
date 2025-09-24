@@ -80,11 +80,6 @@ using namespace tensorrt_llm::runtime;
 namespace tc = tensorrt_llm::common;
 namespace tk = tensorrt_llm::kernels;
 
-<<<<<<< HEAD
-namespace tensorrt_llm::batch_manager
-{
-
-=======
 using tensorrt_llm::batch_manager::CacheTransceiverFactory;
 
 namespace tensorrt_llm::batch_manager
@@ -124,7 +119,6 @@ std::map<SizeType32, SizeType32> TrtGptModelInflightBatching::calculateCacheSize
     return cacheSizeBytesPerTokenPerWindow;
 };
 
->>>>>>> upstream/main
 bool TrtGptModelInflightBatching::executorConfigIsValid(
     ModelConfig const& modelConfig, executor::ExecutorConfig const& executorConfig)
 {
@@ -306,39 +300,10 @@ TrtGptModelInflightBatching::TrtGptModelInflightBatching(std::shared_ptr<nvinfer
     }
     if (mModelConfig.isTransformerBased() && modelConfig.isKVCacheEnabled())
     {
-<<<<<<< HEAD
-
-        auto calculateCacheSizePerToken
-            = [](ModelConfig const& modelConfig, WorldConfig const& worldConfig,
-                  std::vector<SizeType32> const& maxAttentionWindowVec, bool isCrossAttention, SizeType32 kvFactor)
-        {
-            auto [numKvHeadsPerLayerBegin, numKvHeadsPerLayerEnd] = modelConfig.getNumKvHeadsPerLayerLocalRange(
-                worldConfig.getPipelineParallelism(), worldConfig.getPipelineParallelRank(), isCrossAttention);
-            auto numKvHeadsPerLayer = std::vector<SizeType32>(numKvHeadsPerLayerBegin, numKvHeadsPerLayerEnd);
-            auto windowSizeLayers
-                = BaseKVCacheManager::groupLayersByWindowSize(maxAttentionWindowVec, modelConfig.getNbLayers());
-            std::map<SizeType32, SizeType32> cacheSizeBytesPerTokenPerWindow;
-            for (auto const& [windowSize, managedLayers] : windowSizeLayers)
-            {
-                auto const cacheSizePerToken = BaseKVCacheManager::calculateCacheSizePerTokenForSingleWindowSize(
-                    modelConfig, managedLayers, isCrossAttention, kvFactor);
-                auto const cacheSizeBytesPerToken
-                    = cacheSizePerToken * BufferDataType(modelConfig.getKvDataType()).getSize();
-                cacheSizeBytesPerTokenPerWindow[windowSize] = cacheSizeBytesPerToken;
-            }
-
-            return cacheSizeBytesPerTokenPerWindow;
-        };
-        auto cacheTransceiverConfig
-            = executorConfig.getCacheTransceiverConfig().value_or(executor::CacheTransceiverConfig());
-
-        auto const cacheSizeBytesPerTokenPerWindow = calculateCacheSizePerToken(
-=======
         auto cacheTransceiverConfig
             = executorConfig.getCacheTransceiverConfig().value_or(executor::CacheTransceiverConfig());
 
         auto const cacheSizeBytesPerTokenPerWindow = calculateCacheSizePerTokenForDisagg(
->>>>>>> upstream/main
             mModelConfig, mWorldConfig, getMaxAttentionWindowVec(), mModelConfig.useCrossAttention(), 2);
         auto cacheTransPreAllocaSize = kv_cache_manager::CacheTransBufferManager::preAllocBufferSize(
             cacheSizeBytesPerTokenPerWindow, cacheTransceiverConfig);

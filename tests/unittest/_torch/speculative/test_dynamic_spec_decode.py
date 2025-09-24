@@ -1,31 +1,20 @@
 import os
 import sys
 import unittest
-<<<<<<< HEAD
-from unittest.mock import patch
-=======
 from unittest.mock import Mock, patch
->>>>>>> upstream/main
 
 import pytest
 import torch
 from utils.llm_data import llm_models_root
 
 from tensorrt_llm import LLM, SamplingParams
-<<<<<<< HEAD
-=======
 from tensorrt_llm._torch.pyexecutor.llm_request import LlmRequestState
->>>>>>> upstream/main
 from tensorrt_llm.llmapi import (CudaGraphConfig, EagleDecodingConfig,
                                  KvCacheConfig)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 
-<<<<<<< HEAD
-@pytest.mark.high_cuda_memory
-def test_dynamic_spec_decode():
-=======
 @pytest.fixture(scope="function")
 def enforce_single_worker(monkeypatch):
     monkeypatch.setenv("TLLM_WORKER_USE_SINGLE_PROCESS", "1")
@@ -38,7 +27,6 @@ def test_dynamic_spec_decode(enforce_single_worker,
                              disable_overlap_scheduler: bool):
     # mock_should_use_spec_decode doesn't work with multiple processes,
     # so we use the enforce_single_worker fixture to set the environment variable.
->>>>>>> upstream/main
     total_mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
     if total_mem_gb < 35:
         pytest.skip("Not enough memory to load target + draft model")
@@ -49,22 +37,13 @@ def test_dynamic_spec_decode(enforce_single_worker,
 
     max_batch_size = 1
     max_draft_len = 4
-<<<<<<< HEAD
-    kv_cache_config = KvCacheConfig(enable_block_reuse=True,
-                                    free_gpu_memory_fraction=0.5)
-=======
     kv_cache_config = KvCacheConfig(enable_block_reuse=True, max_tokens=8192)
->>>>>>> upstream/main
     cuda_graph_config = CudaGraphConfig(batch_sizes=[1])
 
     llm_common_config = dict(
         model=target_model_dir,
         attn_backend="TRTLLM",
-<<<<<<< HEAD
-        disable_overlap_scheduler=True,
-=======
         disable_overlap_scheduler=disable_overlap_scheduler,
->>>>>>> upstream/main
         cuda_graph_config=cuda_graph_config,
         max_batch_size=max_batch_size,
         kv_cache_config=kv_cache_config,
@@ -82,33 +61,6 @@ def test_dynamic_spec_decode(enforce_single_worker,
         eagle3_one_model=False,
     )
 
-<<<<<<< HEAD
-    # Mock should_use_spec_decode to return True for first two calls, then False
-    def mock_should_use_spec_decode(self, requests):
-        if not hasattr(mock_should_use_spec_decode, 'call_count'):
-            mock_should_use_spec_decode.call_count = 0
-        mock_should_use_spec_decode.call_count += 1
-        return mock_should_use_spec_decode.call_count <= 2
-
-    with patch(
-            'tensorrt_llm._torch.speculative.model_drafter.ModelDrafter.should_use_spec_decode',
-            side_effect=mock_should_use_spec_decode):
-        llm_spec = LLM(**llm_common_config, speculative_config=spec_config)
-        sampling_params = SamplingParams(max_tokens=128, temperature=0)
-
-        # Output tests
-        prompts = [
-            "The capital of France is",
-            "The president of the United States is",
-        ]
-        sampling_params = SamplingParams(max_tokens=10, temperature=0)
-
-        results_spec = llm_spec.generate(prompts, sampling_params)
-        generated_text_spec = [
-            result.outputs[0].text for result in results_spec
-        ]
-        llm_spec.shutdown()
-=======
     llm_spec = LLM(**llm_common_config, speculative_config=spec_config)
     sampling_params = SamplingParams(max_tokens=128, temperature=0)
 
@@ -145,7 +97,6 @@ def test_dynamic_spec_decode(enforce_single_worker,
         results_spec = llm_spec.generate(prompts, sampling_params)
     generated_text_spec = [result.outputs[0].text for result in results_spec]
     llm_spec.shutdown()
->>>>>>> upstream/main
 
     llm_ref = LLM(**llm_common_config)
     results_ref = llm_ref.generate(prompts, sampling_params)
@@ -157,8 +108,6 @@ def test_dynamic_spec_decode(enforce_single_worker,
         assert text_spec == text_ref
 
 
-<<<<<<< HEAD
-=======
 # This test is a supplement to test_dynamic_spec_decode, because forcing single process will disable people to use SIGINT(ctrl-c) when testing
 # Dynamic spec decode in this test is expected to firstly start with mode OFF
 # then it naturally turns ON when the remaining effective requests is less than self.concurrency.
@@ -283,6 +232,5 @@ def test_should_use_spec_decode():
         active_requests, max_batch_size=8, max_num_tokens=4, max_draft_len=4)
 
 
->>>>>>> upstream/main
 if __name__ == "__main__":
     unittest.main()

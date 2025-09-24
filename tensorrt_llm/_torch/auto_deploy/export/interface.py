@@ -5,11 +5,7 @@ This module defines the base classes and interfaces for all export patches.
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-<<<<<<< HEAD
-from typing import Any, Callable, Dict, List, Type, Union, final
-=======
 from typing import Any, Callable, Dict, List, Optional, Type, Union, final
->>>>>>> upstream/main
 
 from pydantic import BaseModel, Field
 
@@ -187,11 +183,8 @@ class ExportPatchRegistry:
     @classmethod
     def get(cls, name: str) -> Type[BaseExportPatch]:
         """Get a patch class by name."""
-<<<<<<< HEAD
-=======
         if not cls.has(name):
             raise ValueError(f"Unknown patch: {name}")
->>>>>>> upstream/main
         return cls._registry[name]
 
     @classmethod
@@ -221,29 +214,15 @@ class ExportPatchRegistry:
 
 
 @contextmanager
-<<<<<<< HEAD
-def apply_export_patches(patch_configs: Dict[str, Union[ExportPatchConfig, Dict[str, Any]]]):
-=======
 def apply_export_patches(
     patch_configs: Optional[Dict[str, Union[ExportPatchConfig, Dict[str, Any]]]] = None,
     patch_list: Optional[List[str]] = None,
 ):
->>>>>>> upstream/main
     """Context manager to apply multiple patches.
 
     Args:
         patch_configs: Dict mapping patch names to their configurations.
     """
-<<<<<<< HEAD
-    patches = []
-
-    # Create patch instances
-    for name, config in patch_configs.items():
-        if not ExportPatchRegistry.has(name):
-            raise ValueError(f"Unknown patch: {name}")
-        patch = ExportPatchRegistry.create_patch(name, config)
-        patches.append(patch)
-=======
     # Validate that both patch_configs and patch_list are not provided simultaneously
     if patch_configs is not None and patch_list is not None:
         raise ValueError("Cannot specify both patch_configs and patch_list. Use only one.")
@@ -258,7 +237,6 @@ def apply_export_patches(
 
     # Create patch instances
     patches = [ExportPatchRegistry.create_patch(k, conf) for k, conf in patch_configs.items()]
->>>>>>> upstream/main
 
     # Apply patches using nested context managers
     if not patches:

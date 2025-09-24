@@ -1,22 +1,10 @@
 from dataclasses import dataclass, field
 from enum import Enum
-<<<<<<< HEAD
-from typing import List, Optional, Union
-
-import torch
-
-
-class ScaffoldingOutput:
-
-    def __init__(self):
-        self.output_str = None
-=======
 from typing import Dict, List, Optional, Union
 
 import torch
 
 from tensorrt_llm.executor.result import GenerationResult
->>>>>>> upstream/main
 
 
 @dataclass
@@ -44,13 +32,6 @@ class GenerationTask(Task):
     input_str: Optional[str] = None
     skip_tokenizer: bool = False
     skip_detokenizer: bool = False
-<<<<<<< HEAD
-
-    # sampling params
-    max_tokens: Optional[int] = 2048
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
-=======
     streaming: bool = False
 
     # sampling params for openai
@@ -73,7 +54,6 @@ class GenerationTask(Task):
     user: Optional[str] = None
 
     # sampling params
->>>>>>> upstream/main
     top_k: Optional[int] = None
     return_context_logits: Optional[bool] = False
 
@@ -82,13 +62,6 @@ class GenerationTask(Task):
     worker_tag: Union[str, "Controller.WorkerTag"] = None
 
     # result field
-<<<<<<< HEAD
-    output_tokens: List[int] = None
-    output_str: Optional[str] = None
-    cumulative_logprob: Optional[float] = None
-    logprobs: Optional[List[float]] = None
-    context_logits: Optional[torch.Tensor] = None
-=======
     # link to TRTLLM's GenerationResult, for async update in streaming mode
     _result: Optional[GenerationResult] = None
 
@@ -129,7 +102,6 @@ class GenerationTask(Task):
     @property
     def context_logits(self) -> Optional[torch.Tensor]:
         return self._result.context_logits if self._result else None
->>>>>>> upstream/main
 
     @staticmethod
     def create_from_prompt(prompt: str) -> "GenerationTask":
@@ -139,15 +111,8 @@ class GenerationTask(Task):
         task.skip_detokenizer = False
         return task
 
-<<<<<<< HEAD
-    def create_scaffolding_output(self) -> "ScaffoldingOutput":
-        output = ScaffoldingOutput()
-        output.output_str = self.output_str
-        return output
-=======
     def create_scaffolding_output(self) -> GenerationResult:
         return self._result
->>>>>>> upstream/main
 
 
 @dataclass

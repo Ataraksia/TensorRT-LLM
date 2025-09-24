@@ -956,8 +956,6 @@ def get_dummy_spec_decoding_heads(hf_model_dir,
     export_hf_checkpoint(model,
                          dtype=model.config.torch_dtype,
                          export_dir=os.path.join(save_dir, 'fp8'))
-<<<<<<< HEAD
-=======
 
 
 def get_mmlu_accuracy(output):
@@ -978,4 +976,3 @@ def get_mmlu_accuracy(output):
     print(f"MMLU weighted average accuracy is: {mmlu_accuracy}")
 
     return mmlu_accuracy
->>>>>>> upstream/main

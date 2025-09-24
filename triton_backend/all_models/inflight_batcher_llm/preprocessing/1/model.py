@@ -29,21 +29,13 @@ import io
 import json
 import os
 from collections import defaultdict
-<<<<<<< HEAD
-from typing import List
-=======
 from typing import Dict, List, Tuple
->>>>>>> upstream/main
 
 import numpy as np
 import requests
 import triton_python_backend_utils as pb_utils
 from PIL import Image
-<<<<<<< HEAD
-from transformers import AutoProcessor, AutoTokenizer, T5Tokenizer
-=======
 from transformers import AutoConfig, AutoProcessor, AutoTokenizer, T5Tokenizer
->>>>>>> upstream/main
 
 
 class TritonPythonModel:
@@ -144,15 +136,9 @@ class TritonPythonModel:
                 'model_type']
 
             assert self.model_type in [
-<<<<<<< HEAD
-                'llava', 'blip2-opt', 'vila', 'mllama', 'llava_onevision',
-                'qwen2_vl'
-            ], f"[TensorRT-LLM][ERROR] Currently supported multi-modal models are llava, blip2-opt, vila, mllama, llava_onevision and qwen2_vl. Got {self.model_type}."
-=======
                 'llava', 'blip2-opt', 'pixtral', 'vila', 'mllama',
                 'llava_onevision', 'qwen2_vl'
             ], f"[TensorRT-LLM][ERROR] Currently supported multi-modal models are llava, blip2-opt, pixtral, vila, mllama, llava_onevision and qwen2_vl. Got {self.model_type}."
->>>>>>> upstream/main
 
             assert self.model_type != 'llava_onevison' or self.max_num_images is None or self.max_num_images <= 1, f"LLaVA-OneVsion is not support multi image inference currently."
 
@@ -165,12 +151,6 @@ class TritonPythonModel:
                 llm_model_config["pretrained_config"]["vocab_size"])
             self._setup_ptable_shape(llm_model_config)
 
-<<<<<<< HEAD
-            if self.model_type in ['mllama', 'llava_onevision', 'qwen2_vl']:
-                self.vision_preprocessor = VisionPreProcessor(
-                    self.model_type,
-                    AutoProcessor.from_pretrained(tokenizer_dir), model_config)
-=======
             if self.model_type in [
                     'mllama', 'llava_onevision', 'qwen2_vl', 'pixtral'
             ]:
@@ -183,7 +163,6 @@ class TritonPythonModel:
                     model_config,
                     self.hf_config,
                 )
->>>>>>> upstream/main
 
         # Parse model output configs and convert Triton types to numpy types
         output_names = [
@@ -314,13 +293,9 @@ class TritonPythonModel:
                 request, 'VIDEO_BYTES')
             vision_processed_tensors = []
             visual_tokens = []
-<<<<<<< HEAD
-            if self.is_multimodal and (img_urls or image_bytes or video_bytes):
-=======
             # Pixtral supports text-only input
             if self.is_multimodal and (img_urls or image_bytes or video_bytes
                                        or self.model_type == 'pixtral'):
->>>>>>> upstream/main
                 assert self.vision_preprocessor != None, "Vision preprocessor for preparing images before encoding is None"
                 processed_tensors = {}
                 if self.model_type == 'mllama':
@@ -352,8 +327,6 @@ class TritonPythonModel:
                     qwen2vl_input_length_tensor = processed_tensors.get(
                         "REQUEST_INPUT_LEN")
                     processed_tensors.pop("REQUEST_INPUT_LEN")
-<<<<<<< HEAD
-=======
                 elif self.model_type == 'pixtral':
                     image_sizes = pb_utils.get_input_tensor_by_name(
                         request, 'IMAGE_SIZES')
@@ -367,7 +340,6 @@ class TritonPythonModel:
                     request_input_len = np.array(
                         [[len(input_ids_for_batch)]
                          for input_ids_for_batch in pixtral_input_id_tensor])
->>>>>>> upstream/main
                 else:
                     raise ValueError(
                         "Unsupported model type for IMAGE_BYTES or IMAGE_URL inputs"
@@ -381,14 +353,9 @@ class TritonPythonModel:
 
             # Preprocessing input data.
             # For the LLaVA_OneVision model, num_multimodal_features is not a fixed value
-<<<<<<< HEAD
-            input_id, request_input_len = self._create_request(
-                query, visual_tokens)
-=======
             if self.model_type != 'pixtral':
                 input_id, request_input_len = self._create_request(
                     query, visual_tokens)
->>>>>>> upstream/main
             if decoder_query is not None:
                 decoder_input_id, request_decoder_input_len = self._create_request(
                     decoder_query)
@@ -419,8 +386,6 @@ class TritonPythonModel:
                     'INPUT_ID', qwen2vl_input_id_tensor)
                 request_input_len_tensor = pb_utils.Tensor.from_dlpack(
                     'REQUEST_INPUT_LEN', qwen2vl_input_length_tensor)
-<<<<<<< HEAD
-=======
             elif self.model_type == 'pixtral':
                 input_id_tensor = pb_utils.Tensor(
                     'INPUT_ID',
@@ -428,7 +393,6 @@ class TritonPythonModel:
                 request_input_len_tensor = pb_utils.Tensor(
                     'REQUEST_INPUT_LEN',
                     request_input_len.astype(self.request_input_len_dtype))
->>>>>>> upstream/main
             else:
                 input_id_tensor = pb_utils.Tensor(
                     'INPUT_ID', input_id.astype(self.input_id_dtype))
@@ -786,14 +750,10 @@ class VisionPreProcessor:
     def __init__(self,
                  vision_model_type,
                  vision_model_processor,
-<<<<<<< HEAD
-                 preprocessor_model_config={}):
-=======
                  preprocessor_model_config=None,
                  hf_config=None):
         preprocessor_model_config = preprocessor_model_config or {}
 
->>>>>>> upstream/main
         # import libraries that are only relevant for multimodal models
         import torch
         from torch.utils.dlpack import from_dlpack
@@ -841,15 +801,12 @@ class VisionPreProcessor:
         self.vision_model_processor = vision_model_processor
         self.vision_model_type = vision_model_type
 
-<<<<<<< HEAD
-=======
         if vision_model_type == 'pixtral':
             assert hf_config is not None, "Pixtral model requires hf_config to be set"
             self.vocab_size = hf_config.text_config.vocab_size
             self.image_size = hf_config.vision_config.image_size
             self.image_token_index = hf_config.image_token_index
 
->>>>>>> upstream/main
     def load_images_from_urls(self, img_urls):
         images = []
         for img_url in img_urls:
@@ -860,18 +817,11 @@ class VisionPreProcessor:
                 image_data = base64.b64decode(image_base64)
                 # Create a BytesIO object from the decoded data
                 image_buffer = io.BytesIO(image_data)
-<<<<<<< HEAD
-                images.append(Image.open(image_buffer))
-            else:
-                images.append(Image.open(
-                    requests.get(img_url, stream=True).raw))
-=======
                 images.append(Image.open(image_buffer).convert("RGB"))
             else:
                 images.append(
                     Image.open(requests.get(img_url,
                                             stream=True).raw).convert("RGB"))
->>>>>>> upstream/main
         return images
 
     def mllama_process(self, queries, img_urls=None, image_bytes=None):
@@ -970,12 +920,9 @@ class VisionPreProcessor:
                 mode='constant')
             for image in preprocessor_outputs['PIXEL_VALUES']
         ]
-<<<<<<< HEAD
-=======
         # Add a dimension image_sizes to match the dimensions defined in config.pbtxt
         for elem in preprocessor_outputs['IMAGE_SIZES']:
             elem.unsqueeze_(1)
->>>>>>> upstream/main
         for key, tensor_list in preprocessor_outputs.items():
             val = self.convert_tensor_list_to_tensor(tensor_list)
             if key in self.output_str_dtypes:
@@ -1098,8 +1045,6 @@ class VisionPreProcessor:
                     val, self.output_str_dtypes[key])
             vision_processed_tensors[key] = val
         return vision_processed_tensors
-<<<<<<< HEAD
-=======
 
     def pixtral_process(self,
                         queries,
@@ -1227,4 +1172,3 @@ class VisionPreProcessor:
                     replacer += 1
 
         return vision_processed_tensors, visual_tokens
->>>>>>> upstream/main

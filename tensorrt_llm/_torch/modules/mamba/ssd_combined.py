@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# Copyright (c) 2024, Tri Dao, Albert Gu.
-# Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/ssd_combined.py
-=======
 # Adapted from https://github.com/state-spaces/mamba/blob/v2.2.4/mamba_ssm/ops/triton/ssd_combined.py
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 #
@@ -21,29 +17,10 @@
 # limitations under the License.
 
 from typing import Optional
->>>>>>> upstream/main
 
 import torch
 from einops import rearrange
 
-<<<<<<< HEAD
-from .causal_conv1d import causal_conv1d_fwd
-from .ssd_bmm import _bmm_chunk_fwd
-from .ssd_chunk_scan import _chunk_scan_fwd
-from .ssd_chunk_state import _chunk_cumsum_fwd, _chunk_state_fwd
-from .ssd_state_passing import _state_passing_fwd
-
-
-def rearrange_and_update_stride(tensor, pattern=None, dim=2):
-    # ensure tensor.stride(dim) is a multiple of eight after rearranging according to pattern,
-    # if not call contiguous(), rearrange only if pattern is not None
-    tensor_rearranged = rearrange(tensor,
-                                  pattern) if pattern is not None else tensor
-    return (tensor_rearranged.contiguous() if tensor_rearranged.stride(dim) %
-            8 != 0 else tensor_rearranged)
-
-
-=======
 from .ssd_bmm import _bmm_chunk_fwd
 from .ssd_chunk_scan import _chunk_scan_fwd
 from .ssd_chunk_state import (_chunk_cumsum_fwd, _chunk_state_fwd,
@@ -51,7 +28,6 @@ from .ssd_chunk_state import (_chunk_cumsum_fwd, _chunk_state_fwd,
 from .ssd_state_passing import _state_passing_fwd
 
 
->>>>>>> upstream/main
 def _mamba_chunk_scan_combined_fwd(
         x,
         dt,
@@ -64,18 +40,12 @@ def _mamba_chunk_scan_combined_fwd(
         dt_bias=None,
         initial_states=None,
         seq_idx=None,
-<<<<<<< HEAD
-        cu_seqlens=None,
-        dt_softplus=False,
-        dt_limit=(0.0, float("inf")),
-=======
         chunk_indices=None,
         chunk_offsets=None,
         cu_seqlens=None,
         dt_softplus=False,
         dt_limit=(0.0, float("inf")),
         mamba_ssm_cache_dtype=None,
->>>>>>> upstream/main
 ):
     batch, seqlen, nheads, headdim = x.shape
     _, _, ngroups, dstate = B.shape
@@ -104,13 +74,6 @@ def _mamba_chunk_scan_combined_fwd(
     if D is not None and D.stride(-1) != 1:
         D = D.contiguous()
     if initial_states is not None:
-<<<<<<< HEAD
-        assert initial_states.shape == (batch, nheads, headdim, dstate)
-    # # (batch, nchunks, chunk_size, chunk_size) or (batch, nchunks, nheads, chunk_size, chunk_size)
-    # dA_cumsum_tmp0, dt_tmp0 = _chunk_cumsum_fwd(dt[:, :147], A, chunk_size, dt_bias=dt_bias, dt_softplus=dt_softplus)
-    # dA_cumsum_tmp1, dt_tmp1 = _chunk_cumsum_fwd(dt[:, 147:], A, chunk_size, dt_bias=dt_bias, dt_softplus=dt_softplus)
-    # dA_cumsum_tmp2, dt_tmp2 = _chunk_cumsum_fwd(dt[:, 147:256], A, chunk_size, dt_bias=dt_bias, dt_softplus=dt_softplus)
-=======
         if cu_seqlens is None:
             assert initial_states.shape == (batch, nheads, headdim, dstate)
         else:
@@ -128,33 +91,21 @@ def _mamba_chunk_scan_combined_fwd(
 
     # 1. Compute chunked cumsum of A * dt
     # - here dt may go through a softplus activation
->>>>>>> upstream/main
     dA_cumsum, dt = _chunk_cumsum_fwd(dt,
                                       A,
                                       chunk_size,
                                       dt_bias=dt_bias,
                                       dt_softplus=dt_softplus,
                                       dt_limit=dt_limit)
-<<<<<<< HEAD
-=======
 
     # 2. Compute the state for each intra-chunk
     # (right term of low-rank factorization of off-diagonal blocks; B terms)
->>>>>>> upstream/main
     states = _chunk_state_fwd(B,
                               x,
                               dt,
                               dA_cumsum,
                               seq_idx=seq_idx,
                               states_in_fp32=True)
-<<<<<<< HEAD
-    # states_tmp0 = _chunk_state_fwd(B[:, :147], x[:, :147], dt_tmp0, dA_cumsum_tmp0, states_in_fp32=True)
-    # states_tmp1 = _chunk_state_fwd(B[:, 147:], x[:, 147:], dt_tmp1, dA_cumsum_tmp1, states_in_fp32=True)
-    # states_tmp2 = _chunk_state_fwd(B[:, 147:256], x[:, 147:256], dt_tmp2, dA_cumsum_tmp2, states_in_fp32=True)
-    states, final_states = _state_passing_fwd(
-        rearrange(states, "... p n -> ... (p n)"),
-        dA_cumsum[:, :, :, -1],
-=======
 
     # 3. Compute the inter-chunk SSM recurrence; produces correct SSM states at chunk boundaries
     # (middle term of factorization of off-diag blocks; A terms)
@@ -170,37 +121,24 @@ def _mamba_chunk_scan_combined_fwd(
     states, final_states = _state_passing_fwd(
         rearrange(states, "... p n -> ... (p n)"),
         dA_cumsum,
->>>>>>> upstream/main
         initial_states=(rearrange(initial_states, "... p n -> ... (p n)")
                         if initial_states is not None else None),
         seq_idx=seq_idx,
         chunk_size=chunk_size,
-<<<<<<< HEAD
-        out_dtype=C.dtype,
-    )
-=======
         out_dtype=mamba_ssm_cache_dtype or C.dtype,
         is_cont_batched=cu_seqlens is not None,
         chunk_offsets=chunk_offsets)
->>>>>>> upstream/main
     states, final_states = [
         rearrange(t, "... (p n) -> ... p n", n=dstate)
         for t in [states, final_states]
     ]
-<<<<<<< HEAD
-    # states_tmp0 = rearrange(_state_passing_fwd(rearrange(states_tmp0, "... p n -> ... (p n)"), dA_cumsum_tmp0[:, :, :, -1], chunk_size=chunk_size), "... (p n) -> ... p n", n=dstate)
-    # states_tmp1 = rearrange(_state_passing_fwd(rearrange(states_tmp1, "... p n -> ... (p n)"), dA_cumsum_tmp1[:, :, :, -1], chunk_size=chunk_size), "... (p n) -> ... p n", n=dstate)
-=======
 
     # 4. Compute batched matrix multiply for C_j^T B_i terms
->>>>>>> upstream/main
     CB = _bmm_chunk_fwd(C,
                         B,
                         chunk_size,
                         seq_idx=seq_idx,
                         output_dtype=torch.float32)
-<<<<<<< HEAD
-=======
 
     # 5. Scan and compute the diagonal blocks, taking into
     #    account past causal states.
@@ -212,7 +150,6 @@ def _mamba_chunk_scan_combined_fwd(
     # - in each (pseudo) chunk, we detect if the previous (pseudo) chunk had
     #   a seq_idx change, in which case we take states information from
     #   init_states.
->>>>>>> upstream/main
     out, out_x = _chunk_scan_fwd(CB,
                                  x,
                                  dt,
@@ -221,14 +158,10 @@ def _mamba_chunk_scan_combined_fwd(
                                  states,
                                  D=D,
                                  z=z,
-<<<<<<< HEAD
-                                 seq_idx=seq_idx)
-=======
                                  seq_idx=seq_idx,
                                  chunk_indices=chunk_indices,
                                  chunk_offsets=chunk_offsets,
                                  initial_states=initial_states)
->>>>>>> upstream/main
     if cu_seqlens is None:
         return out, out_x, dt, dA_cumsum, states, final_states
     else:
@@ -242,89 +175,11 @@ def _mamba_chunk_scan_combined_fwd(
             dA_cumsum.squeeze(0),
             cu_seqlens,
             states.squeeze(0),
-<<<<<<< HEAD
-=======
             initial_states=initial_states,
->>>>>>> upstream/main
         )
         return out, out_x, dt, dA_cumsum, states, final_states, varlen_states
 
 
-<<<<<<< HEAD
-def mamba_split_conv1d_scan_combined(
-    zxbcdt,
-    conv1d_weight,
-    conv1d_bias,
-    dt_bias,
-    A,
-    D,
-    chunk_size,
-    initial_states=None,
-    return_final_states=False,
-    activation="silu",
-    headdim=None,
-    ngroups=1,
-    norm_before_gate=True,
-):
-    assert activation in [None, "silu", "swish"]
-    if D.dim() == 1:
-        assert headdim is not None
-        (nheads, ) = D.shape
-    else:
-        nheads, headdim = D.shape
-    batch, seqlen, _ = zxbcdt.shape
-    dim = nheads * headdim
-    assert nheads % ngroups == 0
-    dstate = (conv1d_weight.shape[0] - dim) // ngroups // 2
-    d_nonssm = (zxbcdt.shape[-1] - 2 * dim - 2 * ngroups * dstate - nheads) // 2
-    assert d_nonssm >= 0
-    assert zxbcdt.shape == (
-        batch,
-        seqlen,
-        2 * d_nonssm + 2 * dim + 2 * ngroups * dstate + nheads,
-    )
-    assert dt_bias.shape == (nheads, )
-    assert A.shape == (nheads, )
-    zx0, z, xBC, dt = torch.split(
-        zxbcdt, [2 * d_nonssm, dim, dim + ngroups * dstate * 2, nheads], dim=-1)
-
-    xBC_conv = rearrange(
-        causal_conv1d_fwd(
-            rearrange_and_update_stride(xBC, "b s d -> b d s"),
-            conv1d_weight,
-            conv1d_bias,
-        ),
-        "b d s -> b s d",
-    )
-    x, B, C = torch.split(xBC_conv, [dim, ngroups * dstate, ngroups * dstate],
-                          dim=-1)
-    x = rearrange(x, "b l (h p) -> b l h p", h=nheads)
-    B = rearrange(B, "b l (g n) -> b l g n", g=ngroups)
-    C = rearrange(C, "b l (g n) -> b l g n", g=ngroups)
-    z = rearrange(z, "b l (h p) -> b l h p",
-                  h=nheads) if z is not None else None
-
-    out, out_x, dt_out, dA_cumsum, states, final_states = (
-        _mamba_chunk_scan_combined_fwd(
-            x,
-            dt,
-            A,
-            B,
-            C,
-            chunk_size=chunk_size,
-            D=D,
-            z=z,
-            dt_bias=dt_bias,
-            initial_states=initial_states,
-            dt_softplus=True,
-        ))
-    out = rearrange(out, "b s h p -> b s (h p)")
-
-    if d_nonssm > 0:
-        out = torch.cat([_swiglu_fwd(zx0), out], dim=-1)
-
-    return out if not return_final_states else (out, final_states)
-=======
 def mamba_chunk_scan_combined(
         x,
         dt,
@@ -395,4 +250,3 @@ def mamba_chunk_scan_combined(
                 varlen_states) if not return_final_states else (out,
                                                                 final_states,
                                                                 varlen_states)
->>>>>>> upstream/main

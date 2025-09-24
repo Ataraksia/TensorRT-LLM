@@ -19,11 +19,7 @@ from tensorrt_llm._torch.auto_deploy.utils.node_utils import is_op
         ),
         pytest.param(
             "NVFP4",
-<<<<<<< HEAD
-            torch.ops.auto_deploy.torch_quant_fp4_moe,
-=======
             torch.ops.auto_deploy.torch_quant_nvfp4_moe,
->>>>>>> upstream/main
             marks=pytest.mark.skipif(
                 not (fp4_compatible() and trtllm_ops_available()), reason="Requires FP4 + TRTLLM"
             ),
@@ -71,14 +67,10 @@ def test_quantize_moe_transformation(quant_algo, expected_op):
     gm_transformed = InferenceOptimizer(
         FakeFactory(quant_config=quant_config),
         {
-<<<<<<< HEAD
-            "quantize_moe": {
-=======
             "quantize_fp8_moe": {
                 "stage": "pattern_matcher",
             },
             "quantize_nvfp4_moe": {
->>>>>>> upstream/main
                 "stage": "pattern_matcher",
             },
         },

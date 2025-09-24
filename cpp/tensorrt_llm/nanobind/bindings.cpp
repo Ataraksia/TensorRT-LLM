@@ -19,10 +19,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/operators.h>
 #include <nanobind/stl/bind_vector.h>
-<<<<<<< HEAD
-=======
 #include <nanobind/stl/chrono.h>
->>>>>>> upstream/main
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/shared_ptr.h>
@@ -41,10 +38,7 @@
 #include "tensorrt_llm/nanobind/batch_manager/kvCacheConnector.h"
 #include "tensorrt_llm/nanobind/batch_manager/kvCacheManager.h"
 #include "tensorrt_llm/nanobind/batch_manager/llmRequest.h"
-<<<<<<< HEAD
-=======
 #include "tensorrt_llm/nanobind/common/tllmExceptions.h"
->>>>>>> upstream/main
 #include "tensorrt_llm/nanobind/executor/bindings.h"
 #include "tensorrt_llm/nanobind/runtime/bindings.h"
 #include "tensorrt_llm/nanobind/testing/modelSpecBinding.h"
@@ -135,17 +129,11 @@ NB_MODULE(TRTLLM_NB_MODULE, m)
     auto mInternalTesting = mInternal.def_submodule("testing", "Testing internal bindings");
     auto mInternalBatchManager = mInternal.def_submodule("batch_manager", "Batch manager internal bindings");
     auto mInternalThop = mInternal.def_submodule("thop", "Torch op internal bindings");
-<<<<<<< HEAD
-
-    tensorrt_llm::nanobind::executor::initBindings(mExecutor);
-    tensorrt_llm::nanobind::runtime::initBindingsEarly(mInternalRuntime);
-=======
     auto mExceptions = m.def_submodule("exceptions", "Exceptions internal bindings");
 
     tensorrt_llm::nanobind::executor::initBindings(mExecutor);
     tensorrt_llm::nanobind::runtime::initBindingsEarly(mInternalRuntime);
     tensorrt_llm::nanobind::common::initExceptionsBindings(mExceptions);
->>>>>>> upstream/main
     tensorrt_llm::nanobind::thop::initBindings(mInternalThop);
 
     auto buildInfo = m.def_submodule("BuildInfo");
@@ -487,12 +475,8 @@ NB_MODULE(TRTLLM_NB_MODULE, m)
         .value("DISAGG_CONTEXT_COMPLETE", tb::LlmRequestState::kDISAGG_CONTEXT_COMPLETE)
         .value("DISAGG_GENERATION_TRANS_IN_PROGRESS", tb::LlmRequestState::kDISAGG_GENERATION_TRANS_IN_PROGRESS)
         .value("DISAGG_GENERATION_TRANS_COMPLETE", tb::LlmRequestState::kDISAGG_GENERATION_TRANS_COMPLETE)
-<<<<<<< HEAD
-        .value("DISAGG_CONTEXT_INIT_AND_TRANS", tb::LlmRequestState::kDISAGG_CONTEXT_INIT_AND_TRANS);
-=======
         .value("DISAGG_CONTEXT_INIT_AND_TRANS", tb::LlmRequestState::kDISAGG_CONTEXT_INIT_AND_TRANS)
         .value("DISAGG_TRANS_ERROR", tb::LlmRequestState::kDISAGG_TRANS_ERROR);
->>>>>>> upstream/main
 
     nb::class_<tr::MemoryCounters>(m, "MemoryCounters")
         .def_static("instance", &tr::MemoryCounters::getInstance, nb::rv_policy::reference)
@@ -528,9 +512,6 @@ NB_MODULE(TRTLLM_NB_MODULE, m)
     m.def("ipc_nvls_allocate", &tr::ipcNvlsAllocate, nb::rv_policy::reference);
     m.def("ipc_nvls_free", &tr::ipcNvlsFree);
     m.def("ipc_nvls_supported", &tr::ipcNvlsSupported);
-<<<<<<< HEAD
-=======
 
     m.def("steady_clock_now", []() { return std::chrono::steady_clock::now(); });
->>>>>>> upstream/main
 }

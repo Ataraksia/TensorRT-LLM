@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 import contextlib
->>>>>>> upstream/main
 from typing import Callable, List, Union
 
 import torch
@@ -34,26 +31,14 @@ def is_call_function(node: Node, target: Union[List[Callable], Callable]):
         return node.op == "call_function" and node.target == target
 
 
-<<<<<<< HEAD
-_enable_piecewise_cuda_graph_capture = True
-
-
-def set_enable_piecewise_cuda_graph_capture_flag(enable: bool):
-=======
 _enable_piecewise_cuda_graph_capture = False
 
 
 def set_capture_piecewise_cuda_graph_flag(enable: bool):
->>>>>>> upstream/main
     global _enable_piecewise_cuda_graph_capture
     _enable_piecewise_cuda_graph_capture = enable
 
 
-<<<<<<< HEAD
-def get_enable_piecewise_cuda_graph_capture_flag() -> bool:
-    global _enable_piecewise_cuda_graph_capture
-    return _enable_piecewise_cuda_graph_capture
-=======
 def get_capture_piecewise_cuda_graph_flag() -> bool:
     global _enable_piecewise_cuda_graph_capture
     return _enable_piecewise_cuda_graph_capture
@@ -94,4 +79,3 @@ def inplace_info():
         }
     }
     return inplace_map
->>>>>>> upstream/main

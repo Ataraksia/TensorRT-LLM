@@ -1,39 +1,19 @@
 """A demo LLM api to for debugging and testing purposes of e2e workflows."""
 
 import gc
-<<<<<<< HEAD
-import types
-from pathlib import Path
-from queue import Empty
-from typing import Any, Callable, List, Literal, Optional, Tuple, Union
-
-import torch
-import torch.multiprocessing as mp
-from transformers import PreTrainedTokenizerBase
-=======
 from collections import defaultdict
 from queue import Empty
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch.multiprocessing as mp
->>>>>>> upstream/main
 
 from ....executor import GenerationExecutor
 from ....executor.request import GenerationRequest
 from ....executor.result import CompletionOutput, GenerationResult
-<<<<<<< HEAD
-from ....inputs.registry import create_input_processor
-from ....llmapi.llm import LLM, RequestOutput
-from ....llmapi.llm_utils import LlmArgs
-from ....llmapi.tokenizer import TokenizerBase
-from ....sampling_params import SamplingParams
-from ..custom_ops.attention_interface import SequenceInfo
-=======
 from ....inputs.multimodal import MultimodalParams
 from ....sampling_params import SamplingParams
 from ...pyexecutor.sampler import greedy_search_sampling_batch, top_k_sampling_batch
->>>>>>> upstream/main
 from ..distributed import common as dist_ad
 from ..utils.logger import ad_logger
 from .ad_executor import ADEngine
@@ -51,20 +31,6 @@ class DemoEngine(ADEngine):
     """
 
     @torch.inference_mode()
-<<<<<<< HEAD
-    def __init__(
-        self,
-        get_inference_model,
-        seq_info,
-        device,
-    ) -> None:
-        super().__init__(get_inference_model, seq_info, device)
-        self.queue = mp.Queue()
-
-    @torch.inference_mode()
-    def __call__(self, requests: GenerationRequest) -> mp.Queue:
-        """Generate tokens and put the results in a queue and return the queue."""
-=======
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.queue = mp.Queue()
@@ -75,7 +41,6 @@ class DemoEngine(ADEngine):
     ) -> mp.Queue:
         """Generate tokens and put the results in a queue and return the queue."""
         requests.multimodal_params = multimodal_params
->>>>>>> upstream/main
         output = self.generate_tokens_batched([requests])[0]
         self.queue.put(output)
         return self.queue
@@ -85,11 +50,7 @@ class DemoEngine(ADEngine):
         self.queue.close()
         self.queue.join_thread()
 
-<<<<<<< HEAD
-    def _assign_pages(self) -> List[List[int]]:
-=======
     def _assign_pages(self, total_lens: List[int]) -> List[List[int]]:
->>>>>>> upstream/main
         """A simple heuristic to assign pages based on current sequence info.
 
         In a nutshell, we will look at the following information to update the page assignments:
@@ -111,10 +72,6 @@ class DemoEngine(ADEngine):
         unassigned page if needed.
         """
         si = self.cache_seq_interface.info
-<<<<<<< HEAD
-        total_lens = [s_l + i_p for s_l, i_p in zip(si.sequence_lengths, si.input_positions)]
-=======
->>>>>>> upstream/main
         page_assignments = si.page_assignments
 
         free_pages = set(range(si.num_pages)) - {i for pages in page_assignments for i in pages}
@@ -123,11 +80,7 @@ class DemoEngine(ADEngine):
             extra_tokens = t_l - len(pages) * si.page_size
             num_extra_pages = (extra_tokens // si.page_size) + (extra_tokens > 0)
             updated_assignments.append(pages + [free_pages.pop() for _ in range(num_extra_pages)])
-<<<<<<< HEAD
-        si.assign_cache_loc(updated_assignments)
-=======
         return updated_assignments
->>>>>>> upstream/main
 
     def generate_tokens_batched(
         self, requests: List[GenerationRequest]
@@ -142,12 +95,6 @@ class DemoEngine(ADEngine):
         )
         assert sampling_params.best_of == 1, "Best-of is not supported."
 
-<<<<<<< HEAD
-        # set up sequence info object
-        sequence_info = self.cache_seq_interface.info
-        sequence_info.reset()
-        sequence_info.nest_sequences([r.prompt_token_ids for r in requests])
-=======
         # set up sequence info object for decode phase
         sequence_info = self.cache_seq_interface.info
 
@@ -169,42 +116,26 @@ class DemoEngine(ADEngine):
             page_assignments=self._assign_pages(total_lens),
             **extra_args,
         )
->>>>>>> upstream/main
 
         # setup objects we want to track for the output
         batch_size = sequence_info.num_sequences
         new_tokens = [[] for _ in range(batch_size)]  # [batch_size][max_seq_len]
         stop_tokens = sampling_params._get_stop_words()
-<<<<<<< HEAD
-=======
         # NOTE: TRTLLM has made the intentional choice to separate `end_id` from `stop_words`, and not
         # include the former in the latter's corresponding stop IDs. From a UX perspective, `stop_words`
         # are optional, and can be customized per user requests, whereas `end_id` is static per model,
         # and should always be used outside of benchmarking.
         stop_tokens.append([sampling_params.end_id])
->>>>>>> upstream/main
         idxs_stop = [sampling_params.max_tokens - 1] * batch_size
         gen_logits = [] if sampling_params.return_generation_logits else None
         context_logits: Optional[List[torch.Tensor]] = None
 
         def _generate_single_step(idx: int):
-<<<<<<< HEAD
-            # assign pages
-            self._assign_pages()
-
-            # get the logits and then last token logits in each sequence ([b, 1, vocab_size])
-=======
->>>>>>> upstream/main
             logits = self._compute_logits()
             logits_last = torch.stack([l_one_seq[-1] for l_one_seq in logits]).float().unsqueeze(1)
 
             token_ids, _ = self._decode_tokens(logits_last, sampling_params)  # [b,1]
 
-<<<<<<< HEAD
-            # update sequence info accordingly for next step
-            sequence_info.update_pos(sequence_info.sequence_lengths)
-            sequence_info.nest_sequences(token_ids)
-=======
             # update sequence info accordingly for next step (generate phase)
             input_pos_next = sequence_info.input_pos
             seq_lens_current = sequence_info.seq_len
@@ -215,7 +146,6 @@ class DemoEngine(ADEngine):
                 input_pos=input_pos_next,
                 page_assignments=self._assign_pages(total_lens_next),
             )
->>>>>>> upstream/main
 
             # nest new tokens and run stop check
             for b, (new_tokens_b, new_id) in enumerate(zip(new_tokens, token_ids)):
@@ -301,13 +231,6 @@ class DemoEngine(ADEngine):
     def _sample(
         cls, logits: torch.Tensor, sampling_params: SamplingParams
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-<<<<<<< HEAD
-        probs = cls._logits_to_probs(
-            logits, sampling_params.temperature, sampling_params.top_k
-        )  # [*logits.shape]
-        # idx_next shape is [*logits.shape[:-1]]
-        idx_next = cls._multinomial_sample_one_no_sync(probs)
-=======
         logits_shape = logits.shape
         logits = logits.view(-1, logits_shape[-1])  # sampling_batch expects 2D logits
         if isinstance(sampling_params.top_k, int):
@@ -315,20 +238,12 @@ class DemoEngine(ADEngine):
         else:
             idx_next, probs = greedy_search_sampling_batch(logits)
         idx_next = idx_next.view(logits_shape[:-1])
->>>>>>> upstream/main
         return idx_next, probs
 
     def _decode_tokens(
         self, logits_last: torch.Tensor, sampling_params: SamplingParams
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Returns a sampled token per input sequence and associating probability."""
-<<<<<<< HEAD
-        if sampling_params.top_k == 1:  # greedy decoding
-            # idx_next is the index of the max logit for each sequence
-            idx_next = logits_last.argmax(dim=-1, keepdim=False)
-            return idx_next, logits_last.squeeze(-1)
-=======
->>>>>>> upstream/main
         # run sampling
         return self._sample(logits_last, sampling_params)
 
@@ -369,10 +284,7 @@ class DemoGenerationExecutor(GenerationExecutor):
         def _unpack(inputs) -> GenerationRequest:
             args, kwargs = inputs  # unpack the inputs
             request: GenerationRequest = args[0]
-<<<<<<< HEAD
-=======
             request.multimodal_params: Optional[MultimodalParams] = args[1]
->>>>>>> upstream/main
             return request
 
         engine = DemoEngine.build_from_config(**engine_kwargs)
@@ -427,109 +339,13 @@ class DemoGenerationExecutor(GenerationExecutor):
             request.set_id(client_id)
 
         # submit request to our demo engine and store results
-<<<<<<< HEAD
-        result = GenerationResult(request)
-        result.queue = self.engine_executor(request)
-=======
         # NOTE: when returning from this function, the reference request.multimodal_params will
         # be cleared immediately. So we pass it in explicitly to maintain a reference even when
         # requests get submitted asynchronously.
         result = GenerationResult(request)
         result.queue = self.engine_executor(request, request.multimodal_params)
->>>>>>> upstream/main
 
         return result
 
     def abort_request(self, client_id: int) -> None:
         ad_logger.warning(f"Abort request is not supported in the demo executor: {client_id=}")
-<<<<<<< HEAD
-
-
-class DemoLLM(LLM):
-    """A simple LLM class to demo the LLM interface while debugging the e2e workflow.
-
-    This is a very simple implementation of an LLM class that can be hacked and used for debugging.
-    """
-
-    def __init__(
-        self,
-        model: str,
-        tokenizer: Optional[Union[str, Path, TokenizerBase, PreTrainedTokenizerBase]] = None,
-        tokenizer_mode: Literal["auto", "slow"] = "auto",
-        skip_tokenizer_init: bool = False,
-        trust_remote_code: bool = False,
-        tensor_parallel_size: int = 1,
-        dtype: str = "auto",
-        revision: Optional[str] = None,
-        tokenizer_revision: Optional[str] = None,
-        **kwargs: Any,
-    ):
-        try:
-            self.pytorch_backend_config = kwargs.pop("pytorch_backend_config", None)
-            self.args = LlmArgs.from_kwargs(
-                model=model,
-                tokenizer=tokenizer,
-                tokenizer_mode=tokenizer_mode,
-                skip_tokenizer_init=skip_tokenizer_init,
-                trust_remote_code=trust_remote_code,
-                tensor_parallel_size=tensor_parallel_size,
-                dtype=dtype,
-                revision=revision,
-                tokenizer_revision=tokenizer_revision,
-                **kwargs,
-            )
-
-        except Exception as e:
-            ad_logger.error(f"Failed to parse the arguments for the LLM constructor: {e}")
-            raise e
-        self.mpi_session = None
-        self.runtime_context = None
-        self._tokenizer = self._try_load_tokenizer()
-        self.input_processor = create_input_processor(None, self.tokenizer)
-
-        # construct sequence info object
-        seq_info = SequenceInfo(
-            max_seq_len=self.args.build_config.max_seq_len,
-            max_batch_size=self.args.build_config.max_batch_size,
-            page_size=self.args.build_config.plugin_config.tokens_per_block,
-        )
-
-        # construct demo executor + engine
-        self._executor = DemoGenerationExecutor(
-            world_size=tensor_parallel_size,
-            tokenizer=self.tokenizer,
-            model=model,
-            ad_config=self.pytorch_backend_config,
-            seq_info=seq_info,
-            device="cuda",
-        )
-
-    def __del__(self):
-        """Ensure proper cleanup of distributed resources."""
-        if hasattr(self, "_executor") and self._executor is not None:
-            self._executor.shutdown()
-        # Call cleanup to ensure process group is properly destroyed
-        dist_ad.cleanup()
-
-    @staticmethod
-    def _handle_response(request_output: RequestOutput, response: List[CompletionOutput]):
-        request_output._done = True
-        gen_request = request_output._generation_request
-        for i, out in enumerate(response):
-            out.text = request_output.tokenizer.decode(
-                out.token_ids,
-                skip_special_tokens=gen_request.sampling_params.skip_special_tokens,
-                spaces_between_special_tokens=gen_request.sampling_params.spaces_between_special_tokens,
-            )
-            request_output._context_logits = out._postprocess_result["context_logits"]
-            request_output._outputs[i] = out
-
-    def generate_async(self, *args, **kwargs) -> RequestOutput:
-        request_output = super().generate_async(*args, **kwargs)
-
-        # patch the handle_output method for our use case
-        request_output._handle_response = types.MethodType(self._handle_response, request_output)
-
-        return request_output
-=======
->>>>>>> upstream/main

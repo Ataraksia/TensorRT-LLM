@@ -18,10 +18,7 @@
 #include "tensorrt_llm/common/assert.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/common/memoryUtils.h"
-<<<<<<< HEAD
-=======
 #include "tensorrt_llm/executor/transferAgent.h"
->>>>>>> upstream/main
 #include "tensorrt_llm/executor/types.h"
 #include "tensorrt_llm/kernels/kvCacheIndex.h"
 #include "tensorrt_llm/kernels/kvCacheUtils.h"
@@ -36,10 +33,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
-<<<<<<< HEAD
-=======
 #include <filesystem>
->>>>>>> upstream/main
 #include <memory>
 #include <set>
 #include <thread>
@@ -53,10 +47,7 @@ namespace tk = tensorrt_llm::kernels;
 namespace tlk = tensorrt_llm::batch_manager::kv_cache_manager;
 namespace tle = tensorrt_llm::executor;
 namespace tr = tensorrt_llm::runtime;
-<<<<<<< HEAD
-=======
 namespace fs = std::filesystem;
->>>>>>> upstream/main
 
 using BlocksPerWindow = std::map<SizeType32, std::tuple<SizeType32, SizeType32>>;
 
@@ -194,9 +185,6 @@ TEST_F(KVCacheManagerTest, BlockManagerTest)
         std::runtime_error);
 }
 
-<<<<<<< HEAD
-template <typename T, nvinfer1::DataType type, int mask>
-=======
 template <typename T>
 void writePatternToOffloadedBlocksDRAM(T* rawBlockPtr, int blockSize, int mask)
 {
@@ -230,7 +218,6 @@ void writePatternToOffloadedBlocksGDS(
 }
 
 template <typename T, nvinfer1::DataType type, int mask, KvCacheTransferMode transferMode>
->>>>>>> upstream/main
 void runPartialCopyTest()
 {
     auto constexpr numLayers = 12;
@@ -250,8 +237,6 @@ void runPartialCopyTest()
     auto constexpr maxAttentionWindowAllLayer = 4096;
     auto constexpr sinkTokenLen = 0;
     auto constexpr canUseOneMoreBlock = true;
-<<<<<<< HEAD
-=======
     std::string directory = "";
     static int file_num = 0;
 
@@ -262,7 +247,6 @@ void runPartialCopyTest()
         fs::create_directories(dirPath);
         directory = dirPath.string();
     }
->>>>>>> upstream/main
 
     SizeType32 constexpr maxNewTokens{0};
     auto constexpr beamWidth = 1;
@@ -317,11 +301,7 @@ void runPartialCopyTest()
         auto block = blockManager.getBlockById(cacheBlockId, maxAttentionWindow);
         EXPECT_TRUE(block->isPrimary());
         // offload so we can write to block in CPU code
-<<<<<<< HEAD
-        blockManager.offloadBlock(block, maxAttentionWindow);
-=======
         blockManager.offloadBlock(block, maxAttentionWindow, transferMode, directory);
->>>>>>> upstream/main
         EXPECT_FALSE(block->isPrimary());
         // need to sync so D2H transfer is done before accessing blocks
         EXPECT_EQ(cudaDeviceSynchronize(), cudaSuccess);
@@ -329,14 +309,6 @@ void runPartialCopyTest()
         auto memoryPoolIndex = block->getMemoryPoolBlockIndex();
         auto blockPtr{tr::ITensor::slice(secondaryPoolPtr, memoryPoolIndex, 1)};
         auto rawBlockPtr = reinterpret_cast<T*>(blockPtr->data());
-<<<<<<< HEAD
-        for (int i = 0; i < blockSize; ++i)
-        {
-            rawBlockPtr[i] = i & mask;
-        }
-        // onboard
-        blockManager.onboardBlock(block, maxAttentionWindow);
-=======
         // Write value
         if constexpr (transferMode == KvCacheTransferMode::DRAM)
         {
@@ -350,7 +322,6 @@ void runPartialCopyTest()
         }
         // onboard
         blockManager.onboardBlock(block, maxAttentionWindow, transferMode, directory);
->>>>>>> upstream/main
         EXPECT_TRUE(block->isPrimary());
         EXPECT_EQ(cudaDeviceSynchronize(), cudaSuccess);
         EXPECT_TRUE(blockManager.verifyQueueIntegrity(maxAttentionWindow));
@@ -425,115 +396,72 @@ void runPartialCopyTest()
         }
     }
     EXPECT_EQ(numBad, 0);
-<<<<<<< HEAD
-    blockManager.onboardBlock(block2, maxAttentionWindow);
-=======
     blockManager.onboardBlock(block2, maxAttentionWindow, transferMode, directory);
->>>>>>> upstream/main
     EXPECT_TRUE(block2->isPrimary());
     EXPECT_EQ(cudaDeviceSynchronize(), cudaSuccess);
 
     blockManager.releaseBlocks(seq1, llmRequest1);
     blockManager.releaseBlocks(seq2, llmRequest2);
-<<<<<<< HEAD
-=======
 
     if constexpr (transferMode == KvCacheTransferMode::GDS)
         fs::remove_all(directory);
->>>>>>> upstream/main
 }
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyINT64)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint64_t, nvinfer1::DataType::kINT64, -1>();
-=======
     runPartialCopyTest<std::uint64_t, nvinfer1::DataType::kINT64, -1, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint64_t, nvinfer1::DataType::kINT64, -1, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyINT32)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint32_t, nvinfer1::DataType::kINT32, -1>();
-=======
     runPartialCopyTest<std::uint32_t, nvinfer1::DataType::kINT32, -1, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint32_t, nvinfer1::DataType::kINT32, -1, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyFLOAT)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint32_t, nvinfer1::DataType::kFLOAT, -1>();
-=======
     runPartialCopyTest<std::uint32_t, nvinfer1::DataType::kFLOAT, -1, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint32_t, nvinfer1::DataType::kFLOAT, -1, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 #ifdef ENABLE_BF16
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyBF16)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint16_t, nvinfer1::DataType::kBF16, 65535>();
-=======
     runPartialCopyTest<std::uint16_t, nvinfer1::DataType::kBF16, 65535, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint16_t, nvinfer1::DataType::kBF16, 65535, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 #endif
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyHALF)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint16_t, nvinfer1::DataType::kHALF, 65535>();
-=======
     runPartialCopyTest<std::uint16_t, nvinfer1::DataType::kHALF, 65535, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint16_t, nvinfer1::DataType::kHALF, 65535, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyBOOL)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kBOOL, 255>();
-=======
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kBOOL, 255, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kBOOL, 255, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyUINT8)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kUINT8, 255>();
-=======
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kUINT8, 255, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kUINT8, 255, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyINT8)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kINT8, 255>();
-=======
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kINT8, 255, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kINT8, 255, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 
 #ifdef ENABLE_FP8
 TEST_F(KVCacheManagerTest, BlockManagerTestPartialCopyFP8)
 {
-<<<<<<< HEAD
-    runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kFP8, 255>();
-=======
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kFP8, 255, KvCacheTransferMode::DRAM>();
     runPartialCopyTest<std::uint8_t, nvinfer1::DataType::kFP8, 255, KvCacheTransferMode::GDS>();
->>>>>>> upstream/main
 }
 #endif
 
@@ -1822,8 +1750,6 @@ TEST_F(KVCacheManagerTest, BlockManagerReuseWithExtraIdAndLoraTaskIdTest)
     EXPECT_EQ(blockManager.getNumFreeBlocks(), blocksInPrimaryPool);
 }
 
-<<<<<<< HEAD
-=======
 TEST_F(KVCacheManagerTest, BlockManagerReuseWithCacheSaltIdTest)
 {
     // Test that cache_salt_id prevents KV cache reuse between requests with same tokens
@@ -2025,7 +1951,6 @@ TEST_F(KVCacheManagerTest, BlockManagerReuseWithCacheSaltIdTest)
     EXPECT_EQ(blockManager.getNumFreeBlocks(), blocksInPrimaryPool);
 }
 
->>>>>>> upstream/main
 TEST_F(KVCacheManagerTest, KVCacheManagerPerRequestStatsTest)
 {
     auto constexpr numLayers = 12;

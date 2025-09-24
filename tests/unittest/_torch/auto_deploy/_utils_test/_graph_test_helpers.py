@@ -1,9 +1,5 @@
 import copy
-<<<<<<< HEAD
-from typing import Callable, Dict, List, Optional
-=======
 from typing import Any, Callable, Dict, List, Optional, Sequence
->>>>>>> upstream/main
 
 import numpy as np
 import torch
@@ -43,21 +39,6 @@ class FakeFactory(ModelFactory):
 
 
 class SequenceEmbeddingInfo(SequenceInfo):
-<<<<<<< HEAD
-    hidden_size: int
-    dtype: torch.dtype
-
-    def set_example_sequence(self) -> None:
-        super().set_example_sequence()
-        # set input ids to a 3D tensor (actually input embeddings)
-        self.input_ids = torch.rand(
-            *self.input_ids.shape,
-            self.hidden_size,
-            device=self.input_ids.device,
-            dtype=self.dtype,
-        )
-
-=======
     """A sequence info object for testing that replaces the input_ids with an embedding tensor.
 
     This is useful to run tests without the tokenizer in the loop.
@@ -97,7 +78,6 @@ class SequenceEmbeddingInfo(SequenceInfo):
 
         super().nest_sequences(input_embeds, *args, **kwargs)
 
->>>>>>> upstream/main
 
 def count_parameters(model: torch.nn.Module):
     for n, p in model.named_parameters():
@@ -284,10 +264,7 @@ def run_sharding_pattern_detection_test(
     # Convert to sets for unordered comparison
     detected_set = set(detected_transformations)
     expected_set = set(expected_transformations)
-<<<<<<< HEAD
-=======
     print("detected_set", detected_set)
     print("expected_set", expected_set)
->>>>>>> upstream/main
 
     assert detected_set == expected_set, "Expected sharding pattern does not match detected pattern"

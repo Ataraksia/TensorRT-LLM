@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 from itertools import chain
->>>>>>> upstream/main
 from typing import List
 
 import torch
@@ -20,15 +17,9 @@ class HandleLogits:
         context_requests: List[LlmRequest],
         generation_requests: List[LlmRequest],
         logits: torch.Tensor,
-<<<<<<< HEAD
-        num_context_logits_prefix_sum: List[int],
-        max_num_sequences: int,
-        beam_width: int,
-=======
         beam_width: int,
         num_context_logits_prefix_sum: list[int],
         is_generation_model: bool,
->>>>>>> upstream/main
     ):
         """Handles context and generation logits for a batch of requests.
 
@@ -36,12 +27,6 @@ class HandleLogits:
             context_requests: List of context requests to process
             generation_requests: List of generation requests to process
             logits: Input logits tensor
-<<<<<<< HEAD
-            num_context_logits_prefix_sum: Prefix sum of context logits for each request
-            max_num_sequences: Maximum number of sequences to process
-            beam_width: Beam width for the generation requests
-        """
-=======
             beam_width: Beam width for the generation requests
             num_context_logits_prefix_sum: Prefix sum of the logits
             is_generation_model: Bool containing whether the model is generation or not
@@ -60,7 +45,6 @@ class HandleLogits:
                 llm_req.py_result.append_context_logits(logits_temp)
             return
 
->>>>>>> upstream/main
         # Copy logits into decoderBuffers.logits
         for batch_index, llm_req in enumerate(context_requests):
             logits_begin = num_context_logits_prefix_sum[batch_index]

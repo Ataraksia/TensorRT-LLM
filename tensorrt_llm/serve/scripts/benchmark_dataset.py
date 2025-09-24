@@ -494,13 +494,6 @@ class RandomDataset(BenchmarkDataset):
 
             # Filter out sequences that are too long or too short
             requests = []
-<<<<<<< HEAD
-            for prompt, initial_prompt_len, cached_token_ids in zip(
-                    dataset, prompt_lengths, prompt_token_ids):
-                i = len(requests)
-                if i == num_requests:
-                    break
-=======
             dataset_len = len(dataset)
 
             for i in range(num_requests):
@@ -509,7 +502,6 @@ class RandomDataset(BenchmarkDataset):
                 prompt = dataset[dataset_idx]
                 initial_prompt_len = prompt_lengths[dataset_idx]
                 cached_token_ids = prompt_token_ids[dataset_idx]
->>>>>>> upstream/main
 
                 # Skip empty prompt
                 if initial_prompt_len == 0:
@@ -545,12 +537,6 @@ class RandomDataset(BenchmarkDataset):
                         prompt_len=total_input_len,
                         expected_output_len=int(output_lens[i]),
                     ))
-<<<<<<< HEAD
-            assert len(requests) == num_requests, (
-                f"Only {len(requests)} requests sampled from sharegpt dataset, {num_requests} requests are needed"
-            )
-=======
->>>>>>> upstream/main
         else:
             for i in range(num_requests):
                 inner_seq = ((offsets[i] + i + np.arange(input_lens[i])) %
@@ -1133,11 +1119,6 @@ class VisionArenaDataset(HuggingFaceDataset):
         enable_multimodal_chat: bool = False,
         **kwargs,
     ) -> list:
-<<<<<<< HEAD
-        if enable_multimodal_chat:
-            raise NotImplementedError
-=======
->>>>>>> upstream/main
 
         output_len = (output_len
                       if output_len is not None else self.DEFAULT_OUTPUT_LEN)
@@ -1147,11 +1128,7 @@ class VisionArenaDataset(HuggingFaceDataset):
         parser_fn = self.SUPPORTED_DATASET_PATHS.get(self.dataset_path)
         if parser_fn is None:
             raise ValueError(f"Unsupported dataset path: {self.dataset_path}")
-<<<<<<< HEAD
-
-=======
         sampled_requests = []
->>>>>>> upstream/main
         for item in self.data:
             if len(prompts) >= num_requests:
                 break

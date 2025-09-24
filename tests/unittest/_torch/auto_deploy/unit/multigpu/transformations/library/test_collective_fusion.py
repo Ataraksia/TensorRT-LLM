@@ -8,21 +8,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from _dist_test_utils import get_device_counts
-<<<<<<< HEAD
-from _graph_test_helpers import run_test
-=======
 from _graph_test_helpers import run_test_transformed_gm
->>>>>>> upstream/main
 from _torch_test_utils import fp8_compatible
 
 import tensorrt_llm._torch.auto_deploy.distributed.common as dist_common
 from tensorrt_llm._torch.auto_deploy.custom_ops.quant import FP8Linear
-<<<<<<< HEAD
-from tensorrt_llm._torch.auto_deploy.transformations.library import fuse_collectives
-=======
 from tensorrt_llm._torch.auto_deploy.export import torch_export_to_gm
 from tensorrt_llm._torch.auto_deploy.transform.optimizer import InferenceOptimizer
->>>>>>> upstream/main
 from tensorrt_llm._torch.auto_deploy.utils.node_utils import is_op
 
 
@@ -70,13 +62,6 @@ def _run_job(
             is_op(n, torch.ops.auto_deploy.torch_dist_all_reduce) for n in gm.graph.nodes
         )
 
-<<<<<<< HEAD
-    # now run the test
-    run_test(
-        model,
-        x,
-        transform=fuse_collectives,
-=======
     gm = torch_export_to_gm(model, args=(x,), clone=True)
     gm_transformed = InferenceOptimizer(
         None,
@@ -92,7 +77,6 @@ def _run_job(
         model,
         x,
         gm_transformed,
->>>>>>> upstream/main
         check_transformed_graph=check_transformed_graph,
         _get_expected_num_params=_get_expected_num_params,
         test_load_hook=False,

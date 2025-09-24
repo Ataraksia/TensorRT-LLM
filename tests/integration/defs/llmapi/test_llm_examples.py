@@ -110,9 +110,6 @@ def test_llmapi_example_inference_async_streaming(llm_root, engine_dir,
 
 
 def test_llmapi_example_multilora(llm_root, engine_dir, llm_venv):
-<<<<<<< HEAD
-    _run_llmapi_example(llm_root, engine_dir, llm_venv, "llm_multilora.py")
-=======
     cmd_line_args = [
         "--chatbot_lora_dir",
         f"{llm_models_root()}/llama-models-v2/sft-tiny-chatbot",
@@ -123,7 +120,6 @@ def test_llmapi_example_multilora(llm_root, engine_dir, llm_venv):
     ]
     _run_llmapi_example(llm_root, engine_dir, llm_venv, "llm_multilora.py",
                         *cmd_line_args)
->>>>>>> upstream/main
 
 
 def test_llmapi_example_guided_decoding(llm_root, engine_dir, llm_venv):
@@ -168,21 +164,12 @@ def test_llmapi_speculative_decoding_ngram(llm_root, engine_dir, llm_venv):
                         "llm_speculative_decoding.py", "NGRAM")
 
 
-<<<<<<< HEAD
-@pytest.mark.skip(reason="https://nvbugs/5365825")
-=======
 @pytest.mark.skip(reason="https://nvbugs/5365825"
                   )  # maybe unrelated, but this test will always timeout
->>>>>>> upstream/main
 def test_llmapi_sampling(llm_root, engine_dir, llm_venv):
     _run_llmapi_example(llm_root, engine_dir, llm_venv, "llm_sampling.py")
 
 
-<<<<<<< HEAD
-@pytest.mark.skip(reason="https://nvbugs/5365825")
-def test_llmapi_runtime(llm_root, engine_dir, llm_venv):
-    _run_llmapi_example(llm_root, engine_dir, llm_venv, "llm_runtime.py")
-=======
 @pytest.mark.skip(reason="https://nvbugs/5365825"
                   )  # maybe unrelated, but this test will always timeout
 def test_llmapi_runtime(llm_root, engine_dir, llm_venv):
@@ -201,4 +188,3 @@ def test_llmapi_kv_cache_connector(llm_root, llm_venv, model):
 def test_llmapi_tensorrt_engine(llm_root, engine_dir, llm_venv):
     _run_llmapi_example(llm_root, engine_dir, llm_venv,
                         "_tensorrt_engine/quickstart_example.py")
->>>>>>> upstream/main

@@ -26,12 +26,9 @@
 namespace gemmGatedAct
 {
 
-<<<<<<< HEAD
-=======
 namespace gemmGatedAct
 {
 
->>>>>>> upstream/main
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace tg = trtllm::gen;
@@ -40,11 +37,7 @@ namespace tg = trtllm::gen;
 
 #ifdef TLLM_ENABLE_CUDA
 CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& shapes,
-<<<<<<< HEAD
-    std::vector<uint64_t> const& strides, int32_t tileSizeMn, int32_t tileSizeK, void* gmemAddr)
-=======
     std::vector<uint64_t> const& strides, std::vector<int32_t> const& tileShapes, void* gmemAddr)
->>>>>>> upstream/main
 {
     CUtensorMap desc{};
     // The data type.
@@ -77,18 +70,6 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
 
     // The swizzle type.
     CUtensorMapSwizzle swizzleType{CU_TENSOR_MAP_SWIZZLE_NONE};
-<<<<<<< HEAD
-    int32_t tileKSizeInBytes = (tileSizeK * tg::dtypeGetNumBits(dtype)) / /* bits */ 8;
-    if ((tileKSizeInBytes % 128) == 0)
-    {
-        swizzleType = CU_TENSOR_MAP_SWIZZLE_128B;
-    }
-    else if ((tileKSizeInBytes % 64) == 0)
-    {
-        swizzleType = CU_TENSOR_MAP_SWIZZLE_64B;
-    }
-    else if ((tileKSizeInBytes % 32) == 0)
-=======
     int32_t fastestDimTileSizeBytes = (tileShapes[0] * tg::dtypeGetNumBits(dtype)) / /* bits */ 8;
     if ((fastestDimTileSizeBytes % 128) == 0)
     {
@@ -99,17 +80,12 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
         swizzleType = CU_TENSOR_MAP_SWIZZLE_64B;
     }
     else if ((fastestDimTileSizeBytes % 32) == 0)
->>>>>>> upstream/main
     {
         swizzleType = CU_TENSOR_MAP_SWIZZLE_32B;
     }
     else
     {
-<<<<<<< HEAD
-        std::cerr << "Unexpected tileKSizeInBytes " << tileKSizeInBytes << std::endl;
-=======
         std::cerr << "Unexpected fastestDimTileSizeBytes  " << fastestDimTileSizeBytes << std::endl;
->>>>>>> upstream/main
         assert(false);
     }
 
@@ -118,13 +94,8 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
 
     // Check shape must be in range [1, 2^32]
     int32_t dim = shapes.size();
-<<<<<<< HEAD
-    // Expect 2 dimensions.
-    assert(dim == 2);
-=======
     // Expect 2 dimensions for regular gemm or 3 dimensions for blocked layout
     assert(dim == 2 || dim == 3);
->>>>>>> upstream/main
     // Check shape range.
     for (int32_t ii = 0; ii < dim; ++ii)
     {
@@ -149,14 +120,6 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
     // The number of elements in 128B.
     auto const numEltsIn128B = numEltsPerUInt32 /*4B*/ * 32;
     // The number of tile K hidden size (per token) in each block of shared memory.
-<<<<<<< HEAD
-    auto const numEltsInClampedTileKSize = std::min(numEltsIn128B, tileSizeK);
-
-    // Build tile shapes.
-    std::vector<uint32_t> tileShapes(dim, 1);
-    tileShapes[0] = numEltsInClampedTileKSize; // tileSizeK
-    tileShapes[1] = tileSizeMn;                // tileSizeMn
-=======
     auto const numEltsInClampedFastestTileSize = std::min(numEltsIn128B, tileShapes[0]);
 
     // Build box dim array. If tileShapes is smaller than dim, just fill with 1s.
@@ -175,18 +138,13 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
             boxDim[ii] = tileShapes[ii];
         }
     }
->>>>>>> upstream/main
 
     // Set tile strides to 0;
     std::vector<uint32_t> tileStrides(dim, 1);
 
     // Build the descriptor.
     CUresult result = cuTensorMapEncodeTiled(&desc, tmaDataFormat,
-<<<<<<< HEAD
-        /*tensorRank=*/dim, gmemAddr, shapes.data(), stridesInBytes.data(), tileShapes.data(), tileStrides.data(),
-=======
         /*tensorRank=*/dim, gmemAddr, shapes.data(), stridesInBytes.data(), boxDim.data(), tileStrides.data(),
->>>>>>> upstream/main
         /*interleave=*/CU_TENSOR_MAP_INTERLEAVE_NONE, swizzleType,
         /*l2Promotion=*/CU_TENSOR_MAP_L2_PROMOTION_L2_128B,
         /*oobFill=*/CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE);
@@ -197,12 +155,6 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
 
         std::cerr << "tmaFormat: " << static_cast<int>(tmaDataFormat) << " dim: " << dim << " gmem: " << gmemAddr
                   << std::endl;
-<<<<<<< HEAD
-        std::cerr << "Shape: " << shapes[0] << " " << shapes[1] << std::endl;
-        std::cerr << "Stride: " << stridesInBytes[0] << std::endl;
-        std::cerr << "tileShapes: " << tileShapes[0] << " " << tileShapes[1] << std::endl;
-        std::cerr << "tileStrides: " << tileStrides[0] << " " << tileStrides[1] << std::endl;
-=======
 
         std::cerr << "Shape: ";
         for (int ii = 0; ii < dim; ++ii)
@@ -231,7 +183,6 @@ CUtensorMap buildNdTmaDescriptor(tg::Dtype dtype, std::vector<uint64_t> const& s
             std::cerr << tileStrides[ii] << " ";
         }
         std::cerr << std::endl;
->>>>>>> upstream/main
         std::cerr << "swizzleType: " << int(swizzleType) << std::endl;
         assert(false);
     }
@@ -253,11 +204,6 @@ struct KernelParams
 
     // TMA descriptor for A.
     // Must be setup using gemm::buildNdTmaDescriptor with shapes and strides from
-<<<<<<< HEAD
-    // makeTmaShapeStrideAb. Logical shape is [M, K]. Logical strides are [K, 1]. Tile box shape is
-    // [tileM, tileK]. Tile box strides are [tileK, 1].
-    // Dtype is set from options.mDtypeElt.
-=======
     // makeTmaShapeStrideAb.
     //
     // If layoutA is MatrixLayout::MajorK
@@ -280,16 +226,10 @@ struct KernelParams
     //   Tile box shape is [tileK / min(blockK, tileK), tileM, min(blockK, tileK)].
     //   Tile box strides are [tileM * min(blockK, tileK), min(blockK, tileK), 1].
     //   Dtype is set from options.mDtypeA, and blockK is 128B.
->>>>>>> upstream/main
     CUtensorMap tmaA;
 
     // TMA descriptor for B.
     // Must be setup using gemm::buildNdTmaDescriptor with shapes and strides from
-<<<<<<< HEAD
-    // makeTmaShapeStrideAb. Logical shape is [N, K]. Logical strides are [K, 1]. Tile box shape is
-    // [tileN, tileK]. Tile box strides are [tileK, 1].
-    // Dtype is set from options.mDtypeElt.
-=======
     // makeTmaShapeStrideAb.
     //
     // If layoutB is MatrixLayout::MajorK
@@ -312,7 +252,6 @@ struct KernelParams
     //   Tile box shape is [tileK / min(blockK, tileK), tileN, min(blockK, tileK)].
     //   Tile box strides are [tileN * min(blockK, tileK), min(blockK, tileK), 1].
     //   Dtype is set from options.mDtypeB, and blockK is 128B.
->>>>>>> upstream/main
     CUtensorMap tmaB;
 
     // TMA descriptor for C, (when useTmaStore is true)
@@ -374,33 +313,21 @@ struct KernelParams
     // When transposeMmaOutput is true, the shape is [N, M / 2].
     // Otherwise, the shape is [M, N / 2].
     // Elements in a given row are stored contiguously in memory (row-major).
-<<<<<<< HEAD
-    void* ptrC;
-=======
     void* ptrC{nullptr};
->>>>>>> upstream/main
 
     // The scaling factors to dequantize A.
     // It is used when the DeepSeek FP8 recipe is enabled. Otherwise should be set to nullptr.
     // If transposeMmaOutput is false, shape is [K / 128, M].
     // Otherwise, shape is [M / 128, K / 128].
     // The rightmost dimension is contiguous in memory.
-<<<<<<< HEAD
-    void const* ptrSfA;
-=======
     void const* ptrSfA{nullptr};
->>>>>>> upstream/main
 
     // The scaling factors to dequantize B.
     // It is used when the DeepSeek FP8 recipe is enabled. Otherwise should be set to nullptr.
     // If transposeMmaOutput is false, shape is [N / 128, K / 128].
     // Otherwise, shape is [K / 128, N].
     // The rightmost dimension is contiguous in memory.
-<<<<<<< HEAD
-    void const* ptrSfB;
-=======
     void const* ptrSfB{nullptr};
->>>>>>> upstream/main
 
     // The per-token scaling factors from scale A.
     //
@@ -410,11 +337,7 @@ struct KernelParams
     //   transposed). The dtype is Dtype::Bfloat16
     //
     // The shape is [M]
-<<<<<<< HEAD
-    void const* ptrPerTokenSfA;
-=======
     void const* ptrPerTokenSfA{nullptr};
->>>>>>> upstream/main
 
     // The per-token scaling factors from scale B.
     //
@@ -424,9 +347,6 @@ struct KernelParams
     //   transposed). The dtype is Dtype::Bfloat16
     //
     // The shape is [N]
-<<<<<<< HEAD
-    void const* ptrPerTokenSfB;
-=======
     void const* ptrPerTokenSfB{nullptr};
 
     // The bias applied after the GEMM and before the activation function.
@@ -443,7 +363,6 @@ struct KernelParams
     //
     // The dtype is float32.
     void const* ptrBias{nullptr};
->>>>>>> upstream/main
 
     // The scaling factors calculated when quantizing C, for MxFp{4,8} and NvFp4 formats, also
     // used for the DeepSeek FP8 recipe.
@@ -457,11 +376,7 @@ struct KernelParams
     // If transposeMmaOutput is false, shape is [M, N / 2 / 16].
     // Otherwise, shape is [N, M / 2 / 16].
     // The layout is controlled by options.mSfLayoutC (either R128c4 or R8c4).
-<<<<<<< HEAD
-    void* ptrSfC;
-=======
     void* ptrSfC{nullptr};
->>>>>>> upstream/main
 
     // Output is equal to
     // y = act(ptrScaleGate[0] * y1) * (ptrScaleC[0] * y2)
@@ -469,12 +384,6 @@ struct KernelParams
     // The output tensor scaling factor for MxFp{4,8}, NvFp4 and DeepSeek FP8 quantization.
     // TensorRT-LLM API requires a scaling factor on the device.
     // Shape is [1].
-<<<<<<< HEAD
-    float const* ptrScaleC;
-    // The output gate scale for MxFp{4,8}, NvFp4 and DeepSeek FP8 quantization.
-    // Shape is [1].
-    float const* ptrScaleGate;
-=======
     float const* ptrScaleC{nullptr};
     // The output gate scale for MxFp{4,8}, NvFp4 and DeepSeek FP8 quantization.
     // Shape is [1].
@@ -498,7 +407,6 @@ struct KernelParams
     //   out_glu  = x_glu * torch.sigmoid(alpha * x_glu) * (x_linear + beta)
     float const* ptrGatedActAlpha{nullptr};
     float const* ptrGatedActBeta{nullptr};
->>>>>>> upstream/main
 
     // The M dimension.
     // It is the total number of tokens if A is the activation matrix.
@@ -531,20 +439,12 @@ struct KernelParams
     // Pointer for partial row max for DeepSeek FP8 recipe.
     // This is temporary storage for the row max results.
     // The shape is [2, M, N / 128] and the dtype is float.
-<<<<<<< HEAD
-    float* ptrPartialRowMax;
-=======
     float* ptrPartialRowMax{nullptr};
->>>>>>> upstream/main
 
     // Flags in global memory that sync on "exit" for row max computation.
     // The size is numTilesM * numTilesN / 2 and the dtype is uint32_t.
     // The memory must be set to 0 before the kernel launch.
-<<<<<<< HEAD
-    uint32_t* ptrRowMaxCompletionBars;
-=======
     uint32_t* ptrRowMaxCompletionBars{nullptr};
->>>>>>> upstream/main
 
     enum class MatrixType
     {
@@ -557,11 +457,6 @@ struct KernelParams
     template <class GemmOptions>
     static auto makeTmaShapeStrideAbc(GemmOptions const& options, MatrixType matrixType)
     {
-<<<<<<< HEAD
-        auto numTokens
-            = (matrixType == MatrixType::MatrixA || matrixType == MatrixType::MatrixC) ? options.mM : options.mN;
-        auto hiddenSize = (matrixType == MatrixType::MatrixC) ? options.mN / 2 : options.mK;
-=======
         // The outer dimension.
         auto numTokens
             = (matrixType == MatrixType::MatrixA || matrixType == MatrixType::MatrixC) ? options.mM : options.mN;
@@ -574,16 +469,12 @@ struct KernelParams
         // The inner dimension tile size.
         auto tileHiddenSize = (matrixType == MatrixType::MatrixC) ? options.mEpilogueTileN / 2 : options.mTileK;
         // Swap variables if transpose output
->>>>>>> upstream/main
         if (matrixType == MatrixType::MatrixC && options.mTransposeMmaOutput)
         {
             numTokens = options.mN;
             hiddenSize = options.mM / 2;
-<<<<<<< HEAD
-=======
             tileNumTokens = options.mEpilogueTileN;
             tileHiddenSize = options.mEpilogueTileM / 2;
->>>>>>> upstream/main
         }
         // The cute tensor shape for A/B: (numTokens, hiddenSize).
         // Note that TMA descriptor expects the first dimension's stride to be
@@ -594,9 +485,6 @@ struct KernelParams
         // Swap the first two dimension as mentioned before.
         auto stride = std::vector<uint64_t>{1, static_cast<uint64_t>(hiddenSize)};
 
-<<<<<<< HEAD
-        return std::make_tuple(shape, stride);
-=======
         // Assemble the box shape
         std::vector<int32_t> tileShape = {tileHiddenSize, tileNumTokens};
 
@@ -626,17 +514,12 @@ struct KernelParams
         }
 
         return std::make_tuple(shape, stride, tileShape);
->>>>>>> upstream/main
     }
 
     // Create the TMA shape/stride for A/B block scaling factors.
     template <class GemmOptions>
-<<<<<<< HEAD
-    static auto makeTmaShapeStrideSfAb(GemmOptions const& options, MatrixType matrixType, tg::SfLayout layout)
-=======
     static auto makeTmaShapeStrideSfAb(
         GemmOptions const& options, MatrixType matrixType, tg::SfLayout layout, int sfReshapeFactor)
->>>>>>> upstream/main
     {
         // The outer dimension.
         auto numTokens = matrixType == MatrixType::MatrixA ? options.mM : options.mN;
@@ -646,17 +529,12 @@ struct KernelParams
         auto numTokensPerTile = matrixType == MatrixType::MatrixA ? options.mTileM : options.mTileN;
         // The inner tile dimension.
         auto hiddenSizePerTile = options.mTileK;
-<<<<<<< HEAD
-        // Number of elements per scaling factor.
-        int32_t const numEltsPerSf = (options.mDtypeElt == tg::Dtype::E2m1) ? 16 : 32;
-=======
         // The dtype of the matrix.
         tg::Dtype matrixDtype = matrixType == MatrixType::MatrixA ? options.mDtypeA : options.mDtypeB;
         // Number of elements per scaling factor.
         int32_t const numEltsPerSf = (matrixType == MatrixType::MatrixA && options.mSfBlockSizeA.has_value())
             ? options.mSfBlockSizeA.value()
             : (tg::dtypeIsBlockFmt(matrixDtype) ? tg::dtypeNumEltsPerSf(matrixDtype) : 32);
->>>>>>> upstream/main
 
         switch (layout)
         {
@@ -694,17 +572,6 @@ struct KernelParams
         {
             // The scaling factor tensor packs 8x4 tiles into contiguous 32B blocks.
             //
-<<<<<<< HEAD
-            // As the inner dimension (k) is required to be a multiple of the tile size, we
-            // can reshape to use fewer read requests, if the tile dimensions allow.
-            // I.e., let's define r = min(⌈hiddenSizePerTile / (numEltsPerSf * 4)⌉, 8)
-            //
-            // The "logical" tensor is: [outer,        inner / numEltsPerSf]
-            // The 8x4 SF layout is:    [⌈outer / 128⌉, inner / (4 * numEltsPerSf), 32]
-            // The TMA tensor shape is: [⌈outer / 128⌉, inner / (4 * numEltsPerSf * r), r * 32]
-
-            int const repeats = std::min(tg::ceilDiv(hiddenSizePerTile, numEltsPerSf * 4), 8);
-=======
             // As the inner dimension (k) is often a multiple of the tile size, we can reshape to use
             // fewer read requests, if the tile dimensions allow. It does not reduce the number of
             // instructions.
@@ -735,7 +602,6 @@ struct KernelParams
                 throw std::runtime_error("SF hiddenSize K (" + std::to_string(tg::ceilDiv(hiddenSize, numEltsPerSf * 4))
                     + ") must be a multiple of repeats (" + std::to_string(repeats) + ")");
             }
->>>>>>> upstream/main
 
             auto shape = std::vector<uint64_t>{static_cast<uint64_t>(repeats * 32),
                 static_cast<uint64_t>(tg::ceilDiv(hiddenSize, numEltsPerSf * 4 * repeats)),
@@ -755,11 +621,7 @@ struct KernelParams
             return std::make_tuple(shape, stride, tileShapes);
         }
 
-<<<<<<< HEAD
-        default: assert(false);
-=======
         default: throw std::runtime_error("Unsupported SF layout");
->>>>>>> upstream/main
         }
         return std::make_tuple(std::vector<uint64_t>{}, std::vector<uint64_t>{}, std::vector<uint32_t>{});
     }
@@ -767,47 +629,16 @@ struct KernelParams
     // Setup the kernel parameters.
     template <class GemmOptions_>
     static KernelParams setKernelParams(GemmOptions_ const& options, void const* ptrA, void const* ptrSfA,
-<<<<<<< HEAD
-        void const* ptrPerTokenSfA, void const* ptrB, void const* ptrSfB, void const* ptrPerTokenSfB, void* ptrC,
-        float const* ptrScaleC, void* ptrSfC, float const* ptrScaleGate, float* rowMax, uint32_t* rowMaxBars)
-=======
         void const* ptrPerTokenSfA, void const* ptrB, void const* ptrSfB, void const* ptrPerTokenSfB,
         void const* ptrBias, void* ptrC, float const* ptrScaleC, void* ptrSfC, float const* ptrScaleGate,
         float const* ptrClampLimit, float const* ptrGatedActAlpha, float const* ptrGatedActBeta, float* rowMax,
         uint32_t* rowMaxBars)
->>>>>>> upstream/main
     {
 
         // Create the return struct.
         KernelParams params;
 
         // Shape/stride for gmem tensor A.
-<<<<<<< HEAD
-        auto [shapeA, strideA] = makeTmaShapeStrideAbc(options, MatrixType::MatrixA);
-        // Build tma descriptor for A.
-        params.tmaA = gemmGatedAct::buildNdTmaDescriptor(
-            options.mDtypeElt, shapeA, strideA, options.mTileM, options.mTileK, const_cast<void*>(ptrA));
-
-        // Shape/stride for gmem tensor B.
-        auto [shapeB, strideB] = makeTmaShapeStrideAbc(options, MatrixType::MatrixB);
-        // Build tma descriptor for B.
-        params.tmaB = gemmGatedAct::buildNdTmaDescriptor(
-            options.mDtypeElt, shapeB, strideB, options.mTileN, options.mTileK, const_cast<void*>(ptrB));
-
-        if (options.mDtypeElt == tg::Dtype::E2m1 || options.mDtypeElt == tg::Dtype::MxE4m3)
-        {
-            tg::Dtype const dTypeSf = tg::dtypeGetBlockSfType(options.mDtypeElt);
-
-            // Build TMA descriptor for gmem A block scaling factors.
-            auto [shapeSfA, strideSfA, tileShapesSfA]
-                = makeTmaShapeStrideSfAb(options, MatrixType::MatrixA, tg::SfLayout::R128c4);
-            params.tmaSfA
-                = gemm::buildSfTmaDescriptor(dTypeSf, shapeSfA, strideSfA, tileShapesSfA, const_cast<void*>(ptrSfA));
-
-            // Build TMA descriptor for gmem B block scaling factors.
-            auto [shapeSfB, strideSfB, tileShapesSfB]
-                = makeTmaShapeStrideSfAb(options, MatrixType::MatrixB, options.mSfLayoutB);
-=======
         auto [shapeA, strideA, tileShapeA] = makeTmaShapeStrideAbc(options, MatrixType::MatrixA);
         // Build tma descriptor for A.
         params.tmaA
@@ -835,7 +666,6 @@ struct KernelParams
             // Build TMA descriptor for gmem B block scaling factors.
             auto [shapeSfB, strideSfB, tileShapesSfB]
                 = makeTmaShapeStrideSfAb(options, MatrixType::MatrixB, options.mSfLayoutB, options.mSfReshapeFactor);
->>>>>>> upstream/main
             params.tmaSfB
                 = gemm::buildSfTmaDescriptor(dTypeSf, shapeSfB, strideSfB, tileShapesSfB, const_cast<void*>(ptrSfB));
         }
@@ -843,21 +673,10 @@ struct KernelParams
         if (options.mUseTmaStore)
         {
             // Shape/stride for gmem tensor C.
-<<<<<<< HEAD
-            auto [shapeC, strideC] = makeTmaShapeStrideAbc(options, MatrixType::MatrixC);
-
-            // Swap M and N tiles for the M-major epilogue.
-            auto outputTileM = options.mTransposeMmaOutput ? options.mEpilogueTileN : options.mEpilogueTileM;
-            auto outputTileN = options.mTransposeMmaOutput ? options.mEpilogueTileM : options.mEpilogueTileN;
-            // Build tma descriptor for C.
-            params.tmaC = gemmGatedAct::buildNdTmaDescriptor(
-                options.mDtypeC, shapeC, strideC, outputTileM, outputTileN / 2, const_cast<void*>(ptrC));
-=======
             auto [shapeC, strideC, tileShapeC] = makeTmaShapeStrideAbc(options, MatrixType::MatrixC);
             // Build tma descriptor for C.
             params.tmaC = gemmGatedAct::buildNdTmaDescriptor(
                 options.mDtypeC, shapeC, strideC, tileShapeC, const_cast<void*>(ptrC));
->>>>>>> upstream/main
         }
 
         params.ptrC = ptrC;
@@ -870,10 +689,6 @@ struct KernelParams
         params.ptrPerTokenSfA = ptrPerTokenSfA;
         params.ptrPerTokenSfB = ptrPerTokenSfB;
 
-<<<<<<< HEAD
-        params.ptrScaleC = ptrScaleC;
-        params.ptrScaleGate = ptrScaleGate;
-=======
         params.ptrBias = ptrBias;
 
         params.ptrScaleC = ptrScaleC;
@@ -881,7 +696,6 @@ struct KernelParams
         params.ptrClampLimit = ptrClampLimit;
         params.ptrGatedActAlpha = ptrGatedActAlpha;
         params.ptrGatedActBeta = ptrGatedActBeta;
->>>>>>> upstream/main
         params.rank = 0;
         params.tpGrpSize = 1;
 
@@ -900,8 +714,5 @@ struct KernelParams
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace gemmGatedAct
-<<<<<<< HEAD
-=======
 
 } // namespace gemmGatedAct
->>>>>>> upstream/main

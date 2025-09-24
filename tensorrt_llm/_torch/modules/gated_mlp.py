@@ -5,51 +5,19 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-<<<<<<< HEAD
-from tensorrt_llm.mapping import Mapping
-
-from ..custom_ops import IS_FLASHINFER_AVAILABLE
-=======
 from tensorrt_llm.logger import logger
 from tensorrt_llm.mapping import Mapping
 
->>>>>>> upstream/main
 from ..distributed import AllReduceParams
 from ..model_config import ModelConfig
 from ..peft.lora.layer import LoraLayer, LoraModuleType
 from ..utils import Fp4QuantizedTensor
 from .linear import Linear, TensorParallelMode, WeightMode, WeightsLoadingConfig
-<<<<<<< HEAD
-
-
-def swiglu(x):
-    if IS_FLASHINFER_AVAILABLE:
-        # WAR for flashinfer activation since it does not support custom op properly
-        from ..custom_ops import flashinfer_silu_and_mul
-        return flashinfer_silu_and_mul(x)
-    else:
-        gate, x = x.chunk(2, dim=-1)
-        return F.silu(gate) * x
-=======
 from .swiglu import swiglu
->>>>>>> upstream/main
 
 
 class GatedMLP(nn.Module):
 
-<<<<<<< HEAD
-    def __init__(self,
-                 *,
-                 hidden_size: int,
-                 intermediate_size: int,
-                 bias: bool,
-                 activation: Callable[[torch.Tensor], torch.Tensor] = F.silu,
-                 dtype: Optional[torch.dtype] = None,
-                 config: Optional[ModelConfig] = None,
-                 overridden_tp_size: Optional[int] = None,
-                 reduce_output: bool = True,
-                 layer_idx: Optional[int] = None):
-=======
     def __init__(
         self,
         *,
@@ -66,7 +34,6 @@ class GatedMLP(nn.Module):
         disable_deep_gemm: bool = False,
     ):
 
->>>>>>> upstream/main
         super().__init__()
         self.layer_idx = layer_idx
         self.hidden_size = hidden_size
@@ -80,19 +47,6 @@ class GatedMLP(nn.Module):
             tp_size = overridden_tp_size
             # "Misuse" pp_size here to perform all-reduce within smaller groups
             pp_size = config.mapping.pp_size * config.mapping.tp_size // overridden_tp_size
-<<<<<<< HEAD
-        else:
-            tp_size = config.mapping.tp_size
-            pp_size = config.mapping.pp_size
-
-        mapping = Mapping(
-            world_size=tp_size * pp_size,
-            rank=self.mapping.rank,
-            gpus_per_node=self.mapping.gpus_per_node,
-            tp_size=tp_size,
-            pp_size=pp_size,
-        )
-=======
             mapping = Mapping(
                 world_size=tp_size * pp_size,
                 rank=self.mapping.rank,
@@ -102,7 +56,6 @@ class GatedMLP(nn.Module):
             )
         else:
             mapping = config.mapping
->>>>>>> upstream/main
 
         self.gate_up_proj = Linear(
             self.hidden_size,
@@ -116,16 +69,12 @@ class GatedMLP(nn.Module):
             quant_config=config.get_quant_config(),
             reduce_output=False,
             skip_create_weights_in_init=config.skip_create_weights_in_init,
-<<<<<<< HEAD
-        )
-=======
             allreduce_strategy=config.allreduce_strategy,
             force_dynamic_quantization=config.force_dynamic_quantization,
             use_cute_dsl_blockscaling_mm=use_cute_dsl_blockscaling_mm,
             disable_deep_gemm=disable_deep_gemm,
         )
 
->>>>>>> upstream/main
         self.down_lora = LoraLayer([LoraModuleType.MLP_4H_TO_H],
                                    [self.hidden_size])
 
@@ -140,13 +89,10 @@ class GatedMLP(nn.Module):
             reduce_output=reduce_output,
             skip_create_weights_in_init=config.skip_create_weights_in_init,
             lora=self.down_lora,
-<<<<<<< HEAD
-=======
             allreduce_strategy=config.allreduce_strategy,
             force_dynamic_quantization=config.force_dynamic_quantization,
             use_cute_dsl_blockscaling_mm=use_cute_dsl_blockscaling_mm,
             disable_deep_gemm=disable_deep_gemm,
->>>>>>> upstream/main
         )
 
         # These two modules are mutually exclusive - either splitted_gate_up_lora or fused_gate_up_lora will be used,
@@ -161,8 +107,6 @@ class GatedMLP(nn.Module):
             [LoraModuleType.MLP_GATE_UP],
             [2 * self.intermediate_size // mapping.tp_size])
 
-<<<<<<< HEAD
-=======
     def _apply_activation(self, x, *, has_lora: bool = False):
         if self.activation == F.silu:
             if self.down_proj.has_fp8_qdq or self.down_proj.has_w4a8_nvfp4_fp8:
@@ -189,7 +133,6 @@ class GatedMLP(nn.Module):
                 f"Activation {self.activation} not yet implemented for fused GatedMLP"
             )
 
->>>>>>> upstream/main
     def forward(
         self,
         x: Union[torch.Tensor, Fp4QuantizedTensor],
@@ -202,27 +145,12 @@ class GatedMLP(nn.Module):
             return self.forward_lora(x, all_rank_num_tokens,
                                      final_all_reduce_params, lora_params)
 
-<<<<<<< HEAD
-        if self.activation == F.silu:
-            h1 = self.gate_up_proj(x)
-
-            h2 = swiglu(h1)
-            output = self.down_proj(h2,
-                                    all_reduce_params=final_all_reduce_params,
-                                    layer_idx=self.layer_idx)
-            return output
-        else:
-            raise NotImplementedError(
-                f"Activation {self.activation} not yet implemented for fused GatedMLP"
-            )
-=======
         h1 = self.gate_up_proj(x)
         h2 = self._apply_activation(h1)
         output = self.down_proj(h2,
                                 all_reduce_params=final_all_reduce_params,
                                 layer_idx=self.layer_idx)
         return output
->>>>>>> upstream/main
 
     def forward_lora(
         self,
@@ -233,10 +161,6 @@ class GatedMLP(nn.Module):
     ) -> torch.Tensor:
         assert lora_params is not None
         assert self.layer_idx is not None, "layer_idx is required for lora"
-<<<<<<< HEAD
-        assert self.activation == F.silu
-=======
->>>>>>> upstream/main
 
         h1 = self.gate_up_proj(x)
 
@@ -249,11 +173,7 @@ class GatedMLP(nn.Module):
         if h1_lora is not None:
             h1 = h1 + h1_lora
 
-<<<<<<< HEAD
-        h2 = swiglu(h1)
-=======
         h2 = self._apply_activation(h1, has_lora=True)
->>>>>>> upstream/main
         output = self.down_proj(h2,
                                 all_reduce_params=final_all_reduce_params,
                                 lora_params=lora_params,

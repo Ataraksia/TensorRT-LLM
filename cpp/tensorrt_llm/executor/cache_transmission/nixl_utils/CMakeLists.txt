@@ -9,16 +9,6 @@
 # license agreement from NVIDIA CORPORATION or its affiliates is strictly
 # prohibited.
 
-<<<<<<< HEAD
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
-  message(
-    STATUS
-      "The NIXL backend is temporarily unavailable on the aarch64 platform.")
-  unset(NIXL_ROOT)
-endif()
-
-=======
->>>>>>> upstream/main
 if(NIXL_ROOT)
   find_package(NIXL REQUIRED)
   # Check if all required packages were found
@@ -40,10 +30,7 @@ if(NIXL_ROOT)
   # Link against all NIXL libraries
   target_link_libraries(${NIXL_WRAPPER_TARGET} PRIVATE NIXL::nixl)
 
-<<<<<<< HEAD
-=======
   # Link against CUDA
   target_link_libraries(${NIXL_WRAPPER_TARGET} PRIVATE CUDA::cudart)
 
->>>>>>> upstream/main
 endif()

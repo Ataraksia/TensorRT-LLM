@@ -4,14 +4,8 @@ from typing import Callable
 import openai
 from transformers import AutoTokenizer
 
-<<<<<<< HEAD
-from tensorrt_llm._torch.pyexecutor.config import PyTorchConfig
-from tensorrt_llm.executor import GenerationExecutor
-from tensorrt_llm.llmapi.llm import LLM
-=======
 from tensorrt_llm import LLM
 from tensorrt_llm.executor import GenerationExecutor
->>>>>>> upstream/main
 from tensorrt_llm.llmapi.llm_args import KvCacheConfig
 from tensorrt_llm.sampling_params import SamplingParams
 
@@ -79,11 +73,6 @@ class OpenaiWorker(Worker):
             "model": self.model,
             "prompt": task.input_str,
         }
-<<<<<<< HEAD
-        add_param_if_not_none(params, "max_tokens", [task.max_tokens])
-        add_param_if_not_none(params, "temperature", [task.temperature])
-        add_param_if_not_none(params, "top_p", [task.top_p])
-=======
         add_param_if_not_none(params, "best_of", [task.best_of])
         add_param_if_not_none(params, "echo", [task.echo])
         add_param_if_not_none(params, "frequency_penalty",
@@ -101,7 +90,6 @@ class OpenaiWorker(Worker):
         add_param_if_not_none(params, "top_p", [task.top_p])
         add_param_if_not_none(params, "user", [task.user])
 
->>>>>>> upstream/main
         return params
 
     def fill_generation_task_with_response(self, task: GenerationTask,
@@ -163,13 +151,6 @@ class TRTLLMWorker(Worker):
         kv_cache_free_gpu_memory_fraction: float = 0.9,
         disable_overlap_scheduler: bool = False,
     ):
-<<<<<<< HEAD
-        pytorch_backend_config = PyTorchConfig(
-            mixed_sampler=True,
-            disable_overlap_scheduler=disable_overlap_scheduler,
-        )
-=======
->>>>>>> upstream/main
         kv_cache_config = KvCacheConfig(
             free_gpu_memory_fraction=kv_cache_free_gpu_memory_fraction, )
 
@@ -183,14 +164,8 @@ class TRTLLMWorker(Worker):
         )
 
         llm = LLM(model_dir,
-<<<<<<< HEAD
-                  backend=backend,
-                  tokenizer=tokenizer,
-                  pytorch_backend_config=pytorch_backend_config,
-=======
                   tokenizer=tokenizer,
                   disable_overlap_scheduler=disable_overlap_scheduler,
->>>>>>> upstream/main
                   kv_cache_config=kv_cache_config,
                   max_batch_size=max_batch_size,
                   max_num_tokens=max_num_tokens)
@@ -211,16 +186,6 @@ class TRTLLMWorker(Worker):
     async def generation_handler(self, task: GenerationTask) -> TaskStatus:
         sampling_params = self.convert_task_params(task)
 
-<<<<<<< HEAD
-        result = await self.llm.generate_async(task.input_str,
-                                               sampling_params=sampling_params)
-
-        task.output_tokens = result.outputs[0].token_ids
-        task.cumulative_logprob = result.outputs[0].cumulative_logprob
-        task.logprobs = result.outputs[0].logprobs
-        task.output_str = result.outputs[0].text
-        task.context_logits = result.context_logits
-=======
         # If the task is streaming, we will return result directly for
         # async iteration outside. Otherwise, we will wait.
         if task.streaming:
@@ -231,7 +196,6 @@ class TRTLLMWorker(Worker):
             result = await self.llm.generate_async(
                 task.input_str, sampling_params=sampling_params)
         task.result = result
->>>>>>> upstream/main
 
         # TODO: error handle
         return TaskStatus.SUCCESS

@@ -16,10 +16,7 @@
  */
 #pragma once
 
-<<<<<<< HEAD
-=======
 #include <optional>
->>>>>>> upstream/main
 #include <set>
 #include <sstream>
 
@@ -35,19 +32,6 @@
 #else
 #include <iostream>
 
-<<<<<<< HEAD
-template <typename T, typename... Args>
-void printArgs(T first, Args... args)
-{
-#ifdef TLLM_GEN_DEBUG
-    std::cout << first;
-    if constexpr (sizeof...(args) > 0)
-    {
-        std::cout << " ";
-        printArgs(args...);
-    }
-#endif
-=======
 template <typename T>
 void printArgs(T arg)
 {
@@ -65,17 +49,13 @@ void printArgs(T first, Args... args)
         printArgs(", ");
         printArgs(args...);
     }
->>>>>>> upstream/main
 }
 
 #define TLLM_CHECK_ERROR(cond, ...)                                                                                    \
     if (!(cond))                                                                                                       \
     {                                                                                                                  \
         printArgs(__VA_ARGS__);                                                                                        \
-<<<<<<< HEAD
-=======
         printArgs("\n");                                                                                               \
->>>>>>> upstream/main
         return false;                                                                                                  \
     }
 
@@ -87,10 +67,7 @@ void printArgs(T first, Args... args)
     if (!(cond))                                                                                                       \
     {                                                                                                                  \
         printArgs(__VA_ARGS__);                                                                                        \
-<<<<<<< HEAD
-=======
         printArgs("\n");                                                                                               \
->>>>>>> upstream/main
         return false;                                                                                                  \
     }
 
@@ -98,11 +75,7 @@ void printArgs(T first, Args... args)
 
 #define TLLM_LOG_INFO(...) TLLM_CHECK_WARNING(false, __VA_ARGS__)
 
-<<<<<<< HEAD
-#endif
-=======
 #endif // TLLM_GEN_EXPORT_INTERFACE
->>>>>>> upstream/main
 
 namespace batchedGemm
 {
@@ -139,14 +112,9 @@ struct GemmOptions
         bool patchF2fp, bool useShuffledMatrixA, bool sliceK, SplitK splitK, bool transposeMmaOutput, int tileM,
         int tileN, int tileK, bool useUnrollLoop2xForMma, bool useCustomMmaSchedule,
         bool useHoistTryWaitForCustomMmaSchedule, bool useDeepSeekFp8, bool usePerTokenSfA, bool usePerTokenSfB,
-<<<<<<< HEAD
-        bool useTmaStore, bool useTwoTmaLoadWarps, bool useTwoMmaWarps, tg::SfLayout sfLayoutA, tg::SfLayout sfLayoutB,
-        tg::SfLayout sfLayoutC, int sfReshapeFactor, TileScheduler tileScheduler)
-=======
         bool useTmaStore, bool useTwoTmaLoadWarps, bool useTwoMmaWarps, std::optional<int32_t> sfBlockSizeA,
         tg::SfLayout sfLayoutA, tg::SfLayout sfLayoutB, tg::SfLayout sfLayoutC, int sfReshapeFactor,
         TileScheduler tileScheduler)
->>>>>>> upstream/main
         : mAllReduceAlgo{allReduceAlgo}
         , mBiasType{biasType}
         , mBlockK(blockK)
@@ -209,10 +177,7 @@ struct GemmOptions
         , mUseTmaStore{useTmaStore}
         , mUseTwoTmaLoadWarps{useTwoTmaLoadWarps}
         , mUseTwoMmaWarps{useTwoMmaWarps}
-<<<<<<< HEAD
-=======
         , mSfBlockSizeA{sfBlockSizeA}
->>>>>>> upstream/main
         , mSfLayoutA{sfLayoutA}
         , mSfLayoutB{sfLayoutB}
         , mSfLayoutC{sfLayoutC}
@@ -359,11 +324,8 @@ struct GemmOptions
     bool mUseTwoTmaLoadWarps{false};
     // Use two different warps for MMA tasks. Applicable only to DeepSeek FP8.
     bool mUseTwoMmaWarps{false};
-<<<<<<< HEAD
-=======
     // Block size of A. For dtypeA == E2m1 and dtypeB == E4m3.
     std::optional<int32_t> mSfBlockSizeA{std::nullopt};
->>>>>>> upstream/main
     // Scale factors layout for A.
     tg::SfLayout mSfLayoutA{tg::SfLayout::R128c4};
     // Scale factors layout for B.
@@ -385,12 +347,6 @@ struct GemmOptions
 enum class SmVersion
 {
     Sm90a,
-<<<<<<< HEAD
-    Sm100a
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-=======
     Sm100a,
     Sm100f,
     Sm103a
@@ -404,7 +360,6 @@ bool isSmVersionBlackwell(SmVersion smVersion)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
->>>>>>> upstream/main
 //
 // GemmConfig
 //
@@ -545,8 +500,6 @@ inline std::string dumpOptions(GemmOptions const& options)
     ss << "mUseTmaStore=" << options.mUseTmaStore << "," << std::endl;
     ss << "mUseTwoTmaLoadWarps=" << options.mUseTwoTmaLoadWarps << "," << std::endl;
     ss << "mUseTwoMmaWarps=" << options.mUseTwoMmaWarps << "," << std::endl;
-<<<<<<< HEAD
-=======
     if (options.mSfBlockSizeA.has_value())
     {
         ss << "mSfBlockSizeA=" << options.mSfBlockSizeA.value() << "," << std::endl;
@@ -557,7 +510,6 @@ inline std::string dumpOptions(GemmOptions const& options)
            << "std::nullopt"
            << ", " << std::endl;
     }
->>>>>>> upstream/main
     ss << "mSfLayoutA="
        << "trtllm::gen::SfLayout(" << static_cast<int32_t>(options.mSfLayoutA) << ")"
        << "," << std::endl;
@@ -607,10 +559,7 @@ inline int32_t getShuffleBlockSize(int epilogueTileM)
 inline bool checkAndUpdateGemmOptions(
     GemmOptions& options, bool isBlackwell, int /* tpGrpSize */, bool updateOptions = true)
 {
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/main
     if (options.mDtypeB == tg::Dtype::Void)
     {
         if (updateOptions)
@@ -651,12 +600,8 @@ inline bool checkAndUpdateGemmOptions(
     // Currently, we only support {MxFp4, NvFp4} -> Bf16.
     TLLM_CHECK_ERROR((options.mDtypeA == options.mDtypeMmaA)
             || ((options.mDtypeA == tg::Dtype::MxE2m1 || options.mDtypeA == tg::Dtype::E2m1)
-<<<<<<< HEAD
-                && options.mDtypeMmaA == tg::Dtype::Bfloat16),
-=======
                 && options.mDtypeMmaA == tg::Dtype::Bfloat16)
             || (options.mDtypeA == tg::Dtype::E2m1 && options.mDtypeMmaA == tg::Dtype::E4m3),
->>>>>>> upstream/main
         "Unsupported cast for A: ", tg::dtypeToString(options.mDtypeA), " -> ", tg::dtypeToString(options.mDtypeMmaA));
 
     // Check that the B cast is supported.
@@ -805,9 +750,6 @@ inline bool checkAndUpdateGemmOptions(
     {
         TLLM_CHECK_ERROR(isBlackwell, "Block scaling is only supported on Blackwell");
 
-<<<<<<< HEAD
-        int const mmaK = (options.mMmaKind == tg::MmaKind::MxFp4NvFp4) ? 64 : 32;
-=======
         int mmaK = 32;
         if (options.mMmaKind == tg::MmaKind::MxFp4NvFp4)
         {
@@ -822,7 +764,6 @@ inline bool checkAndUpdateGemmOptions(
                 mmaK = 64;
             }
         }
->>>>>>> upstream/main
         if (options.mMmaK != mmaK)
         {
             int newTileK = mmaK * divUp(options.mTileK, mmaK);
@@ -843,11 +784,6 @@ inline bool checkAndUpdateGemmOptions(
         TLLM_CHECK_ERROR(options.mMmaN >= 64 || options.mMmaN == options.mTileN, "MmaN (", options.mMmaN,
             ") must be >= 64 or equal to TileN (", options.mTileN, ")");
     }
-<<<<<<< HEAD
-    if (tg::dtypeIsBlockFmt(options.mDtypeA))
-    {
-        int numEltsPerSfA = tg::dtypeNumEltsPerSf(options.mDtypeA);
-=======
 
     if (options.mSfBlockSizeA.has_value())
     {
@@ -869,7 +805,6 @@ inline bool checkAndUpdateGemmOptions(
     if (tg::dtypeIsBlockFmt(options.mDtypeA))
     {
         int numEltsPerSfA = options.mSfBlockSizeA.value_or(tg::dtypeNumEltsPerSf(options.mDtypeA));
->>>>>>> upstream/main
         TLLM_CHECK_ERROR(options.mTileK % (4 * numEltsPerSfA) == 0, "TileK (", options.mTileK,
             ") must be a multiple of ", (4 * numEltsPerSfA), " for typeA ", gemm::toString(options.mDtypeA));
         auto const numEltsPerSfAInK = options.mK / numEltsPerSfA;
@@ -1423,13 +1358,8 @@ inline bool checkAndUpdateGemmOptions(
     {
         // Init kernel traits.
         options.mKernelTraits = KernelTraits(options.mDtypeA, options.mDtypeB, options.mDtypeC, options.mDtypeAcc,
-<<<<<<< HEAD
-            options.mDtypeMmaA, options.mDtypeMmaB, options.mMmaKind, options.mTileM, options.mTileN, options.mTileK,
-            options.mEpilogueTileM, options.mEpilogueTileN, options.mNumStages, options.mNumStagesMma,
-=======
             options.mDtypeMmaA, options.mDtypeMmaB, options.mMmaKind, options.mMmaK, options.mTileM, options.mTileN,
             options.mTileK, options.mEpilogueTileM, options.mEpilogueTileN, options.mNumStages, options.mNumStagesMma,
->>>>>>> upstream/main
             options.mNumSlicesForSplitK, options.mNumSlicesForSliceK, options.mSplitK, options.mUseTmaStore,
             options.mTransposeMmaOutput, options.mAllReduceAlgo, options.mTileScheduler == TileScheduler::Persistent,
             options.mUseDeepSeekFp8, options.mUsePerTokenSfA, options.mUsePerTokenSfB, options.mBiasType);

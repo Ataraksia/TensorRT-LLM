@@ -28,14 +28,11 @@ Please refer to [this guide](https://nvidia.github.io/TensorRT-LLM/installation/
   - [Evaluation](#evaluation)
   - [Serving](#serving)
     - [trtllm-serve](#trtllm-serve)
-<<<<<<< HEAD
-=======
       - [B200 FP4 min-latency config](#b200-fp4-min-latency-config)
       - [B200 FP4 max-throughput config](#b200-fp4-max-throughput-config)
       - [B200 FP8 min-latency config](#b200-fp8-min-latency-config)
       - [B200 FP8 max-throughput config](#b200-fp8-max-throughput-config)
       - [Launch trtllm-serve OpenAI-compatible API server](#launch-trtllm-serve-openai-compatible-api-server)
->>>>>>> upstream/main
     - [Disaggregated Serving](#disaggregated-serving)
     - [Dynamo](#dynamo)
     - [tensorrtllm\_backend for triton inference server (Prototype)](#tensorrtllm_backend-for-triton-inference-server-prototype)
@@ -236,12 +233,6 @@ trtllm-eval --model  <YOUR_MODEL_DIR> \
 ## Serving
 ### trtllm-serve
 
-<<<<<<< HEAD
-Take max-throughput scenario on B200 as an example, the settings are extracted from the [blog](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/blogs/Best_perf_practice_on_DeepSeek-R1_in_TensorRT-LLM.md#b200-max-throughput). **For users' own models and cases, the specific settings could be different to get best performance.**
-
-To serve the model using `trtllm-serve`:
-
-=======
 Below are example B200 serving configurations for both min-latency and max-throughput in FP4 and FP8. If you want to explore configurations, see the [blog](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/blogs/Best_perf_practice_on_DeepSeek-R1_in_TensorRT-LLM.md). **Treat these as starting points—tune for your model and workload to achieve the best performance.**
 
 To serve the model using `trtllm-serve`:
@@ -260,41 +251,11 @@ EOF
 ```
 
 #### B200 FP4 max-throughput config
->>>>>>> upstream/main
 ```bash
 cat >./extra-llm-api-config.yml <<EOF
 cuda_graph_config:
   enable_padding: true
   batch_sizes:
-<<<<<<< HEAD
-    - 1
-    - 2
-    - 4
-    - 8
-    - 16
-    - 32
-    - 64
-    - 128
-    - 256
-    - 384
-print_iter_log: true
-enable_attention_dp: true
-EOF
-
-trtllm-serve \
-  deepseek-ai/DeepSeek-V3 \
-  --host localhost \
-  --port 8000 \
-  --backend pytorch \
-  --max_batch_size 384 \
-  --max_num_tokens 1536 \
-  --tp_size 8 \
-  --ep_size 8 \
-  --pp_size 1 \
-  --kv_cache_free_gpu_memory_fraction 0.85 \
-  --extra_llm_api_options ./extra-llm-api-config.yml
-```
-=======
   - 1024
   - 896
   - 512
@@ -362,30 +323,21 @@ trtllm-serve \
   --extra_llm_api_options ./extra-llm-api-config.yml
 ```
 It's possible seeing OOM issues on some configs. Considering reducing `kv_cache_free_gpu_mem_fraction` to a smaller value as a workaround. We're working on the investigation and addressing the problem. If you are using max-throughput config, reduce `max_num_tokens` to `3072` to avoid OOM issues.
->>>>>>> upstream/main
 
 To query the server, you can start with a `curl` command:
 ```bash
 curl http://localhost:8000/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
-<<<<<<< HEAD
-      "model": "deepseek-ai/DeepSeek-V3",
-=======
       "model": "deepseek-ai/DeepSeek-R1",
->>>>>>> upstream/main
       "prompt": "Where is New York?",
       "max_tokens": 16,
       "temperature": 0
   }'
 ```
 
-<<<<<<< HEAD
-For DeepSeek-R1, use the model name `deepseek-ai/DeepSeek-R1`.
-=======
 For DeepSeek-R1 FP4, use the model name `nvidia/DeepSeek-R1-FP4-v2`.  
 For DeepSeek-V3, use the model name `deepseek-ai/DeepSeek-V3`.
->>>>>>> upstream/main
 
 ### Disaggregated Serving
 

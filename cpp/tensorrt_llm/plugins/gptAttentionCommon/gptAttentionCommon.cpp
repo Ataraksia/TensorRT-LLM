@@ -90,10 +90,7 @@ GPTAttentionPluginCommon::GPTAttentionPluginCommon(int layer_idx, int num_heads,
     mDenseContextFMHA = dense_context_fmha;
     mPagedContextFMHA = use_paged_context_fmha;
     mFP8ContextFMHA = use_fp8_context_fmha;
-<<<<<<< HEAD
-=======
     mFP8AttenOutput = use_fp8_context_fmha;
->>>>>>> upstream/main
     mHasFullAttentionMask = has_full_attention_mask;
     mUseKVCache = use_cache;
     mIsSpecDecodingEnabled = is_spec_decoding_enabled;
@@ -157,10 +154,7 @@ GPTAttentionPluginCommon::GPTAttentionPluginCommon(void const* data, size_t leng
     read(d, mDenseContextFMHA);
     read(d, mPagedContextFMHA);
     read(d, mFP8ContextFMHA);
-<<<<<<< HEAD
-=======
     read(d, mFP8AttenOutput);
->>>>>>> upstream/main
     read(d, mHasFullAttentionMask);
     read(d, mUseKVCache);
     read(d, mIsSpecDecodingEnabled);
@@ -221,20 +215,12 @@ size_t GPTAttentionPluginCommon::getCommonSerializationSize() const noexcept
         + sizeof(mRemovePadding) + sizeof(mMaskType) + sizeof(mBlockSparseParams) + sizeof(mPagedKVCache)
         + sizeof(mTokensPerBlock) + sizeof(mType) + sizeof(mMaxContextLength) + sizeof(mQKVBiasEnabled)
         + sizeof(mCrossAttention) + sizeof(mMaxDistance) + sizeof(mPosShiftEnabled) + sizeof(mDenseContextFMHA)
-<<<<<<< HEAD
-        + sizeof(mPagedContextFMHA) + sizeof(mFP8ContextFMHA) + sizeof(mHasFullAttentionMask) + sizeof(mUseKVCache)
-        + sizeof(mUnfuseQkvGemm) + sizeof(mUseLognScaling) + sizeof(mIsSpecDecodingEnabled) + sizeof(mUseSpecDecoding)
-        + sizeof(mSpecDecodingIsGenerationLengthVariable) + sizeof(mSpecDecodingMaxGenerationLength)
-        + sizeof(mNbMultiBlockSemaphores) + sizeof(mIsMLAEnabled) + sizeof(mMLAParams) + sizeof(mFuseFp4Quant)
-        + sizeof(mSkipAttn) + sizeof(uint32_t) // size of DecoderXQARunnerResource buffer.
-=======
         + sizeof(mPagedContextFMHA) + sizeof(mFP8ContextFMHA) + sizeof(mFP8AttenOutput) + sizeof(mHasFullAttentionMask)
         + sizeof(mUseKVCache) + sizeof(mUnfuseQkvGemm) + sizeof(mUseLognScaling) + sizeof(mIsSpecDecodingEnabled)
         + sizeof(mUseSpecDecoding) + sizeof(mSpecDecodingIsGenerationLengthVariable)
         + sizeof(mSpecDecodingMaxGenerationLength) + sizeof(mNbMultiBlockSemaphores) + sizeof(mIsMLAEnabled)
         + sizeof(mMLAParams) + sizeof(mFuseFp4Quant) + sizeof(mSkipAttn)
         + sizeof(uint32_t) // size of DecoderXQARunnerResource buffer.
->>>>>>> upstream/main
         + sizeof(mCpSize) + sizeof(mCpRank) + sizeof(int32_t) * mCpGroup.size() + mResource->getSerializationSize();
 }
 
@@ -283,10 +269,7 @@ void GPTAttentionPluginCommon::serializeCommon(void* buffer) const noexcept
     write(d, mDenseContextFMHA);
     write(d, mPagedContextFMHA);
     write(d, mFP8ContextFMHA);
-<<<<<<< HEAD
-=======
     write(d, mFP8AttenOutput);
->>>>>>> upstream/main
     write(d, mHasFullAttentionMask);
     write(d, mUseKVCache);
     write(d, mIsSpecDecodingEnabled);

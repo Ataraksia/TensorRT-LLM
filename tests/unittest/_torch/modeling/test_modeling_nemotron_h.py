@@ -33,13 +33,9 @@ def extract_decode_logprobs(result: RequestOutput,
 def create_nemotron_h_llm(use_cuda_graph,
                           disable_overlap_scheduler,
                           max_batch_size,
-<<<<<<< HEAD
-                          mamba_ssm_cache_dtype=None):
-=======
                           mamba_ssm_cache_dtype=None,
                           enable_chunked_prefill=False,
                           max_num_tokens=None):
->>>>>>> upstream/main
     """Create LLM with specific overlap scheduler setting"""
     model_dir = f"{llm_models_root(check=True)}/Nemotron-H-8B-Base-8K"
     return LLM(
@@ -53,11 +49,8 @@ def create_nemotron_h_llm(use_cuda_graph,
             mamba_ssm_cache_dtype="auto"
             if mamba_ssm_cache_dtype is None else mamba_ssm_cache_dtype),
         sampler_type="TRTLLMSampler",
-<<<<<<< HEAD
-=======
         enable_chunked_prefill=enable_chunked_prefill,
         max_num_tokens=max_num_tokens,
->>>>>>> upstream/main
     )
 
 
@@ -347,8 +340,6 @@ def test_nemotron_h_cuda_graph_overlap_scheduler():
             msg=lambda x:
             f"Prompt {i}: with/without overlap scheduler (with CG) logprobs for all selected tokens {x}"
         )
-<<<<<<< HEAD
-=======
 
 
 def test_nemotron_h_chunked_prefill():
@@ -408,4 +399,3 @@ def test_nemotron_h_chunked_prefill():
             atol=0.2,
             rtol=0.05,
             msg=lambda x: f"Prompt {i} decode logprobs {x}")
->>>>>>> upstream/main

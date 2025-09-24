@@ -2,12 +2,6 @@
 This script is used to start the MPICommSession in the rank0 and wait for the
 MPI Proxy process to connect and get the MPI task to run.
 '''
-<<<<<<< HEAD
-from tensorrt_llm._utils import mpi_world_size
-from tensorrt_llm.executor.utils import (
-    get_spawn_proxy_process_ipc_addr_env,
-    get_spawn_proxy_process_ipc_hmac_key_env)
-=======
 from typing import Literal
 
 import click
@@ -16,7 +10,6 @@ import zmq
 from tensorrt_llm._utils import global_mpi_rank, mpi_world_size
 from tensorrt_llm.executor.ipc import ZeroMqQueue
 from tensorrt_llm.executor.utils import get_spawn_proxy_process_ipc_addr_env
->>>>>>> upstream/main
 from tensorrt_llm.llmapi.mpi_session import RemoteMpiCommSessionServer
 from tensorrt_llm.llmapi.utils import print_colored_debug
 
@@ -30,10 +23,6 @@ def launch_server_main(sub_comm=None):
         comm=sub_comm,
         n_workers=num_ranks,
         addr=get_spawn_proxy_process_ipc_addr_env(),
-<<<<<<< HEAD
-        hmac_key=get_spawn_proxy_process_ipc_hmac_key_env(),
-=======
->>>>>>> upstream/main
         is_comm=True)
     print_colored_debug(
         f"MPI Comm Server started at {get_spawn_proxy_process_ipc_addr_env()}")
@@ -42,10 +31,6 @@ def launch_server_main(sub_comm=None):
     print_colored_debug("RemoteMpiCommSessionServer stopped\n", "yellow")
 
 
-<<<<<<< HEAD
-if __name__ == '__main__':
-    launch_server_main()
-=======
 def stop_server_main():
     queue = ZeroMqQueue((get_spawn_proxy_process_ipc_addr_env(), None),
                         use_hmac_encryption=False,
@@ -81,4 +66,3 @@ def main(action: Literal["start", "stop"] = "start"):
 
 if __name__ == '__main__':
     main()
->>>>>>> upstream/main

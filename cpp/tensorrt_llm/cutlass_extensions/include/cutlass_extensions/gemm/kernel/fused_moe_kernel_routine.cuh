@@ -18,11 +18,7 @@
 #pragma once
 #include <cutlass_extensions/gemm/kernel/fused_moe_kernel_traits.cuh>
 
-<<<<<<< HEAD
-namespace fused_moe
-=======
 namespace fused_moe_oss
->>>>>>> upstream/main
 {
 
 template <typename ElementInput_, typename ElementWeight_, typename ElementOutput_, int TileM_, int TileN_, int TileK_,
@@ -802,8 +798,4 @@ struct Fused_Moe_Kernel_routine_sm80<ElementInput_, ElementWeight_, ElementOutpu
     }
 };
 
-<<<<<<< HEAD
-} // namespace fused_moe
-=======
 } // namespace fused_moe_oss
->>>>>>> upstream/main

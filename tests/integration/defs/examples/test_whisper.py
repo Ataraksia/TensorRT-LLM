@@ -47,11 +47,7 @@ def test_llm_whisper_general(llm_venv, engine_dir, data_type,
                              weight_only_precision, use_attention_plugin,
                              use_gemm_plugin, whisper_example_root,
                              whisper_model_root, num_beams, use_cpp_runtime,
-<<<<<<< HEAD
-                             whisper_example_audio_file):
-=======
                              whisper_example_audio_file, llm_datasets_root):
->>>>>>> upstream/main
     print("Locate model checkpoints in test storage...")
     tllm_model_name, model_ckpt_dir = whisper_model_root
 
@@ -127,10 +123,7 @@ def test_llm_whisper_general(llm_venv, engine_dir, data_type,
         print("Run inference using Whisper's custom Python runtime...")
         run_cmd = [
             f"{whisper_example_root}/run.py",
-<<<<<<< HEAD
-=======
             f"--dataset={llm_datasets_root}/hf-internal-testing/librispeech_asr_dummy",
->>>>>>> upstream/main
             f"--engine_dir={whisper_engine_dir}",
             f"--assets_dir={model_ckpt_dir}",
             f"--num_beams={num_beams}",

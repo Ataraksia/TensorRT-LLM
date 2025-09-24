@@ -6,11 +6,8 @@ import io
 import os
 import sys
 from datetime import datetime
-<<<<<<< HEAD
-=======
 from pathlib import Path
 from typing import List, Tuple
->>>>>>> upstream/main
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
@@ -24,10 +21,6 @@ from transformers import AutoProcessor, Blip2Processor
 from utils import utils
 
 
-<<<<<<< HEAD
-def prepare_inputs(text_data,
-                   image_data,
-=======
 def pixtral_pad_images(
         image_list: List[Image.Image]) -> Tuple[np.ndarray, np.ndarray]:
     if not image_list:
@@ -54,7 +47,6 @@ def pixtral_pad_images(
 def prepare_inputs(text_data,
                    image_data,
                    image_sizes,
->>>>>>> upstream/main
                    request_output_len_data,
                    beam_width_data,
                    temperature_data,
@@ -69,10 +61,6 @@ def prepare_inputs(text_data,
                    image_input_name="image_input"):
     inputs = [
         utils.prepare_tensor("text_input", text_data, grpcclient),
-<<<<<<< HEAD
-        utils.prepare_tensor(image_input_name, image_data, grpcclient),
-=======
->>>>>>> upstream/main
         utils.prepare_tensor("max_tokens", request_output_len_data, grpcclient),
         utils.prepare_tensor("beam_width", beam_width_data, grpcclient),
         utils.prepare_tensor("temperature", temperature_data, grpcclient),
@@ -82,8 +70,6 @@ def prepare_inputs(text_data,
         utils.prepare_tensor("top_p", top_p_data, grpcclient),
         utils.prepare_tensor("stream", streaming_data, grpcclient),
     ]
-<<<<<<< HEAD
-=======
     if image_data is not None:
         inputs += [
             utils.prepare_tensor(image_input_name, image_data, grpcclient),
@@ -92,7 +78,6 @@ def prepare_inputs(text_data,
         inputs += [
             utils.prepare_tensor("image_sizes_input", image_sizes, grpcclient),
         ]
->>>>>>> upstream/main
     if repetition_penalty_data is not None:
         inputs += [
             utils.prepare_tensor("repetition_penalty", repetition_penalty_data,
@@ -111,22 +96,6 @@ def prepare_inputs(text_data,
     return inputs
 
 
-<<<<<<< HEAD
-def load_image(image_path):
-    if image_path.startswith("http") or image_path.startswith("https"):
-        image = Image.open(requests.get(image_path,
-                                        stream=True).raw).convert("RGB")
-    elif image_path.startswith("data:image/jpeg;base64,"):
-        image_base64 = image_path.split(",")[1]
-        # Decode the base64 string
-        image_data = base64.b64decode(image_base64)
-        # Create a BytesIO object from the decoded data
-        image_buffer = io.BytesIO(image_data)
-        image = Image.open(image_buffer).convert("RGB")
-    else:
-        image = Image.open(image_path).convert("RGB")
-    return image
-=======
 def load_image(image_path) -> Image.Image:
     if image_path.startswith("http") or image_path.startswith("https"):
         image_bytes = requests.get(image_path, stream=True).content
@@ -137,7 +106,6 @@ def load_image(image_path) -> Image.Image:
         image_bytes = Path(image_path).read_bytes()
 
     return Image.open(io.BytesIO(image_bytes)).convert("RGB")
->>>>>>> upstream/main
 
 
 def load_video(video_path, num_of_frames):
@@ -300,11 +268,7 @@ if __name__ == "__main__":
                         required=True,
                         choices=[
                             'blip2', 'llava', 'vila', 'mllama',
-<<<<<<< HEAD
-                            'llava_onevision', 'qwen2_vl'
-=======
                             'llava_onevision', 'qwen2_vl', 'pixtral'
->>>>>>> upstream/main
                         ],
                         help="Model type")
     parser.add_argument("--hf_model_dir",
@@ -314,24 +278,18 @@ if __name__ == "__main__":
                         help="path to the model directory")
     FLAGS = parser.parse_args()
     # load and process images or video
-<<<<<<< HEAD
-=======
     image_sizes = np.empty((0, 2), dtype=np.int64)
->>>>>>> upstream/main
     if 'vila' in FLAGS.model_type:
         image_paths = FLAGS.image.split(",")
         raw_image = []
         for image_path in image_paths:
             raw_image.append(load_image(image_path))
-<<<<<<< HEAD
-=======
     elif 'pixtral' in FLAGS.model_type:
         image_paths = FLAGS.image.split(",") if FLAGS.image else []
         raw_image = []
         for image_path in image_paths:
             raw_image.append(load_image(image_path))
         raw_image, image_sizes = pixtral_pad_images(raw_image)
->>>>>>> upstream/main
     elif FLAGS.video is not None:
         assert FLAGS.video_num_frames is not None, "Number of frames should be provided for video input."
         raw_video = load_video(FLAGS.video, FLAGS.video_num_frames)
@@ -381,12 +339,9 @@ if __name__ == "__main__":
             FLAGS.text = image_tag + FLAGS.text
         image_data = np.array([[raw_image]])
         image_input_name = "image_bytes_input"
-<<<<<<< HEAD
-=======
     elif 'pixtral' in FLAGS.model_type:
         image_data = np.array([raw_image])
         image_input_name = "image_bytes_input"
->>>>>>> upstream/main
     elif 'llava_onevision' in FLAGS.model_type:
         if FLAGS.video is not None:
             image_data = np.array([raw_video])
@@ -418,12 +373,9 @@ if __name__ == "__main__":
     temperature_data = np.array(temperature, dtype=np.float32)
     streaming = [[FLAGS.streaming]]
     streaming_data = np.array(streaming, dtype=bool)
-<<<<<<< HEAD
-=======
     image_data = None if image_data.size == 0 else image_data
     image_sizes_data = None if image_sizes.size == 0 else np.array(
         [image_sizes], dtype=np.int64)
->>>>>>> upstream/main
 
     model_name = "ensemble"
     if FLAGS.use_bls:
@@ -446,10 +398,7 @@ if __name__ == "__main__":
 
     inputs = prepare_inputs(text_data,
                             image_data,
-<<<<<<< HEAD
-=======
                             image_sizes_data,
->>>>>>> upstream/main
                             request_output_len_data,
                             beam_width_data,
                             temperature_data,

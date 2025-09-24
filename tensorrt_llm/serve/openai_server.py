@@ -1,13 +1,5 @@
 #!/usr/bin/env python
 import asyncio
-<<<<<<< HEAD
-import signal
-import traceback
-from contextlib import asynccontextmanager
-from http import HTTPStatus
-from pathlib import Path
-from typing import AsyncGenerator, AsyncIterator, List, Optional, Tuple
-=======
 import os
 import re
 import signal
@@ -18,48 +10,19 @@ from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, AsyncGenerator, AsyncIterator, List, Optional, Union
->>>>>>> upstream/main
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-<<<<<<< HEAD
-from transformers import AutoConfig, AutoProcessor
-
-=======
 from starlette.routing import Mount
 from transformers import AutoConfig, AutoProcessor
 
 from tensorrt_llm._tensorrt_engine import LLM
->>>>>>> upstream/main
 # yapf: disable
 from tensorrt_llm.executor import CppExecutorError
 from tensorrt_llm.executor.postproc_worker import PostprocParams
 from tensorrt_llm.inputs import prompt_inputs
-<<<<<<< HEAD
-from tensorrt_llm.llmapi import LLM
-from tensorrt_llm.llmapi.llm import RequestOutput
-from tensorrt_llm.logger import logger
-from tensorrt_llm.serve.chat_utils import (ConversationMessage,
-                                           apply_chat_template,
-                                           parse_chat_messages_coroutines)
-from tensorrt_llm.serve.openai_protocol import (ChatCompletionRequest,
-                                                ChatCompletionResponse,
-                                                CompletionRequest,
-                                                CompletionResponse,
-                                                CompletionResponseChoice,
-                                                ErrorResponse, ModelCard,
-                                                ModelList, UsageInfo,
-                                                to_llm_disaggregated_params)
-from tensorrt_llm.serve.postprocess_handlers import (
-    ChatPostprocArgs, CompletionPostprocArgs, chat_response_post_processor,
-    chat_stream_post_processor, completion_response_post_processor,
-    completion_stream_post_processor)
-from tensorrt_llm.version import __version__ as VERSION
-
-from .._utils import nvtx_mark
-=======
 from tensorrt_llm.inputs.data import TokensPrompt
 from tensorrt_llm.inputs.utils import ConversationMessage, apply_chat_template
 from tensorrt_llm.llmapi import DisaggregatedParams as LlmDisaggregatedParams
@@ -98,7 +61,6 @@ from tensorrt_llm.version import __version__ as VERSION
 from .._utils import nvtx_mark, set_prometheus_multiproc_dir
 from .harmony_adapter import (HarmonyAdapter, get_harmony_adapter,
                               maybe_transform_reasoning_effort)
->>>>>>> upstream/main
 
 # yapf: enale
 TIMEOUT_KEEP_ALIVE = 5  # seconds.
@@ -107,21 +69,6 @@ TIMEOUT_KEEP_ALIVE = 5  # seconds.
 class OpenAIServer:
 
     def __init__(self,
-<<<<<<< HEAD
-                 llm: LLM,
-                 model: str):
-        self.llm = llm
-        self.tokenizer = llm.tokenizer
-        try:
-            hf_tokenizer_path = llm._hf_model_dir or self.tokenizer.tokenizer.name_or_path
-            self.processor = AutoProcessor.from_pretrained(hf_tokenizer_path)
-            self.model_config = AutoConfig.from_pretrained(hf_tokenizer_path)
-        except Exception:
-            logger.debug("Failed to load AutoProcessor or AutoConfig for %s", hf_tokenizer_path)
-            self.processor = None
-            self.model_config = None
-
-=======
                  llm: Union[LLM, MultimodalEncoder],
                  model: str,
                  server_role: Optional[ServerRole],
@@ -150,19 +97,11 @@ class OpenAIServer:
             self.enable_store = False
         self.conversation_store = ConversationHistoryStore()
 
->>>>>>> upstream/main
         model_dir = Path(model)
         if model_dir.exists() and model_dir.is_dir():
             self.model = model_dir.name
         else:
             self.model = model
-<<<<<<< HEAD
-
-        @asynccontextmanager
-        async def lifespan(app: FastAPI):
-            # terminate rank0 worker
-            yield
-=======
         self.metrics_collector = None
         self.perf_metrics = None
         self.perf_metrics_lock = None
@@ -206,7 +145,6 @@ class OpenAIServer:
             if self.metadata_server is not None:
                 self.metadata_server.remove(f"trtllm/{self.llm.llm_id}")
                 logger.info(f"trtllm/{self.llm.llm_id} is unregistered")
->>>>>>> upstream/main
             self.llm.shutdown()
 
         self.app = FastAPI(lifespan=lifespan)
@@ -215,11 +153,6 @@ class OpenAIServer:
         async def validation_exception_handler(_, exc):
             return self.create_error_response(message=str(exc))
 
-<<<<<<< HEAD
-        self.register_routes()
-
-    async def await_disconnected(self, raw_request: Request, promise):
-=======
         if self.server_role is not ServerRole.MM_ENCODER:
             self.register_routes()
         else:
@@ -229,7 +162,6 @@ class OpenAIServer:
     async def await_disconnected(self, raw_request: Request, promise):
         if raw_request is None:
             return
->>>>>>> upstream/main
         while not await raw_request.is_disconnected():
             await asyncio.sleep(1)
         if not promise.finished:
@@ -245,22 +177,13 @@ class OpenAIServer:
     def create_error_response(
             message: str,
             err_type: str = "BadRequestError",
-<<<<<<< HEAD
-            status_code: HTTPStatus = HTTPStatus.BAD_REQUEST) -> ErrorResponse:
-=======
             status_code: HTTPStatus = HTTPStatus.BAD_REQUEST) -> Response:
->>>>>>> upstream/main
         error_response = ErrorResponse(message=message,
                                        type=err_type,
                                        code=status_code.value)
         return JSONResponse(content=error_response.model_dump(),
                             status_code=error_response.code)
 
-<<<<<<< HEAD
-
-    def register_routes(self):
-        self.app.add_api_route("/health", self.health, methods=["GET"])
-=======
     def _create_invalid_response_id_error(self, response_id: str) -> Response:
         return self.create_error_response(
             err_type="InvalidRequestError",
@@ -278,24 +201,17 @@ class OpenAIServer:
     def register_routes(self):
         self.app.add_api_route("/health", self.health, methods=["GET"])
         self.app.add_api_route("/health_generate", self.health_generate, methods=["GET"])
->>>>>>> upstream/main
         self.app.add_api_route("/version", self.version, methods=["GET"])
         self.app.add_api_route("/v1/models", self.get_model, methods=["GET"])
         # TODO: the metrics endpoint only reports iteration stats, not the runtime stats for now
         self.app.add_api_route("/metrics", self.get_iteration_stats, methods=["GET"])
-<<<<<<< HEAD
-=======
         self.app.add_api_route("/perf_metrics", self.get_perf_metrics, methods=["GET"])
->>>>>>> upstream/main
         # TODO: workaround before ETCD support
         self.app.add_api_route("/kv_cache_events", self.get_kv_cache_events, methods=["POST"])
         self.app.add_api_route("/v1/completions",
                                self.openai_completion,
                                methods=["POST"])
         self.app.add_api_route("/v1/chat/completions",
-<<<<<<< HEAD
-                               self.openai_chat,
-=======
                                self.openai_chat if not self.use_harmony else self.chat_harmony,
                                methods=["POST"])
         self.app.add_api_route("/v1/responses",
@@ -336,14 +252,11 @@ class OpenAIServer:
         self.app.add_api_route("/metrics", self.get_iteration_stats, methods=["GET"])
         self.app.add_api_route("/v1/chat/completions",
                                self.openai_mm_encoder,
->>>>>>> upstream/main
                                methods=["POST"])
 
     async def health(self) -> Response:
         return Response(status_code=200)
 
-<<<<<<< HEAD
-=======
     async def health_generate(self) -> Response:
         """Health check that performs a minimal generation."""
         try:
@@ -378,7 +291,6 @@ class OpenAIServer:
             logger.error(f"Health generate check encountered exception: {e}", exc_info=True)
             return Response(status_code=500, content=f"Generation health check failed: {str(e)}")
 
->>>>>>> upstream/main
     async def version(self) -> JSONResponse:
         ver = {"version": VERSION}
         return JSONResponse(content=ver)
@@ -393,8 +305,6 @@ class OpenAIServer:
             stats.append(stat)
         return JSONResponse(content=stats)
 
-<<<<<<< HEAD
-=======
     async def get_perf_metrics(self) -> JSONResponse:
         if self.perf_metrics is None:
             return JSONResponse(content=[])
@@ -439,7 +349,6 @@ class OpenAIServer:
             metrics_dict["perf_metrics"] = metrics_json
         return JSONResponse(content=list(perf_metrics))
 
->>>>>>> upstream/main
     async def get_kv_cache_events(self) -> JSONResponse:
         events = []
         try:
@@ -450,8 +359,6 @@ class OpenAIServer:
             pass
         return JSONResponse(content=events)
 
-<<<<<<< HEAD
-=======
     async def _extract_metrics(self, res: RequestOutput):
         if not res.finished:
             return
@@ -469,7 +376,6 @@ class OpenAIServer:
                 async with self.perf_metrics_lock:
                     self.perf_metrics.append(item)
 
->>>>>>> upstream/main
     async def openai_chat(self, request: ChatCompletionRequest, raw_request: Request) -> Response:
 
         def get_role() -> str:
@@ -481,27 +387,6 @@ class OpenAIServer:
 
         async def chat_stream_generator(
                 promise: RequestOutput, postproc_params: PostprocParams) -> AsyncGenerator[str, None]:
-<<<<<<< HEAD
-            if not self.postproc_worker_enabled:
-                post_processor, args = postproc_params.post_processor, postproc_params.postproc_args
-            async for res in promise:
-                pp_results = res.outputs[0]._postprocess_result if self.postproc_worker_enabled else post_processor(res, args)
-                for pp_res in pp_results:
-                    yield pp_res
-            yield f"data: [DONE]\n\n"
-            nvtx_mark("generation ends")
-
-        async def create_chat_response(
-                promise: RequestOutput, postproc_params: PostprocParams) -> ChatCompletionResponse:
-            await promise.aresult()
-            if self.postproc_worker_enabled:
-                return promise.outputs[0]._postprocess_result
-            else:
-                post_processor, args = postproc_params.post_processor, postproc_params.postproc_args
-                return post_processor(promise, args)
-
-        try:
-=======
             try:
                 if not self.postproc_worker_enabled:
                     post_processor, args = postproc_params.post_processor, postproc_params.postproc_args
@@ -533,29 +418,10 @@ class OpenAIServer:
 
         try:
             check_multiple_response(request.n, self.llm.args.backend)
->>>>>>> upstream/main
             conversation: List[ConversationMessage] = []
             tool_dicts = None if request.tools is None else [
                 tool.model_dump() for tool in request.tools
             ]
-<<<<<<< HEAD
-            sampling_params = request.to_sampling_params()
-            postproc_args = ChatPostprocArgs.from_request(request)
-            disaggregated_params = to_llm_disaggregated_params(request.disaggregated_params)
-
-            conversation, mm_coroutines = parse_chat_messages_coroutines(request.messages, self.model_config)
-
-            prompt: str = apply_chat_template(
-                tokenizer=self.tokenizer,
-                processor=self.processor,
-                conversation=conversation,
-                add_generation_prompt=request.add_generation_prompt,
-                tools=tool_dicts,
-                documents=request.documents,
-                chat_template=request.chat_template,
-                chat_template_kwargs=request.chat_template_kwargs or {},
-            )
-=======
             # Pass the tokenizer vocabulary size so ``logit_bias`` can be
             # expanded into an embedding bias tensor in the sampler.
             sampling_params = request.to_sampling_params(
@@ -582,7 +448,6 @@ class OpenAIServer:
                     chat_template=request.chat_template,
                     chat_template_kwargs=request.chat_template_kwargs or {},
                 )
->>>>>>> upstream/main
             prompt = prompt_inputs(prompt)
 
             mm_data = await mm_coroutines
@@ -604,13 +469,9 @@ class OpenAIServer:
                 sampling_params=sampling_params,
                 _postproc_params=postproc_params if self.postproc_worker_enabled else None,
                 streaming=request.stream,
-<<<<<<< HEAD
-                disaggregated_params=disaggregated_params
-=======
                 lora_request=request.lora_request,
                 disaggregated_params=disaggregated_params,
                 cache_salt=request.cache_salt,
->>>>>>> upstream/main
             )
             asyncio.create_task(self.await_disconnected(raw_request, promise))
             if not self.postproc_worker_enabled:
@@ -622,14 +483,6 @@ class OpenAIServer:
                 return StreamingResponse(content=response_generator,
                                          media_type="text/event-stream")
             else:
-<<<<<<< HEAD
-                response = await create_chat_response(promise, postproc_params)
-                return JSONResponse(content=response.model_dump())
-        except CppExecutorError:
-            # If internal executor error is raised, shutdown the server
-            signal.raise_signal(signal.SIGINT)
-        except Exception as e:
-=======
                 response = await create_chat_response(promise, postproc_params, disaggregated_params)
                 return JSONResponse(content=response.model_dump())
         except CppExecutorError:
@@ -714,66 +567,10 @@ class OpenAIServer:
             signal.raise_signal(signal.SIGINT)
         except Exception as e:
             logger.error(traceback.format_exc())
->>>>>>> upstream/main
             return self.create_error_response(str(e))
 
     async def openai_completion(self, request: CompletionRequest, raw_request: Request) -> Response:
 
-<<<<<<< HEAD
-        def merge_promises(
-            promises: List[RequestOutput],
-            postproc_params_collections: List[Optional[PostprocParams]]
-        ) -> AsyncIterator[Tuple[RequestOutput, Optional[PostprocParams]]]:
-            outputs = asyncio.Queue()
-            finished = [False] * len(promises)
-
-            async def producer(i: int, promise: RequestOutput, postproc_params: Optional[PostprocParams]):
-                async for output in promise:
-                    await outputs.put((output, postproc_params))
-                finished[i] = True
-
-            _tasks = [
-                asyncio.create_task(producer(i, promise, postproc_params))
-                for i, (promise, postproc_params) in enumerate(zip(promises, postproc_params_collections))
-            ]
-
-            async def consumer():
-                while not all(finished) or not outputs.empty():
-                    item = await outputs.get()
-                    yield item
-                await asyncio.gather(*_tasks)
-
-            return consumer()
-
-        async def create_completion_generator(
-                generator: AsyncIterator[Tuple[RequestOutput, Optional[PostprocParams]]]):
-            async for request_output, postproc_params in generator:
-                if not self.postproc_worker_enabled:
-                    post_processor, args = postproc_params.post_processor, postproc_params.postproc_args
-                    pp_result = post_processor(request_output, args)
-                else:
-                    pp_result = request_output.outputs[0]._postprocess_result
-                for pp_res in pp_result:
-                    yield pp_res
-            yield f"data: [DONE]\n\n"
-
-        async def create_completion_response(
-                generator: AsyncIterator[Tuple[RequestOutput, Optional[PostprocParams]]]) -> CompletionResponse:
-            all_choices: List[CompletionResponseChoice] = []
-            num_prompt_tokens = num_gen_tokens = 0
-            async for request_output, postproc_params in generator:
-                pp_result: CompletionResponse
-                if not self.postproc_worker_enabled:
-                    post_processor, args = postproc_params.post_processor, postproc_params.postproc_args
-                    pp_result = post_processor(request_output, args)
-                else:
-                    pp_result = request_output.outputs[0]._postprocess_result
-
-                choices, usage = pp_result.choices, pp_result.usage
-                all_choices.extend(choices)
-                num_prompt_tokens += usage.prompt_tokens
-                num_gen_tokens += usage.completion_tokens
-=======
         async def completion_response(promise: RequestOutput,
                                       postproc_params: Optional[PostprocParams]) -> CompletionResponse:
             response = await promise
@@ -800,23 +597,12 @@ class OpenAIServer:
                 # Aggregate prompt token ids for context-only requests
                 if rsp.prompt_token_ids is not None:
                     all_prompt_token_ids.append(rsp.prompt_token_ids)
->>>>>>> upstream/main
 
             usage_info = UsageInfo(
                 prompt_tokens=num_prompt_tokens,
                 completion_tokens=num_gen_tokens,
                 total_tokens=num_gen_tokens + num_prompt_tokens,
             )
-<<<<<<< HEAD
-            response = CompletionResponse(
-                model=self.model,
-                choices=all_choices,
-                usage=usage_info,
-            )
-            return response
-
-        try:
-=======
             merged_rsp = CompletionResponse(
                 model=self.model,
                 choices=all_choices,
@@ -866,7 +652,6 @@ class OpenAIServer:
 
         try:
             check_multiple_response(request.n, self.llm.args.backend)
->>>>>>> upstream/main
             if isinstance(request.prompt, str) or \
                 (isinstance(request.prompt, list) and isinstance(request.prompt[0], int)):
                 prompts = [request.prompt]
@@ -875,9 +660,6 @@ class OpenAIServer:
 
             promises: List[RequestOutput] = []
             postproc_params_collection: List[Optional[PostprocParams]] = []
-<<<<<<< HEAD
-            sampling_params = request.to_sampling_params()
-=======
             # Pass the tokenizer vocabulary size so ``logit_bias`` can be
             # expanded into an embedding bias tensor in the sampler.
             sampling_params = request.to_sampling_params(
@@ -885,7 +667,6 @@ class OpenAIServer:
             # TODO: better way to enable metrics
             if len(os.getenv("TRTLLM_KVCACHE_TIME_OUTPUT_PATH", "")) > 0:
                 sampling_params.return_perf_metrics = True
->>>>>>> upstream/main
             disaggregated_params = to_llm_disaggregated_params(request.disaggregated_params)
             for idx, prompt in enumerate(prompts):
                 postproc_args = CompletionPostprocArgs.from_request(request)
@@ -897,13 +678,6 @@ class OpenAIServer:
                     if request.stream else completion_response_post_processor,
                     postproc_args=postproc_args,
                 )
-<<<<<<< HEAD
-                promise = self.llm.generate_async(
-                    inputs=prompt,
-                    sampling_params=sampling_params,
-                    _postproc_params=postproc_params,
-                    streaming=request.stream,
-=======
 
                 prompt = prompt_inputs(prompt)
                 if prompt.get("prompt") is not None:
@@ -918,7 +692,6 @@ class OpenAIServer:
                     _postproc_params=postproc_params,
                     streaming=request.stream,
                     lora_request=request.lora_request,
->>>>>>> upstream/main
                     disaggregated_params=disaggregated_params
                 )
                 asyncio.create_task(self.await_disconnected(raw_request, promise))
@@ -928,27 +701,6 @@ class OpenAIServer:
                 promises.append(promise)
                 postproc_params_collection.append(None if self.postproc_worker_enabled else postproc_params)
 
-<<<<<<< HEAD
-            generator = merge_promises(promises, postproc_params_collection)
-            if request.stream:
-                response_generator = create_completion_generator(
-                    generator)
-                return StreamingResponse(content=response_generator,
-                                            media_type="text/event-stream")
-            else:
-                response = await create_completion_response(
-                    generator)
-                return JSONResponse(content=response.model_dump())
-        except CppExecutorError:
-            # If internal executor error is raised, shutdown the server
-            signal.raise_signal(signal.SIGINT)
-        except Exception as e:
-            print(f"Encountered an exception: {str(e)}")
-            traceback.print_exc()
-            return self.create_error_response(str(e))
-
-    async def __call__(self, host, port):
-=======
             if request.stream:
                 generators = [completion_generator(promise, params)
                               for promise, params in zip(promises, postproc_params_collection)]
@@ -1151,7 +903,6 @@ class OpenAIServer:
     async def __call__(self, host, port):
         # Store the binding address for server registration
         self.binding_addr = f"http://{host}:{port}"
->>>>>>> upstream/main
         config = uvicorn.Config(self.app,
                                 host=host,
                                 port=port,

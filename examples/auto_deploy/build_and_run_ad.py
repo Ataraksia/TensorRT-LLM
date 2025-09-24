@@ -3,10 +3,7 @@
 from typing import Any, Dict, Iterator, List, Optional, Union
 
 import torch
-<<<<<<< HEAD
-=======
 import yaml
->>>>>>> upstream/main
 from omegaconf import OmegaConf
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import (
@@ -30,12 +27,9 @@ from tensorrt_llm.sampling_params import SamplingParams
 # Global torch config, set the torch compile cache to fix up to llama 405B
 torch._dynamo.config.cache_size_limit = 20
 
-<<<<<<< HEAD
-=======
 # simple string, TRT-LLM style text-only prompt or full-scale HF message template
 PromptInput = Union[str, Dict, List[Dict]]
 
->>>>>>> upstream/main
 
 class PromptConfig(BaseModel):
     """Prompt configuration.
@@ -45,15 +39,6 @@ class PromptConfig(BaseModel):
     """
 
     batch_size: int = Field(default=2, description="Number of queries")
-<<<<<<< HEAD
-    queries: Union[str, List[str]] = Field(
-        default_factory=lambda: [
-            "How big is the universe? ",
-            "In simple words and in a single sentence, explain the concept of gravity: ",
-            "How to fix slicing in golf? ",
-            "Where is the capital of Iceland? ",
-        ]
-=======
     queries: Union[PromptInput, List[PromptInput]] = Field(
         default_factory=lambda: [
             # OPTION 1: simple text prompt
@@ -75,7 +60,6 @@ class PromptConfig(BaseModel):
         description="Example queries to prompt the model with. We support both TRT-LLM text-only "
         "queries via the 'prompt' key and full-scale HF message template called via "
         "apply_chat_template.",
->>>>>>> upstream/main
     )
     sp_kwargs: Dict[str, Any] = Field(
         default_factory=lambda: {"max_tokens": 100, "top_k": 200, "temperature": 1.0},
@@ -89,12 +73,6 @@ class PromptConfig(BaseModel):
         NOTE (lucaslie): has to be done with model_post_init to ensure it's always run. field
         validators are only run if a value is provided.
         """
-<<<<<<< HEAD
-        queries = [self.queries] if isinstance(self.queries, str) else self.queries
-        batch_size = self.batch_size
-        queries = queries * (batch_size // len(queries) + 1)
-        self.queries = queries[:batch_size]
-=======
         queries = self.queries if isinstance(self.queries, list) else [self.queries]
         batch_size = self.batch_size
         queries = queries * (batch_size // len(queries) + 1)
@@ -117,7 +95,6 @@ class PromptConfig(BaseModel):
             else:
                 raise ValueError(f"Invalid query type: {type(query)}")
         self.queries = queries_processed
->>>>>>> upstream/main
 
     @field_validator("sp_kwargs", mode="after")
     @classmethod
@@ -267,11 +244,7 @@ def build_llm_from_config(config: ExperimentConfig) -> LLM:
         "demollm": DemoLLM,
         "trtllm": LLM,
     }
-<<<<<<< HEAD
-    llm = llm_lookup[config.args.runtime](**config.args.to_dict())
-=======
     llm = llm_lookup[config.args.runtime](**config.args.to_llm_kwargs())
->>>>>>> upstream/main
     return llm
 
 
@@ -288,13 +261,8 @@ def print_outputs(outs: Union[RequestOutput, List[RequestOutput]]) -> List[List[
 
 def main(config: Optional[ExperimentConfig] = None):
     if config is None:
-<<<<<<< HEAD
-        config = CliApp.run(ExperimentConfig)
-    ad_logger.info(f"{config=}")
-=======
         config: ExperimentConfig = CliApp.run(ExperimentConfig)
     ad_logger.info(f"AutoDeploy Experiment Config:\n{yaml.dump(config.model_dump())}")
->>>>>>> upstream/main
 
     if config.dry_run:
         return
