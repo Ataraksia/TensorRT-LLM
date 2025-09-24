@@ -198,8 +198,6 @@ private:
     std::optional<std::vector<SizeType32>> mBeamWidthArray;
     /// @brief Number of tokens to generate per forward pass. Default is 1.
     std::optional<SizeType32> mTokensPerStep;
-    /// @brief Number of tokens to generate per forward pass. Default is 1.
-    std::optional<SizeType32> mTokensPerStep;
 };
 
 /// @brief Additional output that should be gathered.
