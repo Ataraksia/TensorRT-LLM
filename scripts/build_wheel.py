@@ -248,38 +248,38 @@ def setup_conan(scripts_dir, venv_python):
     return venv_conan
 
 
-def generate_fmha_cu(project_dir, venv_python):
-    fmha_v2_cu_dir = project_dir / "cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/fmha_v2_cu"
-    fmha_v2_cu_dir.mkdir(parents=True, exist_ok=True)
+# def generate_fmha_cu(project_dir, venv_python):
+#     fmha_v2_cu_dir = project_dir / "cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/fmha_v2_cu"
+#     fmha_v2_cu_dir.mkdir(parents=True, exist_ok=True)
 
-    fmha_v2_dir = project_dir / "cpp/kernels/fmha_v2"
-    os.chdir(fmha_v2_dir)
+#     fmha_v2_dir = project_dir / "cpp/kernels/fmha_v2"
+#     os.chdir(fmha_v2_dir)
 
-    env = os.environ.copy()
-    env.update({
-        "TORCH_CUDA_ARCH_LIST": "9.0",
-        "ENABLE_SM89_QMMA": "1",
-        "ENABLE_HMMA_FP32": "1",
-        "GENERATE_CUBIN": "1",
-        "SCHEDULING_MODE": "1",
-        "ENABLE_SM100": "1",
-        "ENABLE_SM120": "1",
-        "GENERATE_CU_TRTLLM": "true"
-    })
+#     env = os.environ.copy()
+#     env.update({
+#         "TORCH_CUDA_ARCH_LIST": "9.0",
+#         "ENABLE_SM89_QMMA": "1",
+#         "ENABLE_HMMA_FP32": "1",
+#         "GENERATE_CUBIN": "1",
+#         "SCHEDULING_MODE": "1",
+#         "ENABLE_SM100": "1",
+#         "ENABLE_SM120": "1",
+#         "GENERATE_CU_TRTLLM": "true"
+#     })
 
-    build_run("rm -rf generated")
-    build_run("rm -rf temp")
-    build_run("rm -rf obj")
-    build_run("python3 setup.py", env=env)
+#     build_run("rm -rf generated")
+#     build_run("rm -rf temp")
+#     build_run("rm -rf obj")
+#     build_run("python3 setup.py", env=env)
 
-    # Copy generated header file when cu path is active and cubins are deleted.
-    cubin_dir = project_dir / "cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/cubin"
-    build_run(f"mv generated/fmha_cubin.h {cubin_dir}")
+#     # Copy generated header file when cu path is active and cubins are deleted.
+#     cubin_dir = project_dir / "cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/cubin"
+#     build_run(f"mv generated/fmha_cubin.h {cubin_dir}")
 
-    for cu_file in (fmha_v2_dir / "generated").glob("*sm*.cu"):
-        build_run(f"mv {cu_file} {fmha_v2_cu_dir}")
+#     for cu_file in (fmha_v2_dir / "generated").glob("*sm*.cu"):
+#         build_run(f"mv {cu_file} {fmha_v2_cu_dir}")
 
-    os.chdir(project_dir)
+#     os.chdir(project_dir)
 
 
 def create_cuda_stub_links(cuda_stub_dir: str, missing_libs: list[str]) -> str:
@@ -605,12 +605,12 @@ def main(*,
 
     source_dir = get_source_dir()
 
-    fmha_v2_cu_dir = project_dir / "cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/fmha_v2_cu"
-    if clean or generate_fmha:
-        build_run(f"rm -rf {fmha_v2_cu_dir}")
-        generate_fmha_cu(project_dir, venv_python)
-    elif not fmha_v2_cu_dir.exists():
-        generate_fmha_cu(project_dir, venv_python)
+    # fmha_v2_cu_dir = project_dir / "cpp/tensorrt_llm/kernels/contextFusedMultiHeadAttention/fmha_v2_cu"
+    # if clean or generate_fmha:
+    #     build_run(f"rm -rf {fmha_v2_cu_dir}")
+    #     generate_fmha_cu(project_dir, venv_python)
+    # elif not fmha_v2_cu_dir.exists():
+    #     generate_fmha_cu(project_dir, venv_python)
 
     with working_directory(build_dir):
         if clean or first_build or configure_cmake:

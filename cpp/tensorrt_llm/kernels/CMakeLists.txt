@@ -76,7 +76,6 @@ add_cuda_architectures(kernels_src 89)
 
 add_subdirectory(cutlass_kernels)
 add_subdirectory(flashMLA)
-add_subdirectory(contextFusedMultiHeadAttention)
 add_subdirectory(decoderMaskedMultiheadAttention)
 add_subdirectory(selectiveScan)
 add_subdirectory(userbuffers)
