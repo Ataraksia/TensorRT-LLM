@@ -42,7 +42,8 @@ SamplingLayer<T>::SamplingLayer(executor::DecodingMode const& mode, DecoderDomai
     TLLM_LOG_TRACE("%s start", __PRETTY_FUNCTION__);
 
     TLLM_CHECK_WITH_INFO(!mDecodingMode.isBeamSearch(), "SamplingLayer does not support Beam search mode");
-    TLLM_CHECK_WITH_INFO(mDecodingMode.isTopKorTopP(), "SamplingLayer requires TopK or TopP mode");
+    TLLM_CHECK_WITH_INFO(mDecodingMode.isTopKorTopP() || mDecodingMode.isMultiToken(), 
+        "SamplingLayer requires TopK, TopP, or MultiToken mode");
     if (mDecodingMode.isTopK())
     {
         mSamplingLayers.emplace_back(std::make_unique<TopKSamplingLayer<T>>(decoderDomain, mBufferManager));

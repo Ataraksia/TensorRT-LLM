@@ -106,6 +106,7 @@ void GptDecoder<T>::disableLookahead(
     samplingParams->outputLogProbs = mSamplingConfig.outputLogProbs;
     samplingParams->cumLogProbs = mSamplingConfig.cumLogProbs;
     samplingParams->runtimeMinP = mSamplingConfig.minP;
+    samplingParams->tokensPerStep = mSamplingConfig.tokensPerStep;
 
     // get setup parameters
     setupParams->penaltyParams = std::move(penaltyParams);
@@ -164,6 +165,7 @@ void GptDecoder<T>::setup(SamplingConfig const& samplingConfig, size_t batchSize
         samplingParams->outputLogProbs = mSamplingConfig.outputLogProbs;
         samplingParams->cumLogProbs = mSamplingConfig.cumLogProbs;
         samplingParams->runtimeMinP = mSamplingConfig.minP;
+        samplingParams->tokensPerStep = mSamplingConfig.tokensPerStep;
 
         setupParams->decodingParams = std::move(samplingParams);
     }

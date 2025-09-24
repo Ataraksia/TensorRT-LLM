@@ -164,10 +164,11 @@ SamplingConfig Serialization::deserializeSamplingConfig(std::istream& is)
     auto numReturnSequences = su::deserialize<std::optional<SizeType32>>(is);
     auto minP = su::deserialize<std::optional<FloatType>>(is);
     auto beamWidthArray = su::deserialize<std::optional<std::vector<SizeType32>>>(is);
+    auto tokensPerStep = su::deserialize<std::optional<SizeType32>>(is);
 
     return SamplingConfig{beamWidth, topK, topP, topPMin, topPResetIds, topPDecay, randomSeed, temperature, minLength,
         beamSearchDiversityRate, repetitionPenalty, presencePenalty, frequencyPenalty, lengthPenalty, earlyStopping,
-        noRepeatNgramSize, numReturnSequences, minP, beamWidthArray};
+        noRepeatNgramSize, numReturnSequences, minP, beamWidthArray, tokensPerStep};
 }
 
 void Serialization::serialize(SamplingConfig const& config, std::ostream& os)
@@ -191,6 +192,7 @@ void Serialization::serialize(SamplingConfig const& config, std::ostream& os)
     su::serialize(config.mNumReturnSequences, os);
     su::serialize(config.mMinP, os);
     su::serialize(config.mBeamWidthArray, os);
+    su::serialize(config.mTokensPerStep, os);
 }
 
 size_t Serialization::serializedSize(SamplingConfig const& config)
@@ -215,6 +217,7 @@ size_t Serialization::serializedSize(SamplingConfig const& config)
     totalSize += su::serializedSize(config.mNumReturnSequences);
     totalSize += su::serializedSize(config.mMinP);
     totalSize += su::serializedSize(config.mBeamWidthArray);
+    totalSize += su::serializedSize(config.mTokensPerStep);
     return totalSize;
 }
 

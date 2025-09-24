@@ -76,7 +76,8 @@ public:
         std::optional<SizeType32> const& noRepeatNgramSize = std::nullopt,
         std::optional<SizeType32> const& numReturnSequences = std::nullopt,
         std::optional<FloatType> const& minP = std::nullopt,
-        std::optional<std::vector<SizeType32>> const& beamWidthArray = std::nullopt);
+        std::optional<std::vector<SizeType32>> const& beamWidthArray = std::nullopt,
+        std::optional<SizeType32> const& tokensPerStep = std::nullopt);
 
     bool operator==(SamplingConfig const& other) const;
 
@@ -100,6 +101,7 @@ public:
     [[nodiscard]] std::optional<SizeType32> getNumReturnSequences() const;
     [[nodiscard]] std::optional<FloatType> getMinP() const;
     [[nodiscard]] std::optional<std::vector<SizeType32>> getBeamWidthArray() const;
+    [[nodiscard]] std::optional<SizeType32> getTokensPerStep() const;
 
     void setBeamWidth(SizeType32 beamWidth);
     void setTopK(std::optional<SizeType32> const& topK);
@@ -120,6 +122,7 @@ public:
     void setNumReturnSequences(std::optional<SizeType32> const& numReturnSequences);
     void setMinP(std::optional<FloatType> const& minP);
     void setBeamWidthArray(std::optional<std::vector<SizeType32>> const& beamWidthArray);
+    void setTokensPerStep(std::optional<SizeType32> const& tokensPerStep);
 
 private:
     static SizeType32 checkBeamWidth(SizeType32 beamWidth);
@@ -141,6 +144,7 @@ private:
     static std::optional<FloatType> const& checkMinP(std::optional<FloatType> const& minP);
     static std::pair<std::optional<std::vector<SizeType32>> const&, SizeType32 const> const checkBeamWidthArray(
         std::optional<std::vector<SizeType32>> const& beamWidthArray, SizeType32 const beamWidth);
+    static std::optional<SizeType32> const& checkTokensPerStep(std::optional<SizeType32> const& tokensPerStep);
     void updateNumReturnBeams();
 
     friend class Serialization;
@@ -192,6 +196,10 @@ private:
     std::optional<FloatType> mMinP;
     /// @brief Controls the beam width for each step for Variable-Beam-Width-Search.
     std::optional<std::vector<SizeType32>> mBeamWidthArray;
+    /// @brief Number of tokens to generate per forward pass. Default is 1.
+    std::optional<SizeType32> mTokensPerStep;
+    /// @brief Number of tokens to generate per forward pass. Default is 1.
+    std::optional<SizeType32> mTokensPerStep;
 };
 
 /// @brief Additional output that should be gathered.

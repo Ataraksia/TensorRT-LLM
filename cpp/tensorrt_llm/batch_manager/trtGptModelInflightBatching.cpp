@@ -1423,6 +1423,13 @@ executor::DecodingMode getDecodingMode(SpeculativeDecodingMode specDecodingMode,
             "Beam width is set to 1, but decoding mode is BeamSearch. Overwriting decoding mode to TopKTopP.");
         decodingMode = executor::DecodingMode::TopKTopP();
     }
+    // Switch to MultiToken mode when tokensPerStep > 1 is requested
+    if (decodingModeOpt.has_value() && decodingModeOpt->isMultiToken())
+    {
+        TLLM_CHECK_WITH_INFO(beamWidth == 1, "MultiToken decoding mode requires beam width == 1, got %d", beamWidth);
+        TLLM_LOG_INFO("Using MultiToken decoding mode");
+        decodingMode = executor::DecodingMode::MultiToken();
+    }
     // Overwrite decoding mode when Medusa is used.
     if (specDecodingMode.isMedusa() && !decodingMode.isMedusa())
     {

@@ -73,11 +73,11 @@ void initRequestBindings(pybind11::module_& m)
             self.getTopPResetIds(), self.getTopPDecay(), self.getSeed(), self.getTemperature(), self.getMinTokens(),
             self.getBeamSearchDiversityRate(), self.getRepetitionPenalty(), self.getPresencePenalty(),
             self.getFrequencyPenalty(), self.getLengthPenalty(), self.getEarlyStopping(), self.getNoRepeatNgramSize(),
-            self.getNumReturnSequences(), self.getMinP(), self.getBeamWidthArray());
+            self.getNumReturnSequences(), self.getMinP(), self.getBeamWidthArray(), self.getTokensPerStep());
     };
     auto samplingConfigSetstate = [](py::tuple const& state)
     {
-        if (state.size() != 19)
+        if (state.size() != 20)
         {
             throw std::runtime_error("Invalid SamplingConfig state!");
         }
@@ -99,7 +99,8 @@ void initRequestBindings(pybind11::module_& m)
             state[15].cast<std::optional<SizeType32>>(),             // NoRepeatNgramSize
             state[16].cast<std::optional<SizeType32>>(),             // NumReturnSequences
             state[17].cast<std::optional<FloatType>>(),              // MinP
-            state[18].cast<std::optional<std::vector<SizeType32>>>() // BeamWidthArray
+            state[18].cast<std::optional<std::vector<SizeType32>>>(),// BeamWidthArray
+            state[19].cast<std::optional<SizeType32>>()              // TokensPerStep
         );
     };
     py::class_<tle::SamplingConfig>(m, "SamplingConfig")
@@ -121,7 +122,8 @@ void initRequestBindings(pybind11::module_& m)
                  std::optional<tle::SizeType32> const&,             // noRepeatNgramSize
                  std::optional<tle::SizeType32> const&,             // numReturnSequences
                  std::optional<tle::FloatType> const&,              // minP
-                 std::optional<std::vector<tle::SizeType32>> const& // beamWidthArray
+                 std::optional<std::vector<tle::SizeType32>> const&,// beamWidthArray
+                 std::optional<tle::SizeType32> const&              // tokensPerStep
                  >(),
             // clang-format off
             py::arg("beam_width") = 1,
@@ -143,7 +145,8 @@ void initRequestBindings(pybind11::module_& m)
             py::arg("no_repeat_ngram_size") = py::none(),
             py::arg("num_return_sequences") = py::none(),
             py::arg("min_p") = py::none(),
-            py::arg("beam_width_array") = py::none())               // clang-format on
+            py::arg("beam_width_array") = py::none(),
+            py::arg("tokens_per_step") = py::none())                // clang-format on
         .def_property("beam_width", &tle::SamplingConfig::getBeamWidth, &tle::SamplingConfig::setBeamWidth)
         .def_property("top_k", &tle::SamplingConfig::getTopK, &tle::SamplingConfig::setTopK)
         .def_property("top_p", &tle::SamplingConfig::getTopP, &tle::SamplingConfig::setTopP)
@@ -170,6 +173,7 @@ void initRequestBindings(pybind11::module_& m)
         .def_property("min_p", &tle::SamplingConfig::getMinP, &tle::SamplingConfig::setMinP)
         .def_property(
             "beam_width_array", &tle::SamplingConfig::getBeamWidthArray, &tle::SamplingConfig::setBeamWidthArray)
+        .def_property("tokens_per_step", &tle::SamplingConfig::getTokensPerStep, &tle::SamplingConfig::setTokensPerStep)
         .def(py::pickle(samplingConfigGetstate, samplingConfigSetstate));
 
     auto additionalModelOutputGetstate

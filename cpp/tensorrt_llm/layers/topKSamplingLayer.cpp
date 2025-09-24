@@ -72,6 +72,16 @@ void TopKSamplingLayer<T>::setup(SizeType32 batchSize, SizeType32 beamWidth, Ten
 
     auto setupParams = std::dynamic_pointer_cast<SamplingSetupParams>(baseSetupParams);
     mNormalizeLogProbs = setupParams->normalizeLogProbs.value_or(false);
+    
+    // Store tokensPerStep for later use in forwardAsync
+    if (setupParams->tokensPerStep.has_value())
+    {
+        auto tokensPerStepVec = setupParams->tokensPerStep.value();
+        if (!tokensPerStepVec.empty())
+        {
+            mTokensPerStep = tokensPerStepVec.front(); // Use first value for all sequences
+        }
+    }
 
     auto runtimeTopK = setupParams->runtimeTopK.value_or(std::vector{DefaultDecodingParams::getTopK()});
     auto runtimeTopP = setupParams->runtimeTopP.value_or(std::vector{DefaultDecodingParams::getTopP()});
@@ -178,7 +188,8 @@ void TopKSamplingLayer<T>::forwardAsync(std::shared_ptr<BaseDecodingOutputs> con
     params.curandState = inputs->curandStates;
     params.batchSize = batchSize;
     params.maxBatchSize = mDecoderDomain.getBatchSize();
-    params.maxTokensPerStep = 1;
+    params.maxTokensPerStep = mDecoderDomain.getMaxDecodingTokens();
+    params.tokensPerStep = bufferCastOrNull<runtime::SizeType32>(inputs->curTokensPerStep);
     params.vocabSizePadded = mDecoderDomain.getVocabSizePadded();
     params.normalizeLogProbs = mNormalizeLogProbs;
     params.logitsHasProbs = probsComputed;

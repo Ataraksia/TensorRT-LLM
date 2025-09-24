@@ -41,7 +41,7 @@ DecodingLayer<T>::DecodingLayer(executor::DecodingMode const& mode, DecoderDomai
 {
     TLLM_LOG_TRACE("%s start", __PRETTY_FUNCTION__);
 
-    if (mDecodingMode.isTopKorTopP())
+    if (mDecodingMode.isTopKorTopP() || mDecodingMode.isMultiToken())
     {
         mDecodingLayer = std::make_unique<SamplingLayer<T>>(mDecodingMode, decoderDomain, mBufferManager);
     }
@@ -73,7 +73,7 @@ DecodingLayer<T>::DecodingLayer(executor::DecodingMode const& mode, DecoderDomai
     {
         TLLM_CHECK_WITH_INFO(false,
             "Decoding mode is none of the supported {TopK, TopP, TopKTopP, BeamSearch, Medusa, Lookahead, "
-            "ExplicitDraftTokens, ExternalDraftTokens, Eagle}");
+            "ExplicitDraftTokens, ExternalDraftTokens, Eagle, MultiToken}");
     }
 
     TLLM_LOG_TRACE("%s stop", __PRETTY_FUNCTION__);
@@ -96,7 +96,8 @@ void DecodingLayer<T>::setup(SizeType32 batchSize, SizeType32 beamWidth, TensorC
             beamWidth > 1, "Decoding mode is %s, but beamWidth <= 1 (%d <= 1)", mDecodingMode.getName(), beamWidth);
     }
     else if (mDecodingMode.isTopKorTopP() || mDecodingMode.isMedusa() || mDecodingMode.isLookahead()
-        || mDecodingMode.isExplicitDraftTokens() || mDecodingMode.isExternalDraftTokens() || mDecodingMode.isEagle())
+        || mDecodingMode.isExplicitDraftTokens() || mDecodingMode.isExternalDraftTokens() || mDecodingMode.isEagle()
+        || mDecodingMode.isMultiToken())
     {
         TLLM_CHECK_WITH_INFO(
             beamWidth == 1, "Decoding mode is %s, but beamWidth != 1 (%d != 1)", mDecodingMode.getName(), beamWidth);
@@ -105,7 +106,7 @@ void DecodingLayer<T>::setup(SizeType32 batchSize, SizeType32 beamWidth, TensorC
     {
         TLLM_CHECK_WITH_INFO(false,
             "Decoding mode is none of the supported {TopK, TopP, TopKTopP, BeamSearch, Medusa, Lookahead, "
-            "ExplicitDraftTokens, ExternalDraftTokens, Eagle}");
+            "ExplicitDraftTokens, ExternalDraftTokens, Eagle, MultiToken}");
     }
 
     mDecodingLayer->setup(batchSize, beamWidth, batchSlots, setupParams->decodingParams, workspace);
@@ -160,14 +161,14 @@ std::tuple<std::shared_ptr<BaseDecodingOutputs>, std::shared_ptr<BaseDecodingInp
         preparedInputs = baseInputs;
         preparedOutputs = baseOutputs;
     }
-    else if (mDecodingMode.isTopKorTopP())
+    else if (mDecodingMode.isTopKorTopP() || mDecodingMode.isMultiToken())
     {
         auto const ite = params->ite;
         auto const step = params->step;
         auto const localBatchSize = static_cast<int64_t>(params->localBatchSize);
 
         TLLM_CHECK_WITH_INFO(localDecoderDomain.getBeamWidth() == 1,
-            "Decoding mode is TopK and/or TopP, but beamWidth != 1 (%d != 1)", localDecoderDomain.getBeamWidth());
+            "Decoding mode is %s, but beamWidth != 1 (%d != 1)", mDecodingMode.getName());
 
         // In sampling, we have supported batch sampling. So, we always compute all
         // sentences once.
@@ -254,7 +255,7 @@ std::tuple<std::shared_ptr<BaseDecodingOutputs>, std::shared_ptr<BaseDecodingInp
     {
         TLLM_CHECK_WITH_INFO(false,
             "Decoding mode is none of the supported {TopK, TopP, TopKTopP, BeamSearch, Medusa, Lookahead, "
-            "ExplicitDraftTokens, ExternalDraftTokens, Eagle}");
+            "ExplicitDraftTokens, ExternalDraftTokens, Eagle, MultiToken}");
     }
     TLLM_LOG_TRACE("%s stop", __PRETTY_FUNCTION__);
     return {preparedOutputs, preparedInputs};
