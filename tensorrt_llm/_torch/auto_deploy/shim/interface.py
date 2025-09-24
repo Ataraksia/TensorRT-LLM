@@ -1,13 +1,21 @@
+<<<<<<< HEAD
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Tuple, final
+=======
+from typing import Any, Callable, Dict, List, Optional, Tuple, final
+>>>>>>> upstream/main
 
 import torch
 import torch.nn as nn
 from torch._prims_common import DeviceLikeType
 
+<<<<<<< HEAD
 from ...pyexecutor.config import PyTorchConfig
 from ..custom_ops.attention_interface import GetCacheCallable, SequenceInfo
 from ..utils.logger import ad_logger
+=======
+from ..custom_ops.attention_interface import GetCacheCallable, SequenceInfo
+>>>>>>> upstream/main
 
 
 @final
@@ -28,20 +36,34 @@ class CachedSequenceInterface:
         return (*self.info.args, *self._caches.values())
 
     @property
+<<<<<<< HEAD
     def args_original(self) -> Tuple[torch.Tensor, ...]:
         """Return the original graph arguments expected by the model."""
         return self.info.args_original
+=======
+    def named_args(self) -> Dict[str, torch.Tensor]:
+        """Return all the named arguments owned by this interface."""
+        return {**self.info.named_args, **self._caches}
+
+    @property
+    def all_future_arg_names(self) -> List[str]:
+        """Return all the argument names owned by this interface including uninitialized caches."""
+        return list(self.info.named_args.keys()) + list(self._cache_initializers.keys())
+>>>>>>> upstream/main
 
     @property
     def dynamic_shapes(self) -> Tuple[Dict[int, Any], ...]:
         """Return the dynamic shapes of all graph arguments owned by this interface (all static)."""
         return self.info.dynamic_shapes + ({},) * len(self._caches)
 
+<<<<<<< HEAD
     @property
     def original_dynamic_shapes(self) -> Tuple[Dict[int, Any], ...]:
         """Return the dynamic shapes of the original graph arguments."""
         return self.info.original_dynamic_shapes
 
+=======
+>>>>>>> upstream/main
     def to(self, *args, **kwargs) -> None:
         self.info.to(*args, **kwargs)
         if self._caches:
@@ -52,14 +74,24 @@ class CachedSequenceInterface:
         """Add a cache initializer to the cache interface."""
         self._cache_initializers[name] = get_cache
 
+<<<<<<< HEAD
     def initialize_caches(self) -> None:
         """Initialize caches using the cache initializers."""
         assert not self._caches, "Caches already initialized."
         ad_logger.info("Setting up caches + moving info args to device")
+=======
+    def initialize_caches(self) -> int:
+        """Initialize caches using the cache initializers."""
+        assert not self._caches, "Caches already initialized."
+>>>>>>> upstream/main
         self.info.to(self.device)
         self._caches = {
             name: get_cache(self.info) for name, get_cache in self._cache_initializers.items()
         }
+<<<<<<< HEAD
+=======
+        return len(self._caches)
+>>>>>>> upstream/main
 
     def current_cache_size_bytes(self) -> int:
         """Calculate and return the total size of all caches in bytes."""
@@ -83,6 +115,7 @@ class CachedSequenceInterface:
 
 
 GetInferenceModel = Callable[[CachedSequenceInterface], nn.Module]
+<<<<<<< HEAD
 
 
 @dataclass
@@ -126,3 +159,5 @@ class AutoDeployConfig(PyTorchConfig):
 
         # TODO (https://github.com/NVIDIA/TensorRT-LLM/issues/4364) support overlap scheduler
         self.disable_overlap_scheduler = True
+=======
+>>>>>>> upstream/main

@@ -265,7 +265,10 @@ public:
 #else
     static constexpr bool use_fp8 = false;
     static constexpr bool use_w4afp8 = false;
+<<<<<<< HEAD
     static constexpr bool use_wfp4afp4 = false;
+=======
+>>>>>>> upstream/main
 #endif
 
 #if defined(ENABLE_FP4)

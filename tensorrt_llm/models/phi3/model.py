@@ -8,7 +8,11 @@ from ...functional import PositionEmbeddingType, Tensor
 from ...layers import (MLP, MOE, Attention, AttentionMaskType,
                        BlockSparseAttnParams, ColumnLinear, Embedding,
                        LayerNorm, MoeConfig, RmsNorm)
+<<<<<<< HEAD
 from ...lora_manager import LoraConfig, use_lora
+=======
+from ...lora_helper import LoraConfig, use_lora
+>>>>>>> upstream/main
 from ...mapping import Mapping
 from ...module import Module
 from ..modeling_utils import (DecoderLayerList, DecoderModelForCausalLM,

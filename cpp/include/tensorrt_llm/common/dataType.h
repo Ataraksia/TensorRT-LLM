@@ -16,7 +16,11 @@
 
 #pragma once
 
+<<<<<<< HEAD
 #include "tensorrt_llm/common/logger.h"
+=======
+#include "tensorrt_llm/common/tllmException.h"
+>>>>>>> upstream/main
 #include <NvInferRuntime.h>
 #include <map>
 

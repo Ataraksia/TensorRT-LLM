@@ -57,6 +57,14 @@ class MpiWaitThread;
 
 namespace tensorrt_llm::batch_manager
 {
+<<<<<<< HEAD
+=======
+class BaseCacheTransceiver;
+}
+
+namespace tensorrt_llm::batch_manager
+{
+>>>>>>> upstream/main
 
 namespace kv_cache_manager
 {
@@ -79,7 +87,10 @@ class LlmRequest;
 class RuntimeBuffers;
 class BasePeftCacheManager;
 class GuidedDecoder;
+<<<<<<< HEAD
 class BaseCacheTransceiver;
+=======
+>>>>>>> upstream/main
 
 // Algorithms
 class CapacityScheduler;
@@ -148,6 +159,22 @@ public:
 
     ~TrtGptModelInflightBatching() override;
 
+<<<<<<< HEAD
+=======
+    /// @brief Calculate the cache size per token for the disaggregated serving.
+    /// @param modelConfig Model configuration.
+    /// @param worldConfig World configuration.
+    /// @param maxAttentionWindowVec Maximum attention window vector. (may have fewer elements than numLayers, in which
+    /// case it cycles)
+    /// @param isCrossAttention Whether the attention is cross attention.
+    /// @param kvFactor KV factor.
+    /// @return Cache size per token for the disaggregated layers. Note that window size is not included in the result
+    /// here.
+    [[nodiscard]] static std::map<SizeType32, SizeType32> calculateCacheSizePerTokenForDisagg(
+        runtime::ModelConfig const& modelConfig, runtime::WorldConfig const& worldConfig,
+        std::vector<SizeType32> const& maxAttentionWindowVec, bool isCrossAttention, SizeType32 kvFactor);
+
+>>>>>>> upstream/main
     void terminateRequest(LlmRequestPtr const& llmRequest, bool pause = false) override;
 
     /// @brief Terminate request in the next forwardSync call that includes the request.

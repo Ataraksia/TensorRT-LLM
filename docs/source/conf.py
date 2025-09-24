@@ -16,10 +16,16 @@ from docutils import nodes
 
 sys.path.insert(0, os.path.abspath('.'))
 
+<<<<<<< HEAD
 project = 'TensorRT-LLM'
 copyright = '2025, NVidia'
 author = 'NVidia'
 branch_name = pygit2.Repository('.').head.shorthand
+=======
+project = 'TensorRT LLM'
+copyright = '2025, NVidia'
+author = 'NVidia'
+>>>>>>> upstream/main
 html_show_sphinx = False
 
 # Get the git commit hash
@@ -50,6 +56,10 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
+<<<<<<< HEAD
+=======
+    'sphinx.ext.mathjax',
+>>>>>>> upstream/main
     'myst_parser',  # for markdown support
     "breathe",
     'sphinx.ext.todo',
@@ -78,7 +88,11 @@ myst_url_schemes = {
     "https":
     None,
     "source":
+<<<<<<< HEAD
     "https://github.com/NVIDIA/TensorRT-LLM/tree/" + branch_name + "/{{path}}",
+=======
+    "https://github.com/NVIDIA/TensorRT-LLM/tree/" + commit_hash + "/{{path}}",
+>>>>>>> upstream/main
 }
 
 myst_heading_anchors = 4
@@ -86,6 +100,11 @@ myst_heading_anchors = 4
 myst_enable_extensions = [
     "deflist",
     "substitution",
+<<<<<<< HEAD
+=======
+    "dollarmath",
+    "amsmath",
+>>>>>>> upstream/main
 ]
 
 myst_substitutions = {
@@ -106,7 +125,11 @@ container published for a previous
 [GitHub pre-release or release](https://github.com/NVIDIA/TensorRT-LLM/releases)
 (see also [NGC Catalog](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release/tags)).
 ```
+<<<<<<< HEAD
     """,
+=======
+    """
+>>>>>>> upstream/main
 }
 
 autosummary_generate = True
@@ -167,8 +190,16 @@ def tag_role(name, rawtext, text, lineno, inliner, options=None, content=None):
 def setup(app):
     from helper import generate_examples, generate_llmapi
 
+<<<<<<< HEAD
     from tensorrt_llm.llmapi.utils import tag_llm_params
     tag_llm_params()
+=======
+    try:
+        from tensorrt_llm.llmapi.utils import tag_llm_params
+        tag_llm_params()
+    except ImportError:
+        print("Warning: tensorrt_llm not available, skipping tag_llm_params")
+>>>>>>> upstream/main
 
     app.add_role('tag', tag_role)
 

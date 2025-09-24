@@ -1,13 +1,27 @@
+<<<<<<< HEAD
 from typing import Dict, List, Tuple, Union
+=======
+from fnmatch import fnmatch
+from typing import Dict, Optional, Tuple, Union
+>>>>>>> upstream/main
 
 import torch
 import torch.nn.functional as F
 from torch.fx import GraphModule, Node
 
+<<<<<<< HEAD
 from ..custom_ops.quant import FP4_GLOBAL_SCALE_MAX, FP8_MAX, TRTLLM_NVFP4_SCALING_VECTOR_SIZE
 from .logger import ad_logger
 from .node_utils import (
     get_quantization_params_from_linear_node,
+=======
+from ..custom_ops.quant import FP4_GLOBAL_SCALE_MAX, FP8_MAX
+from .logger import ad_logger
+from .node_utils import (
+    extract_param_names_from_lin_node,
+    get_quantization_params_from_linear_node,
+    is_bmm_op,
+>>>>>>> upstream/main
     is_linear_op,
     is_op,
     modelopt_dynamic_block_quantize_op,
@@ -15,7 +29,11 @@ from .node_utils import (
 )
 
 try:
+<<<<<<< HEAD
     from ...quantization.utils import float4_sf_dtype
+=======
+    from ....quantization.utils.fp4_utils import float4_sf_dtype
+>>>>>>> upstream/main
 except ImportError:
     float4_sf_dtype = None
 
@@ -57,6 +75,7 @@ def fp8_scale(input: torch.Tensor) -> torch.Tensor:
     return torch.max(torch.abs(input).to(torch.float)) / FP8_MAX
 
 
+<<<<<<< HEAD
 class QuantizationImpl:
     """An abstracted static class for node quantization."""
 
@@ -336,6 +355,12 @@ def is_quantized_graph(gm: GraphModule):
     """Check if the graph is quantized by modelopt."""
     for n in gm.graph.nodes:
         if is_linear_op(n, include_quantization=False):
+=======
+def is_quantized_graph(gm: GraphModule):
+    """Check if the graph is quantized by modelopt."""
+    for n in gm.graph.nodes:
+        if is_linear_op(n):
+>>>>>>> upstream/main
             input_params, weight_params, output_params = get_quantization_params_from_linear_node(n)
             if input_params or weight_params or output_params:
                 return True
@@ -356,7 +381,11 @@ def is_quantized_op(node: Node):
 def remove_output_quantizers(gm: GraphModule):
     """Remove output quatnizer if any from the graph."""
     for n in gm.graph.nodes:
+<<<<<<< HEAD
         if is_linear_op(n, include_quantization=False) and len(n.users) == 1:
+=======
+        if is_linear_op(n) and len(n.users) == 1:
+>>>>>>> upstream/main
             user = list(n.users.keys())[0]
             if is_quantized_op(user):
                 # skip the output quantizer
@@ -377,3 +406,41 @@ def get_quantization_from_linear_node(node: torch.fx.node.Node):
             print(input_params, weight_params)
 
     return ""
+<<<<<<< HEAD
+=======
+
+
+def should_skip_quantization(
+    node_or_name: Union[Node, str],
+    excluded_patterns: list[str],
+) -> bool:
+    """Check if a node or parameter name should be skipped based on excluded patterns."""
+    if isinstance(node_or_name, str):
+        modname, _, _ = node_or_name.rpartition(".")
+    else:
+        if not (is_linear_op(node_or_name) or is_bmm_op(node_or_name)):
+            return True
+        param_name, _ = extract_param_names_from_lin_node(node_or_name)
+        modname, _, _ = param_name.rpartition(".")
+
+    return any(fnmatch(modname, pattern) for pattern in excluded_patterns)
+
+
+def extract_scales_from_node(node: Node, scale_names: list[str]) -> Dict[str, Optional[Node]]:
+    """
+    Extracts scale tensors from node.args/kwargs using a fixed list of expected scale names.
+    """
+    scales = {}
+    args = list(node.args)
+
+    # Try kwargs first
+    for i, name in enumerate(scale_names):
+        scales[name] = node.kwargs.get(name, None)
+
+    # Fallback to positional args (starting after input, weight, bias)
+    for i, name in enumerate(scale_names):
+        if scales[name] is None and len(args) > 3 + i:
+            scales[name] = args[3 + i]
+
+    return scales
+>>>>>>> upstream/main

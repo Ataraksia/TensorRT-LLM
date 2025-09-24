@@ -12,6 +12,10 @@ from tensorrt_llm._torch.pyexecutor.model_engine import \
     validate_and_set_kv_cache_quant
 from tensorrt_llm.bench.build.build import (get_benchmark_engine_settings,
                                             get_model_config)
+<<<<<<< HEAD
+=======
+from tensorrt_llm.bench.build.dataclasses import NemotronHybridConfig
+>>>>>>> upstream/main
 from tensorrt_llm.bench.dataclasses.general import (DatasetMetadata,
                                                     InferenceRequest)
 from tensorrt_llm.logger import logger
@@ -22,6 +26,11 @@ _KV_CACHE_MAP = {
     QuantAlgo.NVFP4.value: "fp8",
 }
 
+<<<<<<< HEAD
+=======
+ALL_SUPPORTED_BACKENDS = ["pytorch", "_autodeploy", "tensorrt"]
+
+>>>>>>> upstream/main
 
 def get_settings_from_engine(
     engine_path: Path
@@ -86,6 +95,7 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
     enable_chunked_prefill = params.get("enable_chunked_prefill", False)
 
     kv_cache_dtype = "auto"
+<<<<<<< HEAD
     if extra_llm_api_options:
         with open(extra_llm_api_options, 'r') as f:
             llm_args_dict = yaml.safe_load(f)
@@ -96,6 +106,22 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
 
             enable_chunked_prefill = llm_args_dict.get("enable_chunked_prefill",
                                                        enable_chunked_prefill)
+=======
+    mamba_ssm_cache_dtype = params.get("mamba_ssm_cache_dtype", "auto")
+    kv_cache_config = {}
+    if extra_llm_api_options:
+        with open(extra_llm_api_options, 'r') as f:
+            llm_args_dict = yaml.safe_load(f)
+            kv_cache_config = llm_args_dict.get("kv_cache_config", {
+                "dtype": "auto",
+            })
+            kv_cache_dtype = kv_cache_config.get("dtype", "auto")
+            mamba_ssm_cache_dtype = kv_cache_config.get("mamba_ssm_cache_dtype",
+                                                        mamba_ssm_cache_dtype)
+
+        enable_chunked_prefill = llm_args_dict.get("enable_chunked_prefill",
+                                                   enable_chunked_prefill)
+>>>>>>> upstream/main
 
     world_config = {
         "pp_size": params.get("pp"),
@@ -112,6 +138,12 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
     else:
         model_config = get_model_config(model, model_path)
 
+<<<<<<< HEAD
+=======
+        if isinstance(model_config, NemotronHybridConfig):
+            model_config.set_mamba_ssm_cache_dtype(mamba_ssm_cache_dtype)
+
+>>>>>>> upstream/main
         from tensorrt_llm._torch.model_config import ModelConfig
         model = model_path or model
         tllm_model_config = ModelConfig.from_pretrained(model,
@@ -131,6 +163,10 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
             params.get("pp"),
             dataset_metadata.avg_isl,
             dataset_metadata.avg_osl,
+<<<<<<< HEAD
+=======
+            params.get("kv_cache_free_gpu_mem_fraction"),
+>>>>>>> upstream/main
         )
 
         logger.info(
@@ -139,11 +175,16 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
         )
 
         # If chunked prefill is disabled, we need to ensure that the max_num_tokens is at least the max_isl
+<<<<<<< HEAD
         if not enable_chunked_prefill and max_num_tokens < dataset_metadata.max_isl:
+=======
+        if not enable_chunked_prefill:
+>>>>>>> upstream/main
             logger.warning(
                 f"Chunked prefill is disabled, but max_num_tokens ({max_num_tokens}) is less than the max ISL ({dataset_metadata.max_isl}). "
                 f"Forcing max_num_tokens to {dataset_metadata.max_isl + max_batch_size}."
             )
+<<<<<<< HEAD
             max_num_tokens = dataset_metadata.max_isl + max_batch_size
 
     pyt_options = {
@@ -154,6 +195,29 @@ def get_settings(params: dict, dataset_metadata: DatasetMetadata, model: str,
     }
     backend = params.get("backend", "pytorch")
 
+=======
+            max_num_tokens = max(max_num_tokens,
+                                 dataset_metadata.max_isl + max_batch_size)
+        else:
+            # TODO: Figure out how to handle chunked block size.
+            # Expecting this to be the max of chunk block and max_num_tokens.
+            pass
+
+    cuda_graph_config = {
+        "enable_padding": True,
+        "max_batch_size": max_batch_size
+    }
+
+    kv_cache_config["dtype"] = kv_cache_dtype
+    kv_cache_config["mamba_ssm_cache_dtype"] = mamba_ssm_cache_dtype
+
+    pyt_options = {
+        "cuda_graph_config": cuda_graph_config,
+        "kv_cache_config": kv_cache_config,
+    }
+
+    backend = params.get("backend", "pytorch")
+>>>>>>> upstream/main
     return {
         "sw_version": version("tensorrt_llm"),
         "model_path": model_path,
@@ -177,3 +241,42 @@ def generate_warmup_dataset(requests, steps) -> List[InferenceRequest]:
     warm_up_dataset = choices(requests, k=steps)
     shuffle(warm_up_dataset)
     return warm_up_dataset
+<<<<<<< HEAD
+=======
+
+
+def update_sampler_args_with_extra_options(sampler_args: Dict,
+                                           sampler_options: str) -> Dict:
+    """Update sampler arguments with options from a YAML file.
+
+    Args:
+        sampler_args: Base sampler arguments dictionary.
+        sampler_options: Path to YAML file containing additional options.
+
+    Returns:
+        Dict: Merged sampler arguments.
+
+    Raises:
+        FileNotFoundError: If the YAML file doesn't exist.
+        yaml.YAMLError: If the YAML file is malformed.
+        TypeError: If the YAML content is not a dictionary.
+    """
+    if sampler_options is not None:
+        try:
+            with open(sampler_options, 'r') as f:
+                sampler_options_dict = yaml.safe_load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Sampler options file not found: {sampler_options}")
+        except yaml.YAMLError as e:
+            raise yaml.YAMLError(
+                f"Invalid YAML in sampler options file {sampler_options}: {e}")
+
+        if not isinstance(sampler_options_dict, dict):
+            raise TypeError(
+                f"Sampler options file {sampler_options} must contain a dictionary, "
+                f"got {type(sampler_options_dict)}")
+
+        sampler_args = sampler_args | sampler_options_dict
+    return sampler_args
+>>>>>>> upstream/main

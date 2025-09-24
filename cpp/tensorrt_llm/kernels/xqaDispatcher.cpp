@@ -125,7 +125,11 @@ QKVPreprocessingParams<T, KVCacheBuffer> makeQKVPreprocessingParams(XQAParams co
 XqaDispatcher::XqaDispatcher(XqaFixedParams fixedParams)
     : mFixedParams(fixedParams)
     , mQDataType(mFixedParams.inputDataType)
+<<<<<<< HEAD
     , mUseTllmGen(tensorrt_llm::common::getSMVersion() == 100)
+=======
+    , mUseTllmGen(tensorrt_llm::common::isSM100Family())
+>>>>>>> upstream/main
     , mMultiProcessorCount(getMultiProcessorCount())
 {
     if (mUseTllmGen)

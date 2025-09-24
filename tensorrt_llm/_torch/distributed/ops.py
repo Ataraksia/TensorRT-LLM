@@ -1,13 +1,26 @@
 import math
 import os
+<<<<<<< HEAD
 import threading
 from itertools import accumulate
+=======
+import platform
+import threading
+>>>>>>> upstream/main
 from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import nn
 
+<<<<<<< HEAD
 from tensorrt_llm.functional import AllReduceParams, AllReduceStrategy
+=======
+from tensorrt_llm._utils import mpi_comm
+from tensorrt_llm.bindings.internal.runtime import McastGPUBuffer
+from tensorrt_llm.functional import (AllReduceFusionOp, AllReduceParams,
+                                     AllReduceStrategy, MoEAllReduceParams)
+from tensorrt_llm.logger import logger
+>>>>>>> upstream/main
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.plugin.plugin import CustomAllReduceHelper
 
@@ -46,6 +59,65 @@ def allocate_low_presicion_allreduce_workspace(mapping: Mapping) -> None:
     return
 
 
+<<<<<<< HEAD
+=======
+def get_allreduce_mnnvl_workspace(
+    mapping: Mapping, dtype: torch.dtype
+) -> Tuple[McastGPUBuffer, torch.Tensor, torch.Tensor, int]:
+
+    if not hasattr(_thread_local,
+                   f'allreduce_mnnvl_workspaces_{mapping.pp_rank}'):
+        setattr(_thread_local, f'allreduce_mnnvl_workspaces_{mapping.pp_rank}',
+                {})
+    # Support topology split
+    comm = mpi_comm().Split(
+        int(mapping.pp_rank * mapping.cp_size + mapping.cp_rank),
+        mapping.tp_rank)
+    force_mn = os.environ.get("TRTLLM_FORCE_MNNVL_AR", "0") == "1"
+
+    allreduce_mnnvl_workspaces = getattr(
+        _thread_local, f'allreduce_mnnvl_workspaces_{mapping.pp_rank}')
+    if mapping not in allreduce_mnnvl_workspaces:
+        # buffer shape: [3, 2, buffer_tokens, hidden_dim]
+        stride = 3 * 2 * dtype.itemsize
+        # Max hidden_size_to_support
+        max_hidden_dim = 16384
+        buffer_size_in_bytes = math.ceil(
+            12_000_000 / (max_hidden_dim * stride)) * (max_hidden_dim * stride)
+        max_num_elements = buffer_size_in_bytes // stride
+
+        mcast_buffer = McastGPUBuffer(
+            buffer_size_in_bytes,
+            mapping.tp_size,
+            mapping.tp_rank,
+            # Split the communicator according to the topology
+            mapping.pp_rank * mapping.cp_size + mapping.cp_rank,
+            mapping.local_rank,
+            True,  # mnNvlink
+        )
+
+        buffer = mcast_buffer.get_uc_buffer(mapping.tp_rank,
+                                            (3, 2, max_num_elements), dtype, 0)
+        # Only initialize the buffer when we need to resize it
+        buffer.fill_(-0.0)
+        # CPU barrier since we assume this should not be called in cuda graph
+        torch.cuda.synchronize()
+        comm.Barrier()
+
+        # This is a buffer to maintain the state of this allreduce Op
+        # Should have the same lifetime with self._buffer
+        # [Buffer_ptr, Clear_ptr, num_tokens_to_clear,atomic access counter]
+        buffer_flags = torch.tensor([0, 2, 0, 0],
+                                    dtype=torch.uint32,
+                                    device=torch.device("cuda",
+                                                        mapping.local_rank))
+
+        allreduce_mnnvl_workspaces[mapping] = (mcast_buffer, buffer,
+                                               buffer_flags, max_num_elements)
+    return allreduce_mnnvl_workspaces[mapping]
+
+
+>>>>>>> upstream/main
 def userbuffers_allreduce_finalize(
         input: torch.Tensor,
         force_applying_finalize: bool = False) -> torch.Tensor:
@@ -72,6 +144,7 @@ def filter_valid_input(
     return input_list, valid_list
 
 
+<<<<<<< HEAD
 def restore_full_output(output_list: List[torch.Tensor],
                         valid_list: List[bool]) -> List[torch.Tensor]:
     index_list = list(accumulate(map(int, valid_list)))
@@ -79,6 +152,16 @@ def restore_full_output(output_list: List[torch.Tensor],
         map(lambda valid, index: output_list[index - 1]
             if valid else None, valid_list, index_list))
     return output_list
+=======
+def restore_full_output(valid_outputs: List[torch.Tensor],
+                        valid_list: List[bool]) -> List[torch.Tensor]:
+    idx = 0
+    full_outputs = []
+    for v in valid_list:
+        full_outputs.append(valid_outputs[idx] if v else None)
+        idx += int(v)
+    return full_outputs
+>>>>>>> upstream/main
 
 
 def allgather(
@@ -124,12 +207,15 @@ def allgather(
                 val.shape[dim] == sizes[mapping.tp_rank] for val in input
                 if val is not None
             ])
+<<<<<<< HEAD
         # 'sizes' is not needed if all inputs in the same TP group have the same shape
         for split_size in sizes[1:]:
             if split_size != sizes[0]:
                 break
         else:
             sizes = None
+=======
+>>>>>>> upstream/main
 
     # Inputs are reshaped in this way to pass necessary shape information to the allgather op
     if isinstance(input, torch.Tensor):
@@ -193,12 +279,15 @@ def reducescatter(
                 val.shape[dim] == sum_split_size for val in input
                 if val is not None
             ])
+<<<<<<< HEAD
         # 'sizes' is not needed if all outputs in the same TP group have the same shape
         for split_size in sizes[1:]:
             if split_size != sizes[0]:
                 break
         else:
             sizes = None
+=======
+>>>>>>> upstream/main
 
     def convert_input(x, x_info):
         # Inputs are reshaped in this way to pass necessary shape information to the reducescatter op
@@ -242,11 +331,129 @@ def reducescatter(
     return output
 
 
+<<<<<<< HEAD
+=======
+class MNNVLAllReduce(nn.Module):
+    """A specialized AllReduce implementation for Multi-Node NVLink communication.
+
+    This class handles the MNNVL-specific allreduce operations, which can be more efficient
+    for certain operations when using NVLink for multi-node communication.
+    """
+
+    SUPPORTED_FUSION_HIDDEN_DIMS = [2048, 2880, 4096, 5120, 7168, 8192]
+
+    def __init__(self, mapping: Mapping, dtype: torch.dtype):
+        super().__init__()
+        self.mapping = mapping
+        self.dtype = dtype
+        assert (
+            dtype in MNNVLAllReduce.get_supported_dtypes()
+            and (not mapping.has_cp())
+        ), "MNNVL all reduce only supports dtype {MNNVLAllReduce.get_supported_dtypes()} and without cp."
+
+        self.mcast_buffer_mnnvl, self.buffer_mnnvl, self.buffer_flags_mnnvl, self.max_num_elements_mnnvl = get_allreduce_mnnvl_workspace(
+            self.mapping, dtype)
+
+    @staticmethod
+    def get_supported_dtypes():
+        return (torch.float16, torch.bfloat16, torch.float32)
+
+    # Check if MNNVL is supported
+    @staticmethod
+    def is_mnnvl(mapping: Mapping, dtype: torch.dtype) -> bool:
+        from tensorrt_llm._mnnvl_utils import MnnvlMemory
+
+        arch = platform.machine().lower()
+        is_on_aarch64 = "aarch64" in arch
+        return (dtype in MNNVLAllReduce.get_supported_dtypes()
+                and not mapping.has_cp() and mapping.is_multi_node()
+                and MnnvlMemory.supports_mnnvl() and is_on_aarch64)
+
+    def forward(
+        self,
+        input: torch.Tensor,
+        all_reduce_params: AllReduceParams,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        """Forward pass for MNNVL AllReduce.
+
+        Args:
+            input (torch.Tensor): Input tensor to be reduced
+            all_reduce_params (Optional[AllReduceParams]): Parameters for fused operations
+
+        Returns:
+            Union[torch.Tensor, Tuple[torch.Tensor, ...]]: Reduced tensor(s)
+        """
+
+        fusion_op = all_reduce_params.fusion_op
+        shape = input.shape
+        input = input.view(-1, shape[-1])
+        (num_tokens, hidden_dim) = input.shape
+
+        # Slice the buffer according to the hidden size, need to pass this numel as the new buffer size
+        max_num_tokens = self.max_num_elements_mnnvl // hidden_dim
+        num_elements_in_use = max_num_tokens * hidden_dim
+        if num_tokens > max_num_tokens:
+            logger.debug(
+                f"MNNVL AllReduce can't be enabled due to {num_tokens=} larger than {max_num_tokens=}."
+            )
+            return None
+
+        # This should not happen but leave this check for future code changes
+        if num_elements_in_use > self.max_num_elements_mnnvl:
+            logger.debug(
+                f"MNNVL AllReduce can't be enabled due to {num_elements_in_use=} larger than {self.max_num_elements_mnnvl=}."
+            )
+            return None
+
+        output = torch.empty_like(input)
+        buffer_mnnvl = self.buffer_mnnvl.view(-1)[:(3 * 2 *
+                                                    num_elements_in_use)].view(
+                                                        3, 2, -1, hidden_dim)
+
+        if fusion_op == AllReduceFusionOp.NONE:
+            output = torch.ops.trtllm.mnnvl_twoshot_allreduce(
+                input,
+                buffer_mnnvl,
+                self.buffer_flags_mnnvl,
+                num_elements_in_use,
+                True,
+            )
+            return output.view(shape)
+        # Fallback to use other allreduce if hidden_size is not supported
+        elif (fusion_op == AllReduceFusionOp.RESIDUAL_RMS_NORM
+              and hidden_dim in MNNVLAllReduce.SUPPORTED_FUSION_HIDDEN_DIMS):
+            torch.ops.trtllm.mnnvl_twoshot_allreduce(
+                input,
+                buffer_mnnvl,
+                self.buffer_flags_mnnvl,
+                num_elements_in_use,
+                False,
+            )
+            residual_in = all_reduce_params.residual
+
+            output, residual_out = torch.ops.trtllm.mnnvl_twoshot_rmsnorm(
+                buffer_mnnvl,
+                all_reduce_params.norm_weight,
+                all_reduce_params.eps,
+                residual_in,
+                self.buffer_flags_mnnvl,
+                num_elements_in_use,
+            )
+            return output.view(shape), residual_out.view(shape)
+        return None
+
+
+>>>>>>> upstream/main
 class AllReduce(nn.Module):
 
     def __init__(self,
                  mapping: Mapping,
+<<<<<<< HEAD
                  strategy: AllReduceStrategy = AllReduceStrategy.AUTO):
+=======
+                 strategy: AllReduceStrategy = AllReduceStrategy.AUTO,
+                 dtype: Optional[torch.dtype] = None):
+>>>>>>> upstream/main
         super().__init__()
         """
         AllReduce is a module that performs an all-reduce operation on a tensor.
@@ -284,14 +491,19 @@ class AllReduce(nn.Module):
             For the reference implementation for each pattern, please refer to the following unit test:
             https://github.com/NVIDIA/TensorRT-LLM/blob/main/tests/unittest/_torch/multi_gpu/test_allreduce.py
 
+<<<<<<< HEAD
             The LOWPRECISION strategy can be selected either by directly specifying it in the constructor
             or by setting the environment variable FORCE_LOW_PRECISION_ALL_REDUCE_STRATEGY when using
             the AUTO strategy.
+=======
+            The LOWPRECISION strategy can be selected either by directly specifying it in the constructor.
+>>>>>>> upstream/main
         """
 
         self.mapping = mapping
         self.workspace = None
         self.strategy = strategy
+<<<<<<< HEAD
 
         self.force_low_precision_env = os.environ.get(
             "FORCE_LOW_PRECISION_ALL_REDUCE_STRATEGY")
@@ -302,6 +514,41 @@ class AllReduce(nn.Module):
                     allocate_low_presicion_allreduce_workspace(self.mapping)
                 self.workspace = get_allreduce_workspace(self.mapping)
 
+=======
+        self.mnnvl_allreduce = None
+
+        if self.mapping.tp_size > 1:
+            # When Strategy is UB, it is guaranteed that the workspace is not used.
+            if self.strategy != AllReduceStrategy.UB:
+                if self.strategy == AllReduceStrategy.LOWPRECISION:
+                    allocate_low_presicion_allreduce_workspace(self.mapping)
+                self.workspace = get_allreduce_workspace(self.mapping)
+
+            # Initialize MNNVL AllReduce if needed
+            if self.strategy in (AllReduceStrategy.AUTO,
+                                 AllReduceStrategy.MNNVL):
+                if MNNVLAllReduce.is_mnnvl(self.mapping, dtype):
+                    try:
+                        self.mnnvl_allreduce = MNNVLAllReduce(
+                            self.mapping, dtype) if dtype else None
+                        if self.mnnvl_allreduce:
+                            logger.debug(f"MNNVLAllReduce is enabled")
+                        else:
+                            logger.debug(f"MNNVLAllReduce is disabled")
+                    except Exception as e:
+                        logger.debug(
+                            f"MNNVL AllReduce can't be enabled due to {e}.")
+                        self.mnnvl_allreduce = None
+                else:
+                    logger.debug(
+                        f"MNNVLAllReduce can't be enabled due to failing the is_mnnvl check."
+                    )
+                    self.mnnvl_allreduce = None
+
+    def is_mnnvl(self) -> bool:
+        return self.mnnvl_allreduce is not None
+
+>>>>>>> upstream/main
     def forward(
         self,
         input: torch.Tensor,
@@ -336,10 +583,30 @@ class AllReduce(nn.Module):
                                          == False):
             return input
 
+<<<<<<< HEAD
         # Assume using no fusion allreduce here
         if all_reduce_params is None:
             all_reduce_params = AllReduceParams()
 
+=======
+        input = input.contiguous()  # Underlying op requires contiguous input
+
+        allreduce_strategy = self.strategy
+        if all_reduce_params is None:
+            all_reduce_params = AllReduceParams()
+
+        # Try MNNVL AllReduce first if available
+        if self.mnnvl_allreduce:
+            mnnvl_output = self.mnnvl_allreduce(
+                input, all_reduce_params=all_reduce_params)
+            if mnnvl_output is not None:
+                return mnnvl_output
+
+        # Fall back to regular AllReduce if MNNVL is not available or not applicable
+        # Make sure the strategy is AUTO since allreduceOp does not have the branch for MNNVL
+        if allreduce_strategy == AllReduceStrategy.MNNVL:
+            allreduce_strategy = AllReduceStrategy.AUTO
+>>>>>>> upstream/main
         output = torch.ops.trtllm.allreduce(
             input=input,
             residual=all_reduce_params.residual,
@@ -348,9 +615,17 @@ class AllReduce(nn.Module):
             bias=all_reduce_params.bias,
             workspace=self.workspace,
             group=self.mapping.tp_group,
+<<<<<<< HEAD
             strategy=self.strategy,
             op=all_reduce_params.fusion_op,
             eps=all_reduce_params.eps,
+=======
+            strategy=allreduce_strategy,
+            op=all_reduce_params.fusion_op,
+            eps=all_reduce_params.eps,
+            trigger_completion_at_end=all_reduce_params.
+            trigger_completion_at_end,
+>>>>>>> upstream/main
         )
 
         return output if len(output) > 1 else output[0]
@@ -367,6 +642,11 @@ class MoEAllReduce(nn.Module):
             mapping (Mapping):  The parallel mapping config.
 
         Notes:
+<<<<<<< HEAD
+=======
+            * min latency mode:
+
+>>>>>>> upstream/main
             Support pattern: MoE Reduction + Add + AR + ADD_RMS, see this torch reference implementation:
             expert_reduction = torch.sum(active_experts_token_input *
                                         scale.unsqueeze(-1),
@@ -374,10 +654,22 @@ class MoEAllReduce(nn.Module):
             output_add = expert_reduction + shared_expert_output
             output_residual = output_add + residual
             output_hidden_states = rms_norm(output_residual, norm_weight, eps)
+<<<<<<< HEAD
+=======
+
+            * regular mode:
+
+            Support pattern: MoE Reduction + Add + AR + ADD_RMS, see this torch reference implementation:
+            expert_reduction = local_reduction(input, expanded_idx_to_permuted_idx, expert_scale_factor)
+            output_add = expert_reduction + shared_expert_output
+            output_residual = output_add + residual
+            output_hidden_states = rms_norm(output_residual, norm_weight, eps)
+>>>>>>> upstream/main
         """
         super().__init__()
         self.mapping = mapping
         self.workspace = get_allreduce_workspace(self.mapping)
+<<<<<<< HEAD
 
     def forward(
         self,
@@ -391,6 +683,23 @@ class MoEAllReduce(nn.Module):
     ) -> torch.Tensor:
         """
         Args:
+=======
+        # Pls keep this value in sync with the kOneShotMaxToken in moeAllReduceFusionKernels.h
+        self.max_token = 128
+
+    def forward(
+        self,
+        input: torch.Tensor,
+        *,
+        all_reduce_params: MoEAllReduceParams,
+    ) -> torch.Tensor:
+
+        assert all_reduce_params.is_valid(), "MoEAllReduceParams is not valid"
+
+        if all_reduce_params.is_cutlass_min_latency:
+            """
+            Args:
+>>>>>>> upstream/main
             residual: residual tensor
             norm_weight: RMS norm weight
             device_num_experts: number of experts per device
@@ -399,6 +708,7 @@ class MoEAllReduce(nn.Module):
             token_input: per token input, shared expert output
             eps: epsilon for RMSNorm
 
+<<<<<<< HEAD
         Output:
             hidden_states: hidden_states of the model
             residual: residual tensor
@@ -415,3 +725,39 @@ class MoEAllReduce(nn.Module):
             nranks=self.mapping.tp_size,
             eps=eps,
         )
+=======
+            Output:
+                hidden_states: hidden_states of the model
+                residual: residual tensor
+            """
+
+            return torch.ops.trtllm.moe_allreduce(
+                active_experts_token_input=input,
+                residual=all_reduce_params.residual,
+                norm_weight=all_reduce_params.norm_weight,
+                device_num_experts=all_reduce_params.device_num_experts,
+                scale_input=all_reduce_params.expert_scale_factor,
+                token_input=all_reduce_params.shared_expert_output,
+                workspace=self.workspace,
+                rank=self.mapping.tp_rank,
+                nranks=self.mapping.tp_size,
+                eps=all_reduce_params.eps,
+            )
+        else:
+            assert all_reduce_params.residual.shape[
+                0] <= self.max_token, "Num tokens must be less than or equal to max_token"
+
+            return torch.ops.trtllm.moe_finalize_allreduce(
+                input=input,
+                residual=all_reduce_params.residual,
+                norm_weight=all_reduce_params.norm_weight,
+                expanded_idx_to_permuted_idx=all_reduce_params.
+                expanded_idx_to_permuted_idx,
+                shared_expert_output=all_reduce_params.shared_expert_output,
+                expert_scale_factor=all_reduce_params.expert_scale_factor,
+                workspace=self.workspace,
+                rank=self.mapping.tp_rank,
+                nranks=self.mapping.tp_size,
+                eps=all_reduce_params.eps,
+            )
+>>>>>>> upstream/main

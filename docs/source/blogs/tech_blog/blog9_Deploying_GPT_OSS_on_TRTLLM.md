@@ -1,7 +1,15 @@
+<<<<<<< HEAD
 # Running a High Performance GPT-OSS-120B Inference Server with TensorRT-LLM
 
 NVIDIA has [announced](https://developer.nvidia.com/blog/delivering-1-5-m-tps-inference-on-nvidia-gb200-nvl72-nvidia-accelerates-openai-gpt-oss-models-from-cloud-to-edge/) day-0 support for OpenAI's new open-source model series, [gpt-oss](https://openai.com/index/introducing-gpt-oss/). In the guide below, we will walk you through how to launch your own
 high-performance TensorRT-LLM server for **gpt-oss-120b** for inference.
+=======
+# Running a High Performance GPT-OSS-120B Inference Server with TensorRT LLM
+
+In the guide below, we will walk you through how to launch your own
+high-performance TensorRT LLM server for **gpt-oss-120b** for inference.
+This guide covers both low-latency and max-throughput cases.
+>>>>>>> upstream/main
 
 **Low-latency** use cases aim to maximize the number of tokens per second per user (tps/user) with limited concurrency.
 
@@ -13,6 +21,7 @@ For **max-throughput**, the goal is to maximize the tokens produced per GPU per 
 - Fast SSD storage for model weights
 - Access to the gpt-oss-120b model checkpoint
 
+<<<<<<< HEAD
 We have a forthcoming guide for achieving great performance on H100; however, this guide focuses on the GPUs listed above.
 
 ## Install TensorRT-LLM
@@ -24,6 +33,16 @@ In this section, we introduce several ways to install TensorRT-LLM.
 Day-0 support for gpt-oss is provided via the NGC container image `nvcr.io/nvidia/tensorrt-llm/release:gpt-oss-dev`. This image was built on top of the pre-day-0 **dev branch**. This container is multi-platform and will run on both x64 and arm64 architectures.
 
 Run the following docker command to start the TensorRT-LLM container in interactive mode:
+=======
+We have a forthcoming guide for getting great performance on H100, however this guide focuses on the above GPUs.
+
+
+## Launching the TensorRT LLM docker container
+
+The container image that you will use will be pulled from NVIDIA's NGC. This container is multi-platform and will run on both x64 and arm64 architectures: `nvcr.io/nvidia/tensorrt-llm/release:gpt-oss-dev`
+
+Run the follow docker command to start the TensorRT LLM container in interactive mode:
+>>>>>>> upstream/main
 
 ```bash
 docker run --rm --ipc=host -it \
@@ -33,7 +52,11 @@ docker run --rm --ipc=host -it \
   -p 8000:8000 \
   -e TRTLLM_ENABLE_PDL=1 \
   -v ~/.cache:/root/.cache:rw \
+<<<<<<< HEAD
   nvcr.io/nvidia/tensorrt-llm/release:gpt-oss-dev \
+=======
+  nvcr.io/nvidia/tensorrt-llm/release:1.1.0rc1 \
+>>>>>>> upstream/main
   /bin/bash
 ```
 
@@ -43,6 +66,7 @@ Explanation of the command:
 - Allows container to interact with the host's IPC resources and shared memory for optimal performance (`--ipc=host`)
 - Runs the container in interactive mode (`-it`)
 - Sets up shared memory and stack limits for optimal performance
+<<<<<<< HEAD
 - Maps port 8000 from the container to the host
 - Enables PDL for performance optimization
 
@@ -86,6 +110,20 @@ num_gpus=8
 max_batch_size=1
 ```
 
+=======
+- Maps port 8000 from the container to your host
+- enables PDL for low-latency perf optimization
+- disables parallel weight loading
+
+Lastly the container mounts your user `.cache` directory to save the downloaded model checkpoints which are saved to `~/.cache/huggingface/hub/` by default. This prevents having to redownload the weights each time you rerun the container.
+
+
+## Running the TensorRT LLM Server
+
+As pointed out in the introduction, this guide covers low-latency and max-throughput cases. Each requires a different configurations and commands to run. We will first cover the Low-Latency use-case, followed by the max throughput use-case.
+
+### Low-latency Use-Case
+>>>>>>> upstream/main
 
 #### Creating the Extra Options Configuration
 
@@ -102,6 +140,7 @@ moe_config:
 EOF
 ```
 
+<<<<<<< HEAD
 Key takeaways:
 - `enable_attention_dp` is set to `false` to use TP instead of DP for attention.
 s- `cuda_graph_config.max_batch_size` is the maximum batch size for CUDA graph.
@@ -114,6 +153,16 @@ s- `cuda_graph_config.max_batch_size` is the maximum batch size for CUDA graph.
 
 #### Run the benchmark
 Use `trtllm-bench` to benchmark the performance of your system:
+=======
+> Note: If you are using NVIDIA H200 GPUs it is highly recommended to set the `moe_config.backend` to TRITON to use the OpenAI Triton MoE kernel. See the section [(H200 Only) Using OpenAI Triton Kernels for MoE](#h200-only-using-openai-triton-kernels-for-moe) for more details.
+
+
+#### Launching TensorRT LLM Serve
+
+To launch the TensorRT LLM Server to serve the model with the **low latency** config, run the following command. Commands for different GPU configurations are provided (1xGPU, 8xGPU, 4xGPU):
+
+<details open> <summary>1x B200/GB200/H200</summary>
+>>>>>>> upstream/main
 
 ```bash
 trtllm-bench \
@@ -172,9 +221,17 @@ Compared to the low-latency configuration, we:
 - set `stream_interval` to 10 to stream results to the client every 10 tokens. At high concurrency, the detokenization overhead of streaming mode cannot be hidden under GPU execution time, so `stream_interval` serves as a workaround to reduce this overhead.
 - set `moe_config.backend` to `CUTLASS` to use the `CUTLASS` MoE kernels which are optimized for high throughput.
 
+<<<<<<< HEAD
 #### Run the benchmark
 
 Run the following command to benchmark the throughput of your system:
+=======
+#### Launching TensorRT LLM Serve
+
+To launch the TensorRT LLM Server to serve the model with the **max throughput** config, run the following command. Commands for different GPU configurations are provided (1xGPU, 8xGPU, 4xGPU):
+
+<details open> <summary>1x B200/GB200/H200</summary>
+>>>>>>> upstream/main
 
 ```bash
 trtllm-bench \
@@ -206,6 +263,7 @@ Currently, the best throughput **19.5k tps/gpu** is achieved with DP4EP4 using 4
 
 ## Launch the TensorRT-LLM Server
 
+<<<<<<< HEAD
 We can use `trtllm-serve` to serve the model by translating the benchmark commands above. For low-latency configuration, run:
 
 ```bash
@@ -243,6 +301,75 @@ trtllm-serve \
 
 
 ### Test the Server with a Sample Request
+=======
+We can use `trtllm-serve` to serve the model by translating the benchmark commands above. For low-latency configuration, run:  
+**Note:** You can also point to a local path containing the model weights instead of the HF repo (e.g., `${local_model_path}`).
+
+```bash
+mpirun -n 1 --oversubscribe --allow-run-as-root \
+trtllm-serve  openai/gpt-oss-120b \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --backend pytorch \
+  --tp_size 8 \
+  --ep_size 8 \
+  --max_batch_size 640 \
+  --trust_remote_code \
+  --extra_llm_api_options max_throughput.yaml \
+  --kv_cache_free_gpu_memory_fraction 0.9
+```
+</details>
+
+<details> <summary>4x GB200/B200/H200</summary>
+
+```bash
+trtllm-serve \
+  openai/gpt-oss-120b \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --backend pytorch \
+  --tp_size 4 \
+  --ep_size 4 \
+  --max_batch_size 640 \
+  --trust_remote_code \
+  --extra_llm_api_options max_throughput.yaml \
+  --kv_cache_free_gpu_memory_fraction 0.9
+```
+</details>
+
+
+This command:
+- Maps port 8000 from the container to your host
+- Uses the PyTorch backend and specifies the tensor and expert parallel sizes
+- References the low latency or max throughput configuration file for extra options
+- Configures memory settings for optimal performance
+- Enables all GPUs with attention data parallelism for the max throughput scenario
+
+The initialization may take several minutes as it loads and optimizes the models.
+
+
+## (H200 Only) Using OpenAI Triton Kernels for MoE
+
+OpenAI ships a set of Triton kernels optimized for its MoE models. TensorRT LLM can leverage these kernels for Hopper based GPUs like NVIDIA's H200 for best performance. The NGC TensorRT LLM container image mentioned above already includes the required kernels so you do not need to build or install them. It is highly recommended to enable them with the steps below:
+
+### Selecting Triton as the MoE backend
+
+To use the Triton MoE backend with **trtllm-serve** (or other similar commands) add this snippet to the YAML file passed via `--extra_llm_api_options`:
+
+```yaml
+moe_config:
+  backend: TRITON
+```
+
+Alternatively the TRITON backend can be enabled by passing the CLI flag to the trtllm-server command at runtime:
+
+```bash
+--moe_backend TRITON
+```
+
+
+## Test the Server with a Sample Request
+>>>>>>> upstream/main
 
 
 To check the server's health and readiness:
@@ -262,7 +389,11 @@ curl localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '
     "messages": [
         {
             "role": "user",
+<<<<<<< HEAD
             "content": "What is NVIDIA's advantage for inference?"
+=======
+            "content": "What is NVIDIAs advantage for inference?"
+>>>>>>> upstream/main
         }
     ],
     "max_tokens": 1024,
@@ -348,12 +479,16 @@ others according to your needs.
 
 ## (H200/H100 Only) Using OpenAI Triton Kernels for MoE
 
+<<<<<<< HEAD
 OpenAI ships a set of Triton kernels optimized for its MoE models. TensorRT-LLM can leverage these kernels for Hopper-based GPUs like NVIDIA's H200 for optimal performance. `TRTLLM` MoE backend is not supported on Hopper, and `CUTLASS` backend support is still ongoing.  Please enable `TRITON` backend with the steps below if you are running on Hopper GPUs.
 
 ### Installing OpenAI Triton
 
 The `nvcr.io/nvidia/tensorrt-llm/release:gpt-oss-dev` has prepared Triton already (`echo $TRITON_ROOT` could reveal the path). In other situations, you will need to build and install a specific version of Triton. Please follow the instructions in this [link](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/models/core/gpt_oss#using-openai-triton-kernels-for-moe).
 
+=======
+OpenAI ships a set of Triton kernels optimized for its MoE models. TensorRT-LLM can leverage these kernels for Hopper-based GPUs like NVIDIA's H200 for optimal performance. `TRTLLM` MoE backend is not supported on Hopper, and `CUTLASS` backend support is still ongoing. Please follow the instructions in this [link](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/models/core/gpt_oss#using-openai-triton-kernels-for-moe) to install and enable the `TRITON` MoE kernels on Hopper GPUs.
+>>>>>>> upstream/main
 
 ### Selecting Triton as the MoE backend
 

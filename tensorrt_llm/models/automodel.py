@@ -16,9 +16,16 @@ class AutoConfig:
                           quant_config: Optional[QuantConfig] = None,
                           **kwargs):
         import transformers
+<<<<<<< HEAD
 
         hf_config = transformers.AutoConfig.from_pretrained(
             hf_model_or_dir, trust_remote_code=True)
+=======
+        trust_remote_code = kwargs.get('trust_remote_code', False)
+
+        hf_config = transformers.AutoConfig.from_pretrained(
+            hf_model_or_dir, trust_remote_code=trust_remote_code)
+>>>>>>> upstream/main
 
         if hasattr(hf_config,
                    'architectures') and hf_config.architectures is not None:

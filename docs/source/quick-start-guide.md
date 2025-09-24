@@ -2,6 +2,7 @@
 
 # Quick Start Guide
 
+<<<<<<< HEAD
 This is the starting point to try out TensorRT-LLM. Specifically, this Quick Start Guide enables you to quickly get set up and send HTTP requests using TensorRT-LLM.
 
 ## Installation
@@ -36,6 +37,17 @@ Here is a simple example to show how to use the LLM API with TinyLlama.
 
 You can also directly load TensorRT Model Optimizer's [quantized checkpoints on Hugging Face](https://huggingface.co/collections/nvidia/model-optimizer-66aa84f7966b3150262481a4) in the LLM constructor.
 To learn more about the LLM API, check out the [](llm-api/index) and [](examples/llm_api_examples).
+=======
+This is the starting point to try out TensorRT LLM. Specifically, this Quick Start Guide enables you to quickly get set up and send HTTP requests using TensorRT LLM.
+
+
+## Launch Docker on a node with NVIDIA GPUs deployed
+
+```bash
+docker run --ipc host --gpus all -p 8000:8000 -it nvcr.io/nvidia/tensorrt-llm/release
+```
+
+>>>>>>> upstream/main
 
 (deploy-with-trtllm-serve)=
 ## Deploy online serving with trtllm-serve
@@ -47,6 +59,7 @@ To start the server, you can run a command like the following example inside a D
 trtllm-serve "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 ```
 
+<<<<<<< HEAD
 
 > [!NOTE]
 > If you are running `trtllm-server` inside a Docker container, you have two options for sending API requests:
@@ -58,6 +71,15 @@ trtllm-serve "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 > ```bash
 > docker exec -it <container_id> bash
 > ```
+=======
+```{note}
+If you are running trtllm-server inside a Docker container, you have two options for sending API requests:
+1. Expose a port (e.g., 8000) to allow external access to the server from outside the container.
+2. Open a new terminal and use the following command to directly attach to the running container:
+```bash
+docker exec -it <container_id> bash
+```
+>>>>>>> upstream/main
 
 After the server has started, you can access well-known OpenAI endpoints such as `v1/chat/completions`.
 Inference can then be performed using examples similar to the one provided below, from a separate terminal.
@@ -104,6 +126,7 @@ _Example Output_
 }
 ```
 
+<<<<<<< HEAD
 For detailed examples and command syntax, refer to the [trtllm-serve](commands/trtllm-serve.rst) section.
 
 1. Expose port `8000` to access the server from outside the container.
@@ -129,3 +152,36 @@ For more examples, refer to:
 
 - [Best Practices Guide](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/index.html)
 - [Support Matrix](https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html)
+=======
+For detailed examples and command syntax, refer to the [trtllm-serve](commands/trtllm-serve/trtllm-serve.rst) section.
+
+## Run Offline inference with LLM API
+The LLM API is a Python API designed to facilitate setup and inference with TensorRT LLM directly within Python. It enables model optimization by simply specifying a HuggingFace repository name or a model checkpoint. The LLM API streamlines the process by managing model loading, optimization, and inference, all through a single `LLM` instance.
+
+Here is a simple example to show how to use the LLM API with TinyLlama.
+
+```{literalinclude} ../../examples/llm-api/quickstart_example.py
+    :language: python
+    :linenos:
+```
+
+You can also directly load pre-quantized models [quantized checkpoints on Hugging Face](https://huggingface.co/collections/nvidia/model-optimizer-66aa84f7966b3150262481a4) in the LLM constructor.
+To learn more about the LLM API, check out the [](llm-api/index) and [](examples/llm_api_examples).
+
+## Next Steps
+
+In this Quick Start Guide, you have:
+
+- Learned how to deploy a model with `trtllm-serve` for online serving
+- Explored the LLM API for offline inference with TensorRT LLM
+
+To continue your journey with TensorRT LLM, explore these resources:
+
+- **[Installation Guide](installation/index.rst)** - Detailed installation instructions for different platforms
+- **[Deployment Guide](examples/llm_api_examples)** - Comprehensive examples for deploying LLM inference in various scenarios
+- **[Model Support](models/supported-models.md)** - Check which models are supported and how to add new ones
+- **CLI Reference** - Explore TensorRT LLM command-line tools:
+  - [`trtllm-serve`](commands/trtllm-serve/trtllm-serve.rst) - Deploy models for online serving
+  - [`trtllm-bench`](commands/trtllm-bench.rst) - Benchmark model performance
+  - [`trtllm-eval`](commands/trtllm-eval.rst) - Evaluate model accuracy
+>>>>>>> upstream/main

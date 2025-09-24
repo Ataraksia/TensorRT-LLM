@@ -1,7 +1,10 @@
 import contextlib
 import copy
 import itertools
+<<<<<<< HEAD
 import pickle  # nosec B403
+=======
+>>>>>>> upstream/main
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -12,6 +15,10 @@ import tensorrt as trt
 import torch
 from filelock import FileLock
 
+<<<<<<< HEAD
+=======
+from tensorrt_llm import serialization
+>>>>>>> upstream/main
 from tensorrt_llm._utils import (str_dtype_to_trt, trt_dtype_to_np,
                                  trt_dtype_to_torch)
 from tensorrt_llm.functional import AllReduceParams, create_allreduce_plugin
@@ -39,6 +46,16 @@ from .utils import (get_updated_plugin, to_base_class_layer, to_subclass_layer,
 
 default_int_dtype = trt.int64
 
+<<<<<<< HEAD
+=======
+# These dataclasses are used in ParallelConfig serialization. If there are other classes need to be serialized, please add to this list.
+BASE_AUTOPP_CLASSES = {
+    "tensorrt_llm.auto_parallel.parallelization": ["ParallelConfig"],
+    "tensorrt_llm.auto_parallel.config": ["AutoParallelConfig", "CostModel"],
+    "tensorrt_llm.auto_parallel.simplifier": ["GraphConfig", "StageType"]
+}
+
+>>>>>>> upstream/main
 
 @dataclass
 class ParallelConfig:
@@ -55,12 +72,21 @@ class ParallelConfig:
 
     def save(self, filename):
         with open(filename, 'wb') as file:
+<<<<<<< HEAD
             pickle.dump(self, file)
+=======
+            serialization.dump(self, file)
+>>>>>>> upstream/main
 
     @staticmethod
     def from_file(filename) -> "ParallelConfig":
         with open(filename, "rb") as file:
+<<<<<<< HEAD
             return pickle.load(file)  # nosec B301
+=======
+            return serialization.load(file,
+                                      approved_imports=BASE_AUTOPP_CLASSES)
+>>>>>>> upstream/main
 
     def print_graph_strategy(self, file=None):
         for index, (node_name,

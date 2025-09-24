@@ -1,5 +1,9 @@
 import tempfile
 
+<<<<<<< HEAD
+=======
+import pytest
+>>>>>>> upstream/main
 from transformers import AutoTokenizer
 from utils.llm_data import llm_models_root
 from utils.util import force_ampere, skip_no_modelopt, skip_pre_ada
@@ -20,6 +24,10 @@ batch_input_text = [
 ]
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5488280")
+>>>>>>> upstream/main
 @force_ampere
 @skip_no_modelopt
 def test_int4_awq_quantization():
@@ -63,6 +71,10 @@ def test_int4_awq_quantization():
             # TODO: TRTLLM-185, check the score when the test infra is ready, hard coded value is not stable, cause flaky tests in L0
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5488280")
+>>>>>>> upstream/main
 @skip_pre_ada
 @skip_no_modelopt
 def test_fp8_quantization():

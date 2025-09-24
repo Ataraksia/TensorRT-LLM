@@ -18,11 +18,20 @@
 #pragma once
 
 #include "cacheTransBuffer.h"
+<<<<<<< HEAD
 #include "dataTransceiver.h"
 #include "tensorrt_llm/batch_manager/kvCacheManager.h"
 #include "tensorrt_llm/batch_manager/kvCacheUtils.h"
 #include "tensorrt_llm/common/envUtils.h"
 #include "tensorrt_llm/common/logger.h"
+=======
+#include "tensorrt_llm/batch_manager/kvCacheManager.h"
+#include "tensorrt_llm/batch_manager/kvCacheUtils.h"
+#include "tensorrt_llm/common/assert.h"
+#include "tensorrt_llm/common/envUtils.h"
+#include "tensorrt_llm/common/logger.h"
+#include "tensorrt_llm/executor/cacheCommunicator.h"
+>>>>>>> upstream/main
 #include "tensorrt_llm/executor/cache_transmission/cacheSplitConcat.h"
 #include "tensorrt_llm/executor/dataTransceiverState.h"
 #include "tensorrt_llm/runtime/bufferManager.h"
@@ -30,10 +39,31 @@
 #include <NvInferRuntimeBase.h>
 #include <cstddef>
 #include <cstdint>
+<<<<<<< HEAD
+=======
+#include <fstream>
+#include <vector>
+
+// Forward declare TransferSession in the correct global namespace scope
+namespace tensorrt_llm::batch_manager
+{
+class TransferSession;
+}
+>>>>>>> upstream/main
 
 namespace tensorrt_llm::batch_manager::kv_cache_manager
 {
 
+<<<<<<< HEAD
+=======
+using DataContext = tensorrt_llm::executor::kv_cache::DataContext;
+using Connection = tensorrt_llm::executor::kv_cache::Connection;
+using SizeType32 = tensorrt_llm::runtime::SizeType32;
+using BaseKVCacheManager = kv_cache_manager::BaseKVCacheManager;
+using CacheTransBufferManager = kv_cache_manager::CacheTransBufferManager;
+using BlockRange = kv_cache_manager::BlockRange;
+
+>>>>>>> upstream/main
 BlockRange getBlockRangeForSending(BaseKVCacheManager* cacheManager, LlmRequest const& llmRequest);
 
 BlockRange getBlockRangeForReceiving(BaseKVCacheManager* cacheManager, LlmRequest const& llmRequest);
@@ -42,16 +72,27 @@ BlockRange getBlockRangeForReceiving(BaseKVCacheManager* cacheManager, LlmReques
 class BaseCacheFormatter
 {
 public:
+<<<<<<< HEAD
     using SizeType32 = tensorrt_llm::runtime::SizeType32;
+=======
+>>>>>>> upstream/main
     using CacheState = executor::kv_cache::CacheState;
 
     /// @brief Format the cache data into bytes for sending.
     /// @param session The transfer session.
+<<<<<<< HEAD
     virtual void format(TransferSession& session) = 0;
 
     /// @brief Unformat the cache data from received bytes.
     /// @param session The transfer session.
     virtual void unformat(TransferSession& session) = 0;
+=======
+    virtual void format(tensorrt_llm::batch_manager::TransferSession& session) = 0;
+
+    /// @brief Unformat the cache data from received bytes.
+    /// @param session The transfer session.
+    virtual void unformat(tensorrt_llm::batch_manager::TransferSession& session) = 0;
+>>>>>>> upstream/main
 
     /// @brief Determine whether the sender is applicable to the source and target.
     /// @param selfConfig Source data arrangement.
@@ -91,9 +132,15 @@ public:
         TLLM_CHECK(mCacheTransBufferManager);
     }
 
+<<<<<<< HEAD
     void format(TransferSession& session) override;
 
     void unformat(TransferSession& session) override;
+=======
+    void format(tensorrt_llm::batch_manager::TransferSession& session) override;
+
+    void unformat(tensorrt_llm::batch_manager::TransferSession& session) override;
+>>>>>>> upstream/main
 
     [[nodiscard]] bool inquireSupport(CacheState const& selfConfig, CacheState const& destConfig) const override;
 

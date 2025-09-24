@@ -54,9 +54,22 @@ input [
   {
     name: "image_url_input"
     data_type: TYPE_STRING
+<<<<<<< HEAD
     dims: [ 1 ]
     optional: true
   },
+=======
+    dims: [ -1 ]
+    optional: true
+  },
+  # An arbitrary number of images for pixtral
+  {
+      name: "image_sizes_input"
+      data_type: TYPE_INT64
+      dims: [ -1, 2 ]
+      optional: true
+  },
+>>>>>>> upstream/main
   {
     name: "video_bytes_input"
     data_type: TYPE_UINT8
@@ -254,6 +267,13 @@ ensemble_scheduling {
         value: "image_url_input"
       }
       input_map {
+<<<<<<< HEAD
+=======
+        key: "IMAGE_SIZES"
+        value: "image_sizes_input"
+      }
+      input_map {
+>>>>>>> upstream/main
         key: "VIDEO_BYTES"
         value: "video_bytes_input"
       }

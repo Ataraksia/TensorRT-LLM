@@ -45,6 +45,7 @@ option(ENABLE_MULTI_DEVICE
 option(ENABLE_UCX "Enable building with UCX (Uniform Communication X) support"
        ON)
 option(NVRTC_DYNAMIC_LINKING "Link against the dynamic NVRTC libraries" OFF)
+<<<<<<< HEAD
 option(ENABLE_NVSHMEM "Enable building with NVSHMEM support" OFF)
 option(USING_OSS_CUTLASS_LOW_LATENCY_GEMM
        "Using open sourced Cutlass low latency gemm kernel" ON)
@@ -55,6 +56,22 @@ option(USING_OSS_CUTLASS_MOE_GEMM "Using open sourced Cutlass moe gemm kernel"
 option(USING_OSS_CUTLASS_ALLREDUCE_GEMM
        "Using open sourced Cutlass AR gemm kernel" ON)
 
+=======
+option(CUBLAS_DYNAMIC_LINKING
+       "Link against the dynamic cublas/cublasLt libraries" ON)
+option(CURAND_DYNAMIC_LINKING "Link against the dynamic curand library" ON)
+
+option(ENABLE_NVSHMEM "Enable building with NVSHMEM support" OFF)
+option(USING_OSS_CUTLASS_LOW_LATENCY_GEMM
+       "Using open sourced Cutlass low latency gemm kernel" ON)
+option(USING_OSS_CUTLASS_FP4_GEMM "Using open sourced Cutlass fp4 gemm kernel"
+       ON)
+option(USING_OSS_CUTLASS_MOE_GEMM "Using open sourced Cutlass moe gemm kernel"
+       ON)
+option(USING_OSS_CUTLASS_ALLREDUCE_GEMM
+       "Using open sourced Cutlass AR gemm kernel" ON)
+
+>>>>>>> upstream/main
 message(STATUS "ENABLE_NVSHMEM is ${ENABLE_NVSHMEM}")
 
 if(NVTX_DISABLE)
@@ -120,6 +137,7 @@ endif()
 if(INDEX_RANGE_CHECK)
   add_compile_definitions("INDEX_RANGE_CHECK")
   message(WARNING "Check index range to detect OOB accesses")
+<<<<<<< HEAD
 endif()
 
 # Read the project version
@@ -173,6 +191,90 @@ else()
   set(NVRTC_BUILTINS_LIB CUDA::nvrtc_builtins_static)
 endif()
 
+=======
+endif()
+
+# Read the project version
+set(TRTLLM_VERSION_DIR ${PROJECT_SOURCE_DIR}/../tensorrt_llm)
+set_directory_properties(PROPERTIES CMAKE_CONFIGURE_DEPENDS
+                                    ${TRTLLM_VERSION_DIR}/version.py)
+execute_process(
+  COMMAND ${Python_EXECUTABLE} -c "import version; print(version.__version__)"
+  WORKING_DIRECTORY ${TRTLLM_VERSION_DIR}
+  OUTPUT_VARIABLE TRTLLM_VERSION
+  RESULT_VARIABLE TRTLLM_VERSION_RESULT
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+if(TRTLLM_VERSION_RESULT EQUAL 0)
+  message(STATUS "TensorRT-LLM version: ${TRTLLM_VERSION}")
+else()
+  message(FATAL_ERROR "Failed to determine Tensorrt-LLM version")
+endif()
+
+configure_file(
+  cmake/templates/version.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/tensorrt_llm/executor/version.h)
+
+setup_cuda_compiler()
+
+enable_language(C CXX CUDA)
+
+# Configure CUDA Architectures after enabling CUDA.
+
+# Old CMake rejects family conditional architectures during enable_language, But
+# after that CMake handles it just fine.
+setup_cuda_architectures()
+
+set(CUDA_DRV_LIB CUDA::cuda_driver)
+set(CUDA_NVML_LIB CUDA::nvml)
+set(CUDA_RT_LIB CUDA::cudart_static)
+set(NVPTX_LIB CUDA::nvptxcompiler_static)
+
+set(CUDA_TOOLKIT_COMPONENTS cudart_static cuda_driver nvml nvptxcompiler_static)
+
+if(CUBLAS_DYNAMIC_LINKING)
+  set(CUBLAS_LIB CUDA::cublas)
+  set(CUBLASLT_LIB CUDA::cublasLt)
+  list(APPEND CUDA_TOOLKIT_COMPONENTS cublas cublasLt)
+else()
+  if(WIN32)
+    message(FATAL_ERROR "Static cublas not available on windows")
+  endif()
+  message(DEBUG "Linking with static cublas libs")
+
+  set(CUBLAS_LIB CUDA::cublas_static)
+  set(CUBLASLT_LIB CUDA::cublasLt_static)
+  list(APPEND CUDA_TOOLKIT_COMPONENTS cublas_static cublasLt_static)
+endif()
+
+if(CURAND_DYNAMIC_LINKING)
+  set(CURAND_LIB CUDA::curand)
+  list(APPEND CUDA_TOOLKIT_COMPONENTS curand)
+else()
+  if(WIN32)
+    message(FATAL_ERROR "Static curand not available on windows")
+  endif()
+  message(DEBUG "Linking with static curand lib")
+
+  set(CURAND_LIB CUDA::curand_static)
+  list(APPEND CUDA_TOOLKIT_COMPONENTS curand_static)
+endif()
+
+if(NVRTC_DYNAMIC_LINKING)
+  set(NVRTC_LIB CUDA::nvrtc)
+  set(NVRTC_BUILTINS_LIB CUDA::nvrtc_builtins)
+  list(APPEND CUDA_TOOLKIT_COMPONENTS nvrtc nvrtc_builtins)
+else()
+  set(NVRTC_LIB CUDA::nvrtc_static)
+  set(NVRTC_BUILTINS_LIB CUDA::nvrtc_builtins_static)
+  list(APPEND CUDA_TOOLKIT_COMPONENTS nvrtc_static nvrtc_builtins_static)
+endif()
+
+find_package(CUDAToolkit 11.2 REQUIRED COMPONENTS ${CUDA_TOOLKIT_COMPONENTS})
+
+set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
+
+>>>>>>> upstream/main
 resolve_dirs(CUDAToolkit_INCLUDE_DIRS "${CUDAToolkit_INCLUDE_DIRS}")
 
 message(STATUS "CUDA library status:")
@@ -215,6 +317,10 @@ endif()
 include_directories(
   SYSTEM
   ${CUDAToolkit_INCLUDE_DIRS}
+<<<<<<< HEAD
+=======
+  ${CUDAToolkit_INCLUDE_DIRS}/cccl
+>>>>>>> upstream/main
   ${CUDNN_ROOT_DIR}/include
   $<TARGET_PROPERTY:TensorRT::NvInfer,INTERFACE_INCLUDE_DIRECTORIES>
   ${3RDPARTY_DIR}/cutlass/include
@@ -477,7 +583,10 @@ print(os.path.dirname(torch.__file__),end='');"
       endif()
     endif()
   endif()
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 else()
   if(NOT WIN32)
     if(NOT USE_CXX11_ABI)
@@ -525,6 +634,10 @@ if(ENABLE_UCX)
     find_package(ucxx REQUIRED PATHS ${CMAKE_BINARY_DIR}/ucxx/build
                  NO_DEFAULT_PATH)
   endif()
+<<<<<<< HEAD
+=======
+  find_package(NIXL)
+>>>>>>> upstream/main
 endif()
 if(ENABLE_UCX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_UCX=1")

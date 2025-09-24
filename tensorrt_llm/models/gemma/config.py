@@ -52,7 +52,11 @@ class GemmaConfig(PretrainedConfig):
         final_logit_softcapping: Optional[float] = None,
         attn_logit_softcapping: Optional[float] = None,
         mapping: Optional[Union[Mapping, dict]] = None,
+<<<<<<< HEAD
         sliding_window_pattern: int = None,
+=======
+        _sliding_window_pattern: int = None,
+>>>>>>> upstream/main
         rope_local_base_freq: int = None,
         sliding_window: int = None,
         **kwargs,
@@ -94,7 +98,11 @@ class GemmaConfig(PretrainedConfig):
             if self.is_gemma_2:
                 self.attn_logit_softcapping = attn_logit_softcapping
             if self.is_gemma_3:
+<<<<<<< HEAD
                 self.sliding_window_pattern = sliding_window_pattern
+=======
+                self._sliding_window_pattern = _sliding_window_pattern
+>>>>>>> upstream/main
                 self.rope_local_base_freq = rope_local_base_freq
                 self.sliding_window = sliding_window
 
@@ -153,8 +161,13 @@ class GemmaConfig(PretrainedConfig):
         model_type = loads(
             (Path(config_dir) / "config.json").read_text())["model_type"]
         HFConfigClass = {
+<<<<<<< HEAD
             "gemma2": transformers.GemmaConfig,
             "gemma": transformers.Gemma2Config,
+=======
+            "gemma": transformers.GemmaConfig,
+            "gemma2": transformers.Gemma2Config,
+>>>>>>> upstream/main
             "gemma3_text": transformers.Gemma3TextConfig,
         }[model_type]
         hf_config = HFConfigClass.from_pretrained(config_dir)

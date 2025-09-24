@@ -201,6 +201,7 @@ Metrics Endpoint
 
 .. note::
 
+<<<<<<< HEAD
    This endpoint is beta maturity.
 
    The statistics for the PyTorch backend are beta and not as comprehensive as those for the TensorRT backend.
@@ -251,6 +252,62 @@ After at least one inference request is sent to the server, you can fetch the ru
         "newActiveRequestsQueueLatencyMS": 0.0007503032684326172
     }
 ]
+=======
+   The metrics endpoint for the default PyTorch backend are in beta and are not as comprehensive as those for the TensorRT backend.
+
+   Some fields, such as CPU memory usage, are not yet available for the PyTorch backend.
+
+   Enabling ``enable_iter_perf_stats`` in the PyTorch backend can slightly impact performance, depending on the serving configuration.
+
+The ``/metrics`` endpoint provides runtime iteration statistics such as GPU memory usage and KV cache details.
+
+For the default PyTorch backend, iteration statistics logging is enabled by setting the ``enable_iter_perf_stats`` field in a YAML file:
+
+.. code-block:: yaml
+
+   # extra_llm_config.yaml
+   enable_iter_perf_stats: true
+
+Start the server and specify the ``--extra_llm_api_options`` argument with the path to the YAML file:
+
+.. code-block:: bash
+
+   trtllm-serve "TinyLlama/TinyLlama-1.1B-Chat-v1.0" --extra_llm_api_options extra_llm_config.yaml
+
+After sending at least one inference request to the server, you can fetch runtime iteration statistics by polling the ``/metrics`` endpoint.
+Since the statistics are stored in an internal queue and removed once retrieved, it's recommended to poll the endpoint shortly after each request and store the results if needed.
+
+.. code-block:: bash
+
+   curl -X GET http://localhost:8000/metrics
+
+Example output:
+
+.. code-block:: json
+
+    [
+        {
+            "gpuMemUsage": 76665782272,
+            "iter": 154,
+            "iterLatencyMS": 7.00688362121582,
+            "kvCacheStats": {
+                "allocNewBlocks": 3126,
+                "allocTotalBlocks": 3126,
+                "cacheHitRate": 0.00128,
+                "freeNumBlocks": 101253,
+                "maxNumBlocks": 101256,
+                "missedBlocks": 3121,
+                "reusedBlocks": 4,
+                "tokensPerBlock": 32,
+                "usedNumBlocks": 3
+            },
+            "numActiveRequests": 1
+            ...
+        }
+    ]
+
+
+>>>>>>> upstream/main
 
 Syntax
 ------

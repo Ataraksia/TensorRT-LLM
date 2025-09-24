@@ -13,7 +13,11 @@ from torch.fx import GraphModule
 
 from ..models.factory import ModelFactory
 from ..shim.interface import CachedSequenceInterface
+<<<<<<< HEAD
 from ..transformations._graph import canonicalize_graph, lift_to_meta
+=======
+from ..transformations._graph import canonicalize_graph, lift_to_meta, run_shape_prop
+>>>>>>> upstream/main
 from ..utils.logger import ad_logger
 from ..utils.sharding_utils import ShardingConfig
 
@@ -54,6 +58,10 @@ class SharedConfig(BaseModel):
     sharding_config: ShardingConfig = Field(default_factory=ShardingConfig)
     local_rank: int = Field(default=0)
     world_size: int = Field(default=1)
+<<<<<<< HEAD
+=======
+    attn_backend: str = Field(default="flashinfer", description="The attention backend to use.")
+>>>>>>> upstream/main
 
 
 class TransformConfig(BaseModel):
@@ -273,13 +281,21 @@ class BaseTransform(ABC):
 
         # log the result of the transform
         log_msgs = [
+<<<<<<< HEAD
             f"stage={self.config.stage.value}",
             f"transform={t_name}",
+=======
+            f"enabled={self.config.enabled}",
+>>>>>>> upstream/main
             "skipped=True" if info.skipped else f"num_matches={info.num_matches}",
             f"is_clean={info.is_clean}",
             f"has_valid_shapes={info.has_valid_shapes}",
         ]
+<<<<<<< HEAD
         ad_logger.info(", ".join(log_msgs))
+=======
+        self._log_info(", ".join(log_msgs))
+>>>>>>> upstream/main
         ad_logger.debug(f"Graph after {t_name}: {gm}")
 
         # update + store new meta data
@@ -291,6 +307,15 @@ class BaseTransform(ABC):
         return gm
 
     @final
+<<<<<<< HEAD
+=======
+    def _log_info(self, *args: any):
+        """Log a message with the transform key."""
+        prefix = f"[stage={self.config.stage.value}, transform={self.get_transform_key()}]"
+        ad_logger.info(f"{prefix} " + " ".join(map(str, args)))
+
+    @final
+>>>>>>> upstream/main
     def _get_autodeploy_meta(self, gm: GraphModule) -> AutodeployMeta:
         """Get the autodeploy metadata from the graphmodule."""
         return gm.meta.get(self._autodeploy_meta_key, {})
@@ -298,6 +323,11 @@ class BaseTransform(ABC):
     @final
     def _set_autodeploy_meta(self, gm: GraphModule, autodeploy_meta: AutodeployMeta) -> None:
         """Set the autodeploy metadata in the graphmodule."""
+<<<<<<< HEAD
+=======
+        if not hasattr(gm, "meta"):
+            gm.meta = {}
+>>>>>>> upstream/main
         gm.meta[self._autodeploy_meta_key] = autodeploy_meta
 
     @final
@@ -322,11 +352,22 @@ class BaseTransform(ABC):
 
         # check if run cleanup depending on the config and info
         if self.config.requires_shape_prop and not has_valid_shapes:
+<<<<<<< HEAD
             with lift_to_meta(gm):
                 canonicalize_graph(gm, shape_prop=True)
             is_clean = True
             has_valid_shapes = True
         elif self.config.requires_clean_graph and not is_clean:
+=======
+            self._log_info("running pre-cleanup with shape_prop")
+            canonicalize_graph(gm)
+            with lift_to_meta(gm):
+                run_shape_prop(gm)
+            is_clean = True
+            has_valid_shapes = True
+        elif self.config.requires_clean_graph and not is_clean:
+            self._log_info("running pre-cleanup (no shape_prop)")
+>>>>>>> upstream/main
             canonicalize_graph(gm)
             is_clean = True
 
@@ -347,9 +388,18 @@ class BaseTransform(ABC):
 
         # check if run cleanup depending on the config and info
         if self.config.run_shape_prop and not (info.is_clean and info.has_valid_shapes):
+<<<<<<< HEAD
             with lift_to_meta(gm):
                 canonicalize_graph(gm, shape_prop=True)
         elif self.config.run_graph_cleanup and not info.is_clean:
+=======
+            self._log_info("running post-cleanup with shape_prop")
+            canonicalize_graph(gm)
+            with lift_to_meta(gm):
+                run_shape_prop(gm)
+        elif self.config.run_graph_cleanup and not info.is_clean:
+            self._log_info("running post-cleanup (no shape_prop)")
+>>>>>>> upstream/main
             canonicalize_graph(gm)
 
         # create new info object with updated cleanup status

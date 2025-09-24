@@ -22,6 +22,10 @@
 #include "tensorrt_llm/batch_manager/llmRequest.h" // TODO forward declare
 #include "tensorrt_llm/common/optionalRef.h"
 #include "tensorrt_llm/executor/executor.h"
+<<<<<<< HEAD
+=======
+#include "tensorrt_llm/executor/transferAgent.h"
+>>>>>>> upstream/main
 #include "tensorrt_llm/kernels/kvCacheIndex.h"
 #include "tensorrt_llm/runtime/bufferManager.h"
 #include "tensorrt_llm/runtime/common.h"
@@ -42,6 +46,11 @@
 #include <unordered_map>
 #include <vector>
 
+<<<<<<< HEAD
+=======
+namespace kvc = tensorrt_llm::executor::kv_cache;
+
+>>>>>>> upstream/main
 namespace tensorrt_llm::batch_manager::eviction_policy
 {
 class BaseEvictionPolicy;
@@ -69,6 +78,10 @@ using UniqueToken = tensorrt_llm::runtime::UniqueToken;
 using VecUniqueTokens = tensorrt_llm::runtime::VecUniqueTokens;
 using LoraTaskIdType = tensorrt_llm::runtime::LoraTaskIdType;
 using BlocksPerWindow = std::map<SizeType32, std::tuple<SizeType32, SizeType32>>;
+<<<<<<< HEAD
+=======
+using CacheSaltIDType = tensorrt_llm::runtime::CacheSaltIDType;
+>>>>>>> upstream/main
 
 // Type alias for multimodal hash key (hash array + start offset)
 using MmKey = std::pair<std::array<uint8_t, 32>, SizeType32>;
@@ -115,6 +128,10 @@ struct BlockKey
     // Extra keys for multimodal data (similar to VLLM's approach)
     // Each extra key is a pair of (mm_hash, start_offset_in_block)
     std::vector<MmKey> extraKeys;
+<<<<<<< HEAD
+=======
+    std::optional<CacheSaltIDType> cacheSaltID = std::nullopt;
+>>>>>>> upstream/main
 
     BlockKey() = default;
 
@@ -129,24 +146,40 @@ struct BlockKey
     }
 
     explicit BlockKey(bool usesExtraIds, std::optional<LoraTaskIdType> loraTaskId, VecUniqueTokens uniqueTokens,
+<<<<<<< HEAD
         std::vector<MmKey> extraKeys = {})
+=======
+        std::vector<MmKey> extraKeys = {}, std::optional<CacheSaltIDType> cacheSaltID = std::nullopt)
+>>>>>>> upstream/main
         : usesExtraIds{usesExtraIds}
         , loraTaskId{loraTaskId}
         , uniqueTokens{std::move(uniqueTokens)}
         , extraKeys{std::move(extraKeys)}
+<<<<<<< HEAD
+=======
+        , cacheSaltID{cacheSaltID}
+>>>>>>> upstream/main
     {
     }
 
     bool operator==(BlockKey const& other) const noexcept
     {
         return (usesExtraIds == other.usesExtraIds && loraTaskId == other.loraTaskId
+<<<<<<< HEAD
             && uniqueTokens == other.uniqueTokens && extraKeys == other.extraKeys);
+=======
+            && uniqueTokens == other.uniqueTokens && extraKeys == other.extraKeys && cacheSaltID == other.cacheSaltID);
+>>>>>>> upstream/main
     }
 
     int partialMatch(BlockKey const& other) const noexcept
     {
         SizeType32 numMatched{0};
+<<<<<<< HEAD
         if (loraTaskId == other.loraTaskId && extraKeys == other.extraKeys)
+=======
+        if (loraTaskId == other.loraTaskId && extraKeys == other.extraKeys && cacheSaltID == other.cacheSaltID)
+>>>>>>> upstream/main
         {
             auto [matchEnd, otherMatchEnd] = std::mismatch(
                 uniqueTokens.begin(), uniqueTokens.end(), other.uniqueTokens.begin(), other.uniqueTokens.end());
@@ -445,6 +478,19 @@ public:
         return mKvCacheRetentionConfig.getDecodeDurationMs();
     }
 
+<<<<<<< HEAD
+=======
+    [[nodiscard]] executor::KvCacheTransferMode getTransferMode() const
+    {
+        return mKvCacheRetentionConfig.getTransferMode();
+    }
+
+    [[nodiscard]] std::string const& getDirectory() const
+    {
+        return mKvCacheRetentionConfig.getDirectory();
+    }
+
+>>>>>>> upstream/main
     // @brief Check whether the sequence uses cyclic KV cache.
     // @return `true` if we have begun overwriting the beginning of the sequence's KV cache.
     // @details If `true`, we cannot store the sequence's KV cache for reuse.
@@ -538,7 +584,12 @@ public:
         SizeType32 blocksInSecondaryPool, SizeType32 maxNumSequences, std::shared_ptr<runtime::CudaStream> stream,
         bool onboardBlocks, CacheType cacheType, std::optional<executor::RetentionPriority> secondaryOffloadMinPriority,
         std::shared_ptr<KVCacheEventManager> eventManager, bool enablePartialReuse, bool copyOnPartialReuse,
+<<<<<<< HEAD
         std::shared_ptr<kv_connector::KvCacheConnectorManager> kvCacheConnectorManager);
+=======
+        std::shared_ptr<kv_connector::KvCacheConnectorManager> kvCacheConnectorManager,
+        std::shared_ptr<kvc::BaseLoopbackAgent> loopbackAgent = nullptr);
+>>>>>>> upstream/main
 
     ~WindowBlockManager();
 
@@ -702,11 +753,21 @@ public:
 
     //! \brief Bring offloaded block from secondary to primary memory.
     //! \details Does nothing if block is already in primary memory.
+<<<<<<< HEAD
     void onboardBlock(BlockPtr const& offloadBlock);
 
     //! \brief Bring block from primary to secondary memory.
     //! \details Does nothing if block is already in secondary memory.
     void offloadBlock(BlockPtr const& block);
+=======
+    void onboardBlock(BlockPtr const& offloadBlock,
+        executor::KvCacheTransferMode mode = executor::KvCacheTransferMode::DRAM, std::string const& directory = "");
+
+    //! \brief Bring block from primary to secondary memory.
+    //! \details Does nothing if block is already in secondary memory.
+    void offloadBlock(BlockPtr const& block, executor::KvCacheTransferMode mode = executor::KvCacheTransferMode::DRAM,
+        std::string const& directory = "");
+>>>>>>> upstream/main
 
     //! \brief Find first new block that must be allocated for context phase and return it's concatenated token vectors.
     //! \details Only full blocks are considered.
@@ -760,7 +821,12 @@ private:
     //! \param sequence Sequence to which blocks are assigned.
     //! \return Number of matched tokens from loaded blocks.
     SizeType32 loadOrAllocateBlocks(std::vector<BlockKey> const& blockKeys, SizeType32 numContextBlocks,
+<<<<<<< HEAD
         GenerationRequest& sequence, std::vector<executor::RetentionPriorityAndDuration> const& perBlockRetentions);
+=======
+        GenerationRequest& sequence, std::vector<executor::RetentionPriorityAndDuration> const& perBlockRetentions,
+        executor::KvCacheTransferMode mode = executor::KvCacheTransferMode::DRAM, std::string const& directory = "");
+>>>>>>> upstream/main
 
     //! \brief Free block and all it's descendants. This makes block a claimed leaf block.
     void freeChildren(BlockPtr const& block, executor::RetentionPriority priority,
@@ -769,7 +835,12 @@ private:
     //! \brief Find block least likely to be reused, free it if necessary and return.
     [[nodiscard]] BlockPtr getFreeBlock(
         executor::RetentionPriority = executor::KvCacheRetentionConfig::kDefaultRetentionPriority,
+<<<<<<< HEAD
         std::optional<std::chrono::milliseconds> durationMs = std::nullopt);
+=======
+        std::optional<std::chrono::milliseconds> durationMs = std::nullopt,
+        executor::KvCacheTransferMode mode = executor::KvCacheTransferMode::DRAM, std::string const& directory = "");
+>>>>>>> upstream/main
 
     //! \brief Free block from previous block and claim it from free blocks list.
     void claimLeafBlock(BlockPtr const& block, std::optional<executor::RetentionPriority> priority = std::nullopt,
@@ -817,6 +888,11 @@ private:
     std::shared_ptr<BaseEvictionPolicy> mEvictionPolicy;
     // Event manager
     std::shared_ptr<KVCacheEventManager> mEventManager;
+<<<<<<< HEAD
+=======
+    // Pointer to parent loopback agent
+    std::shared_ptr<kvc::BaseLoopbackAgent> mLoopbackAgent;
+>>>>>>> upstream/main
     // Transfer manager
     std::shared_ptr<KVCacheTransferManager> mTransferManager;
 
@@ -864,7 +940,12 @@ public:
         std::optional<executor::RetentionPriority> secondaryOffloadMinPriority = std::nullopt,
         std::shared_ptr<KVCacheEventManager> eventManager = nullptr, bool enablePartialReuse = true,
         bool copyOnPartialReuse = true,
+<<<<<<< HEAD
         std::shared_ptr<kv_connector::KvCacheConnectorManager> kvCacheConnectorManager = nullptr);
+=======
+        std::shared_ptr<kv_connector::KvCacheConnectorManager> kvCacheConnectorManager = nullptr,
+        std::optional<kvc::BaseAgentConfig> agentConfig = std::nullopt);
+>>>>>>> upstream/main
 
     BlockManager(BlockManager const&) = delete;
     BlockManager& operator=(BlockManager const&) = delete;
@@ -913,11 +994,21 @@ public:
 
     //! \brief Bring block from primary to secondary memory for window size.
     //! \details Does nothing if block is already in primary memory.
+<<<<<<< HEAD
     void onboardBlock(BlockPtr const& offloadBlock, SizeType32 windowSize);
 
     //! \brief Bring block from primary to secondary memory for window size.
     //! \details Does nothing if block is already in secondary memory.
     void offloadBlock(BlockPtr const& block, SizeType32 windowSize);
+=======
+    void onboardBlock(BlockPtr const& offloadBlock, SizeType32 windowSize,
+        executor::KvCacheTransferMode mode = executor::KvCacheTransferMode::DRAM, std::string const& directory = "");
+
+    //! \brief Bring block from primary to secondary memory for window size.
+    //! \details Does nothing if block is already in secondary memory.
+    void offloadBlock(BlockPtr const& block, SizeType32 windowSize,
+        executor::KvCacheTransferMode mode = executor::KvCacheTransferMode::DRAM, std::string const& directory = "");
+>>>>>>> upstream/main
 
     void storeBlocks(std::vector<BlockKey> const& blockKeys, std::vector<KVCacheBlock::IdType> const& blockIds,
         SizeType32 windowSize)
@@ -1156,6 +1247,10 @@ private:
     SizeType32 mNumLayers;
     SizeType32 mTokensPerBlock;
     std::shared_ptr<KVCacheEventManager> mEventManager;
+<<<<<<< HEAD
+=======
+    std::shared_ptr<kvc::BaseLoopbackAgent> mLoopbackAgent;
+>>>>>>> upstream/main
     CudaStreamPtr mStream;
     CacheType mCacheType;
 

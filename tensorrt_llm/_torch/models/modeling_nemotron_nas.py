@@ -4,7 +4,11 @@ import torch
 from torch import nn
 from transformers import PretrainedConfig
 
+<<<<<<< HEAD
 from tensorrt_llm.functional import PositionEmbeddingType
+=======
+from tensorrt_llm.functional import PositionEmbeddingType, RotaryScalingType
+>>>>>>> upstream/main
 from tensorrt_llm.lora_manager import HfLoraLoader
 from tensorrt_llm.models.convert_utils import split_matrix_tp
 
@@ -44,14 +48,32 @@ def _create_linear_from_configs(model_config: ModelConfig[PretrainedConfig],
         gather_output=True,
         quant_config=model_config.get_quant_config(),
         skip_create_weights_in_init=model_config.skip_create_weights_in_init,
+<<<<<<< HEAD
     )
 
 
 class NemotronNASAttention(Attention):
+=======
+        allreduce_strategy=model_config.allreduce_strategy)
+
+
+class NemotronNASAttention(Attention):
+    NON_NEOX_TYPES = ("mistral_yarn", "rope_llama4")
+>>>>>>> upstream/main
 
     def __init__(self, model_config: ModelConfig[PretrainedConfig],
                  layer_idx: int):
         config = model_config.pretrained_config
+<<<<<<< HEAD
+=======
+        is_neox = getattr(model_config.pretrained_config,
+                          "position_embedding_type",
+                          None) not in self.NON_NEOX_TYPES
+        rope = RopeParams.from_config(config)
+        if rope.scale_type == RotaryScalingType.yarn:
+            rope.mscale_all_dim = 0.0
+
+>>>>>>> upstream/main
         super().__init__(
             hidden_size=config.hidden_size,
             num_attention_heads=config.num_attention_heads,
@@ -59,8 +81,14 @@ class NemotronNASAttention(Attention):
             max_position_embeddings=config.max_position_embeddings,
             bias=False,
             pos_embd_params=PositionalEmbeddingParams(
+<<<<<<< HEAD
                 type=PositionEmbeddingType.rope_gpt_neox,
                 rope=RopeParams.from_config(config),
+=======
+                type=PositionEmbeddingType.rope_gpt_neox
+                if is_neox else PositionEmbeddingType.rope_gptj,
+                rope=rope,
+>>>>>>> upstream/main
             ),
             layer_idx=layer_idx,
             dtype=config.torch_dtype,
@@ -137,15 +165,31 @@ class NemotronNASDecoderLayer(DecoderLayer):
 
     def forward(
         self,
+<<<<<<< HEAD
         position_ids: torch.LongTensor,
         hidden_states: torch.Tensor,
         attn_metadata: AttentionMetadata,
+=======
+        position_ids: torch.IntTensor,
+        hidden_states: torch.Tensor,
+        attn_metadata: AttentionMetadata,
+        residual: Optional[torch.Tensor] = None,
+>>>>>>> upstream/main
         **kwargs,
     ) -> torch.Tensor:
         if not self.block_config.attention.no_op:
             # Self Attention
+<<<<<<< HEAD
             residual = hidden_states
             hidden_states = self.input_layernorm(hidden_states)
+=======
+            if residual is None:
+                residual = hidden_states
+                hidden_states = self.input_layernorm(hidden_states)
+            else:
+                hidden_states, residual = self.input_layernorm(
+                    hidden_states, residual)
+>>>>>>> upstream/main
 
             hidden_states = self.self_attn(
                 position_ids=position_ids,
@@ -153,6 +197,7 @@ class NemotronNASDecoderLayer(DecoderLayer):
                 attn_metadata=attn_metadata,
                 **kwargs,
             )
+<<<<<<< HEAD
             hidden_states = residual + hidden_states
 
         if not self.block_config.ffn.no_op:
@@ -163,6 +208,20 @@ class NemotronNASDecoderLayer(DecoderLayer):
             hidden_states = residual + hidden_states
 
         return hidden_states
+=======
+
+        if not self.block_config.ffn.no_op:
+            # Fully Connected
+            if residual is None:
+                residual = hidden_states
+                hidden_states = self.post_attention_layernorm(hidden_states)
+            else:
+                hidden_states, residual = self.post_attention_layernorm(
+                    hidden_states, residual)
+            hidden_states = self.mlp(hidden_states, **kwargs)
+
+        return hidden_states, residual
+>>>>>>> upstream/main
 
 
 class NemotronNASModel(DecoderModel):
@@ -183,11 +242,21 @@ class NemotronNASModel(DecoderModel):
                 model_config,
                 'lora_config') and model_config.lora_config is not None and len(
                     model_config.lora_config.lora_dir) == 1:
+<<<<<<< HEAD
             lora_loader = HfLoraLoader(model_config.lora_config.lora_dir)
             if lora_loader.vocab_size != 0 and lora_loader.embed_tokens is not None:
                 vocab_size = lora_loader.vocab_size
                 weight = lora_loader.embed_tokens
                 self.has_custom_embed_tokens = True
+=======
+            # Only check for custom vocab in HF LoRA, not NeMo
+            if model_config.lora_config.lora_ckpt_source == "hf":
+                lora_loader = HfLoraLoader(model_config.lora_config.lora_dir)
+                if lora_loader.vocab_size != 0 and lora_loader.embed_tokens is not None:
+                    vocab_size = lora_loader.vocab_size
+                    weight = lora_loader.embed_tokens
+                    self.has_custom_embed_tokens = True
+>>>>>>> upstream/main
 
         self.embed_tokens = Embedding(
             vocab_size,
@@ -214,6 +283,42 @@ class NemotronNASModel(DecoderModel):
                             eps=config.rms_norm_eps,
                             dtype=config.torch_dtype)
 
+<<<<<<< HEAD
+=======
+    def forward(
+        self,
+        attn_metadata: AttentionMetadata,
+        input_ids: Optional[torch.IntTensor] = None,
+        position_ids: Optional[torch.IntTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        lora_params: Optional[dict] = None,
+        **kwargs,
+    ) -> torch.Tensor:
+
+        if (input_ids is None) ^ (inputs_embeds is not None):
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time, and must specify either one"
+            )
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        hidden_states = inputs_embeds
+        residual = None
+
+        for decoder_layer in self.layers:
+            hidden_states, residual = decoder_layer(
+                position_ids=position_ids,
+                hidden_states=hidden_states,
+                attn_metadata=attn_metadata,
+                residual=residual,
+                lora_params=lora_params,
+            )
+
+        hidden_states, _ = self.norm(hidden_states, residual)
+        return hidden_states
+
+>>>>>>> upstream/main
 
 @register_auto_model("DeciLMForCausalLM")
 class NemotronNASForCausalLM(DecoderModelForCausalLM[NemotronNASModel,

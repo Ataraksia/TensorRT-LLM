@@ -58,6 +58,10 @@ using RandomSeedType = std::uint64_t;
 using VecLogProbs = std::vector<FloatType>;
 using StreamPtr = std::shared_ptr<tensorrt_llm::runtime::CudaStream>;
 using MillisecondsType = std::chrono::milliseconds;
+<<<<<<< HEAD
+=======
+using CacheSaltIDType = std::uint64_t;
+>>>>>>> upstream/main
 using LogitsPostProcessor
     = std::function<void(IdType, Tensor&, BeamTokens const&, StreamPtr const&, std::optional<IdType>)>;
 using LogitsPostProcessorMap = std::unordered_map<std::string, LogitsPostProcessor>;

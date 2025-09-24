@@ -36,6 +36,45 @@ MODEL_PATHS = {
 }
 
 
+<<<<<<< HEAD
+=======
+def mpi_publish_name():
+    port_name = None
+    try:
+        port_name = MPI.Open_port()
+        MPI.Publish_name('my_port', port_name)
+    except MPI.Exception as e:
+        print(f"Error publishing port name: {e}")
+        raise e
+    except Exception as e:
+        print(f"Unexpected error publishing port name: {e}")
+        raise e
+
+    return port_name
+
+
+def mpi_initialize_intercomm(port_name):
+    intercomm = None
+    try:
+        intercomm = MPI.COMM_SELF.Accept(port_name)
+    except MPI.Exception as e:
+        print(f"Error accepting intercomm: {e}", flush=True)
+        raise
+    except Exception as e:
+        print(f"Unexpected error accepting intercomm: {e}", flush=True)
+        raise
+    return intercomm
+
+
+def mpi_send_termination_request(intercomm):
+    if intercomm is not None:
+        # Send termination requests
+        intercomm.send(None, dest=0, tag=MPI_REQUEST)
+        intercomm.send(None, dest=1, tag=MPI_REQUEST)
+        print("Sent termination requests to the workers.")
+
+
+>>>>>>> upstream/main
 def model_path(model_name):
     llm_models_root = os.environ["LLM_MODELS_ROOT"]
     for name, path in MODEL_PATHS.items():
@@ -48,8 +87,20 @@ async def run_worker(kv_cache_config, cache_transceiver_config, pytorch_config,
                      model_name, rank):
     assert isinstance(pytorch_config, dict)
     print(f"Running worker {rank}")
+<<<<<<< HEAD
     port_name = MPI.Lookup_name('my_port')
     intercomm = MPI.COMM_WORLD.Connect(port_name)
+=======
+    try:
+        port_name = MPI.Lookup_name('my_port')
+        intercomm = MPI.COMM_WORLD.Connect(port_name)
+    except MPI.Exception as e:
+        print(f"Error publishing port name: {e}")
+        raise e
+    except Exception as e:
+        print(f"Unexpected error publishing port name: {e}")
+        raise e
+>>>>>>> upstream/main
 
     session = MPI.COMM_WORLD.Split(color=rank, key=0)
     set_mpi_comm(session)
@@ -139,8 +190,12 @@ def verify_disaggregated(model, generation_overlap, enable_cuda_graph, prompt,
         zip(kv_cache_configs, cache_transceiver_configs, worker_pytorch_configs,
             model_names, ranks))
 
+<<<<<<< HEAD
     port_name = MPI.Open_port()
     MPI.Publish_name('my_port', port_name)
+=======
+    port_name = mpi_publish_name()
+>>>>>>> upstream/main
 
     with MPIPoolExecutor(max_workers=2, env={"UCX_TLS": "^ib"}) as executor:
         futures = []
@@ -152,9 +207,16 @@ def verify_disaggregated(model, generation_overlap, enable_cuda_graph, prompt,
             print(f"Error in worker {worker_arg}: {e}")
             raise e
 
+<<<<<<< HEAD
         try:
             print("Launched all the workers.")
             intercomm = MPI.COMM_SELF.Accept(port_name)
+=======
+        intercomm = None
+        try:
+            print("Launched all the workers.", flush=True)
+            intercomm = mpi_initialize_intercomm(port_name)
+>>>>>>> upstream/main
 
             for _ in range(2):
                 intercomm.recv(tag=MPI_READY)
@@ -187,6 +249,7 @@ def verify_disaggregated(model, generation_overlap, enable_cuda_graph, prompt,
             output = responses[0]
             assert output[0].text == expected_output
             assert output[0].token_ids == expected_output_ids
+<<<<<<< HEAD
 
         finally:
             # Send termination requests
@@ -195,6 +258,17 @@ def verify_disaggregated(model, generation_overlap, enable_cuda_graph, prompt,
             print("Sent termination requests to the workers.")
 
             # Wait for all futures to complete
+=======
+        except Exception as e:
+            print(f"Exception encountered: {e}", flush=True)
+            raise e
+        finally:
+            print("Sending termination request", flush=True)
+            mpi_send_termination_request(intercomm)
+
+            # Wait for all futures to complete
+            print("Waiting for all workers to terminate. ", flush=True)
+>>>>>>> upstream/main
             for future in futures:
                 future.result()
             print("All workers terminated.")
@@ -282,8 +356,12 @@ def test_disaggregated_llama_context_capacity(model, enable_cuda_graph,
         zip(kv_cache_configs, cache_transceiver_configs, worker_pytorch_configs,
             model_names, ranks))
 
+<<<<<<< HEAD
     port_name = MPI.Open_port()
     MPI.Publish_name('my_port', port_name)
+=======
+    port_name = mpi_publish_name()
+>>>>>>> upstream/main
 
     prompt = "European Union is a political and economic union of 27 countries. The European Union is headquartered in Brussels, Belgium. The first president of the European Union was Jean-Claude Juncker. The current president is Ursula von der Leyen. The European Union is a major economic and political entity."
 
@@ -297,9 +375,16 @@ def test_disaggregated_llama_context_capacity(model, enable_cuda_graph,
             print(f"Error in worker {worker_arg}: {e}")
             raise e
 
+<<<<<<< HEAD
         try:
             print("Launched all the workers.")
             intercomm = MPI.COMM_SELF.Accept(port_name)
+=======
+        intercomm = None
+        try:
+            print("Launched all the workers.")
+            intercomm = mpi_initialize_intercomm(port_name)
+>>>>>>> upstream/main
 
             for _ in range(2):
                 intercomm.recv(tag=MPI_READY)
@@ -334,11 +419,19 @@ def test_disaggregated_llama_context_capacity(model, enable_cuda_graph,
                 intercomm.send(requests, dest=1, tag=MPI_REQUEST)
                 output = intercomm.recv(source=1, tag=MPI_RESULT)
 
+<<<<<<< HEAD
         finally:
             # Send termination requests
             intercomm.send(None, dest=0, tag=MPI_REQUEST)
             intercomm.send(None, dest=1, tag=MPI_REQUEST)
             print("Sent termination requests to the workers.")
+=======
+        except MPI.Exception as e:
+            print(f"MPI Error")
+            raise e
+        finally:
+            mpi_send_termination_request(intercomm)
+>>>>>>> upstream/main
 
             # Wait for all futures to complete
             for future in futures:
@@ -387,8 +480,12 @@ def test_disaggregated_spec_dec_batch_slot_limit(model, spec_dec_model_path,
         zip(kv_cache_configs, cache_transceiver_configs, worker_pytorch_configs,
             model_names, ranks))
 
+<<<<<<< HEAD
     port_name = MPI.Open_port()
     MPI.Publish_name('my_port', port_name)
+=======
+    port_name = mpi_publish_name()
+>>>>>>> upstream/main
 
     prompt = "What is the capital of Germany?"
 
@@ -402,9 +499,16 @@ def test_disaggregated_spec_dec_batch_slot_limit(model, spec_dec_model_path,
             print(f"Error in worker {worker_arg}: {e}")
             raise e
 
+<<<<<<< HEAD
         try:
             print("Launched all the workers.")
             intercomm = MPI.COMM_SELF.Accept(port_name)
+=======
+        intercomm = None
+        try:
+            print("Launched all the workers.")
+            intercomm = mpi_initialize_intercomm(port_name)
+>>>>>>> upstream/main
 
             for _ in range(2):
                 intercomm.recv(tag=MPI_READY)
@@ -438,11 +542,19 @@ def test_disaggregated_spec_dec_batch_slot_limit(model, spec_dec_model_path,
                 intercomm.send(requests, dest=1, tag=MPI_REQUEST)
                 output = intercomm.recv(source=1, tag=MPI_RESULT)
 
+<<<<<<< HEAD
         finally:
             # Send termination requests
             intercomm.send(None, dest=0, tag=MPI_REQUEST)
             intercomm.send(None, dest=1, tag=MPI_REQUEST)
             print("Sent termination requests to the workers.")
+=======
+        except MPI.Exception as e:
+            print(f"MPI Error")
+            raise e
+        finally:
+            mpi_send_termination_request(intercomm)
+>>>>>>> upstream/main
 
             # Wait for all futures to complete
             for future in futures:

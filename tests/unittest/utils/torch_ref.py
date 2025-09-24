@@ -480,7 +480,12 @@ def ssd_chunk_scan_combined_ref(x,
                                 D=None,
                                 z=None,
                                 dt_bias=None,
+<<<<<<< HEAD
                                 dt_softplus=False):
+=======
+                                dt_softplus=False,
+                                initial_states=None):
+>>>>>>> upstream/main
     """
     Argument:
         x: (batch, seqlen, nheads, headdim)
@@ -492,6 +497,10 @@ def ssd_chunk_scan_combined_ref(x,
         D: (nheads, headdim) or (nheads,)
         z: (batch, seqlen, nheads, headdim)
         dt_bias: (nheads,)
+<<<<<<< HEAD
+=======
+        initial_states: (batch, nheads, dstate, headdim)
+>>>>>>> upstream/main
     Return:
         out: (batch, seqlen, nheads, headdim)
         final_states: (batch, nheads, dstate, headdim)
@@ -520,8 +529,21 @@ def ssd_chunk_scan_combined_ref(x,
         states = states.to(torch.float32)
     # 2. Pass the state to all the chunks by weighted cumsum.
     # state_passing_ref is much less numerically stable
+<<<<<<< HEAD
     states, final_states = state_passing_ref(
         rearrange(states, "... p n -> ... (p n)"), dA_cumsum[:, :, :, -1])
+=======
+    # align initial_states shape with states shape
+    initial_states = rearrange(
+        initial_states,
+        "... n p -> ... p n") if initial_states is not None else None
+    states, final_states = state_passing_ref(
+        rearrange(states, "... p n -> ... (p n)"),
+        dA_cumsum[:, :, :, -1],
+        rearrange(initial_states, "... p n-> ... (p n)")
+        if initial_states is not None else None,
+    )
+>>>>>>> upstream/main
     states, final_states = [
         rearrange(t, "... (p n) -> ... p n", n=dstate)
         for t in [states, final_states]

@@ -898,11 +898,14 @@ int main(int argc, char** argv)
                 "'-save-softmax'.\n");
             exit(1);
         }
+<<<<<<< HEAD
         if (data_type == DATA_TYPE_E4M3)
         {
             fprintf(stderr, "Currently fp8 kernel doesn't support saving softmax.\n");
             exit(1);
         }
+=======
+>>>>>>> upstream/main
     }
     // Sanitize
     if (min_s == -1)

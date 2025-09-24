@@ -165,7 +165,16 @@ class TritonDecoder(Decoder):
                 continue
             triton_name = tensor.name()
             if tensor.is_cpu():
+<<<<<<< HEAD
                 value = tensor.as_numpy()
+=======
+                try:
+                    value = tensor.as_numpy()
+                except pb_utils.TritonModelException as e:
+                    # Use to_dlpack()/from_dlpack() if as_numpy() fails,
+                    # e.g. in case of BF16 tensors
+                    value = from_dlpack(tensor.to_dlpack())
+>>>>>>> upstream/main
             else:
                 # If the tensor is in GPU memory make it torch.Tensor type
                 value = from_dlpack(tensor.to_dlpack())
@@ -247,6 +256,10 @@ class TritonDecoder(Decoder):
             "text_input": "QUERY",
             "image_bytes_input": "IMAGE_BYTES",
             "image_url_input": "IMAGE_URL",
+<<<<<<< HEAD
+=======
+            "image_sizes_input": "IMAGE_SIZES",
+>>>>>>> upstream/main
             "video_bytes_input": "VIDEO_BYTES",
             "decoder_text_input": "DECODER_QUERY",
             "max_tokens": "REQUEST_OUTPUT_LEN",

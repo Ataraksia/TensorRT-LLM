@@ -22,7 +22,11 @@ namespace tensorrt_llm
 {
 namespace kernels
 {
+<<<<<<< HEAD
 namespace cutlass_kernels
+=======
+namespace cutlass_kernels_oss
+>>>>>>> upstream/main
 {
 
 template <typename ActivationType, typename WeightType, typename ScaleZeroType, typename BiasType, typename OutputType,
@@ -34,6 +38,10 @@ void sm90_generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType 
     tensorrt_llm::cutlass_extensions::CutlassGemmConfig gemm_config, char* workspace, size_t workspace_bytes,
     cudaStream_t stream, int* occupancy = nullptr);
 
+<<<<<<< HEAD
 } // namespace cutlass_kernels
+=======
+} // namespace cutlass_kernels_oss
+>>>>>>> upstream/main
 } // namespace kernels
 } // namespace tensorrt_llm

@@ -3,18 +3,28 @@ from typing import Optional, Tuple
 import torch
 from torch import nn
 
+<<<<<<< HEAD
+=======
+from tensorrt_llm._torch.modules.qk_norm_attention import QKNormRoPEAttention
+>>>>>>> upstream/main
 from tensorrt_llm.functional import PositionEmbeddingType
 
 from ..attention_backend import AttentionMetadata
 from ..attention_backend.interface import (PositionalEmbeddingParams,
                                            PredefinedAttentionMask, RopeParams)
 from ..model_config import ModelConfig
+<<<<<<< HEAD
 from ..modules.attention import Attention
+=======
+>>>>>>> upstream/main
 from ..modules.decoder_layer import DecoderLayer
 from ..modules.embedding import Embedding
 from ..modules.gated_mlp import GatedMLP
 from ..modules.linear import TensorParallelMode
+<<<<<<< HEAD
 from ..modules.multi_stream_utils import maybe_execute_in_parallel
+=======
+>>>>>>> upstream/main
 from ..modules.rms_norm import RMSNorm
 from ..speculative import SpecMetadata
 from .modeling_utils import (DecoderModel, DecoderModelForCausalLM,
@@ -50,12 +60,19 @@ def check_is_sliding(config: Exaone4Config, layer_idx: int) -> bool:
     return False
 
 
+<<<<<<< HEAD
 class Exaone4Attention(Attention):
+=======
+class Exaone4Attention(QKNormRoPEAttention):
+>>>>>>> upstream/main
 
     def __init__(self,
                  model_config: ModelConfig[Exaone4Config],
                  layer_idx: Optional[int] = None,
+<<<<<<< HEAD
                  aux_stream: Optional[torch.cuda.Stream] = None,
+=======
+>>>>>>> upstream/main
                  fuse_qk_norm_rope: bool = False):
         config = model_config.pretrained_config
 
@@ -73,10 +90,17 @@ class Exaone4Attention(Attention):
                 rope=RopeParams.from_config(config),
             )
 
+<<<<<<< HEAD
         self.fuse_qk_norm_rope = (self.is_sliding and fuse_qk_norm_rope)
 
         # TODO: Fusing qk norm with rope has an issue that slightly hurts accuracy.
         assert self.fuse_qk_norm_rope is False, "Fusing qk norm and rope is having issue now"
+=======
+        fuse_qk_norm_rope = (self.is_sliding and fuse_qk_norm_rope)
+
+        # TODO: Fusing qk norm with rope has an issue that slightly hurts accuracy.
+        assert fuse_qk_norm_rope is False, "Fusing qk norm and rope is having issue now"
+>>>>>>> upstream/main
 
         super().__init__(
             hidden_size=config.hidden_size,
@@ -85,12 +109,18 @@ class Exaone4Attention(Attention):
             max_position_embeddings=config.max_position_embeddings,
             bias=False,
             pos_embd_params=pos_embd_params,
+<<<<<<< HEAD
             rope_fusion=False,
+=======
+            fuse_qk_norm_rope=fuse_qk_norm_rope,
+            skip_rope=self.sliding_window and not self.is_sliding,
+>>>>>>> upstream/main
             layer_idx=layer_idx,
             dtype=config.torch_dtype,
             config=model_config,
         )
 
+<<<<<<< HEAD
         self.q_norm = RMSNorm(hidden_size=self.head_dim,
                               eps=config.rms_norm_eps,
                               dtype=config.torch_dtype)
@@ -144,6 +174,8 @@ class Exaone4Attention(Attention):
         else:
             return q, k, v
 
+=======
+>>>>>>> upstream/main
     def forward(
         self,
         position_ids: Optional[torch.LongTensor],
@@ -175,7 +207,10 @@ class Exaone4DecoderLayer(DecoderLayer):
         self,
         model_config: ModelConfig[Exaone4Config],
         layer_idx: int,
+<<<<<<< HEAD
         aux_stream: Optional[torch.cuda.Stream] = None,
+=======
+>>>>>>> upstream/main
     ):
         super().__init__()
         config = model_config.pretrained_config
@@ -186,7 +221,10 @@ class Exaone4DecoderLayer(DecoderLayer):
         self.self_attn = Exaone4Attention(
             model_config,
             layer_idx=layer_idx,
+<<<<<<< HEAD
             aux_stream=aux_stream,
+=======
+>>>>>>> upstream/main
         )
 
         self.mlp = GatedMLP(
@@ -244,7 +282,10 @@ class Exaone4Model(DecoderModel):
         super().__init__(model_config)
         config = self.model_config.pretrained_config
         self.num_hidden_layers = config.num_hidden_layers
+<<<<<<< HEAD
         self.aux_stream = torch.cuda.Stream()
+=======
+>>>>>>> upstream/main
         self.embed_tokens = Embedding(
             config.vocab_size,
             config.hidden_size,
@@ -258,7 +299,10 @@ class Exaone4Model(DecoderModel):
             Exaone4DecoderLayer(
                 model_config,
                 layer_idx,
+<<<<<<< HEAD
                 self.aux_stream,
+=======
+>>>>>>> upstream/main
             ) for layer_idx in range(self.num_hidden_layers)
         ])
 

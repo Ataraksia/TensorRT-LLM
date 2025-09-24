@@ -16,6 +16,18 @@
  */
 #pragma once
 
+<<<<<<< HEAD
+=======
+#include <cassert>
+#include <cstdint>
+#include <string>
+#ifndef TLLM_GEN_EXPORT_INTERFACE
+#include "trtllm/gen/CommonUtils.h"
+#else  // TLLM_GEN_EXPORT_INTERFACE
+#include "CommonUtils.h"
+#endif // TLLM_GEN_EXPORT_INTERFACE
+
+>>>>>>> upstream/main
 namespace gemm
 {
 
@@ -84,6 +96,19 @@ inline std::string mmaKindToString(MmaKind mmaKind)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+<<<<<<< HEAD
+=======
+// function to get the TMEM column stride per group (i.e., 64 K elements)
+inline int32_t getTmemColStridePerGroup(int32_t tileMn, int32_t mmaK)
+{
+    // Calculate the stride of TMEM column for every 64 elements in the K dimension
+    int32_t div = 2 * ceilDiv(tileMn, 64);
+    return mmaK == 96 ? std::max(4, div) : div;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+>>>>>>> upstream/main
 } // namespace gen
 } // namespace trtllm
 

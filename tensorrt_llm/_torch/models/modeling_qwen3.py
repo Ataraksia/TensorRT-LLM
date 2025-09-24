@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 from typing import Optional, Tuple
+=======
+from typing import Optional
+>>>>>>> upstream/main
 
 import torch
 from torch import nn
@@ -8,12 +12,18 @@ from tensorrt_llm.functional import PositionEmbeddingType
 
 from ..attention_backend import AttentionMetadata
 from ..attention_backend.interface import PositionalEmbeddingParams, RopeParams
+<<<<<<< HEAD
 from ..model_config import ModelConfig
 from ..modules.attention import Attention, QkNormType
+=======
+from ..distributed import AllReduceParams
+from ..model_config import ModelConfig
+>>>>>>> upstream/main
 from ..modules.decoder_layer import DecoderLayer
 from ..modules.embedding import Embedding
 from ..modules.gated_mlp import GatedMLP
 from ..modules.linear import TensorParallelMode
+<<<<<<< HEAD
 from ..modules.multi_stream_utils import maybe_execute_in_parallel
 from ..modules.rms_norm import RMSNorm
 from .modeling_utils import (DecoderModel, DecoderModelForCausalLM,
@@ -21,17 +31,44 @@ from .modeling_utils import (DecoderModel, DecoderModelForCausalLM,
 
 
 class Qwen3Attention(Attention):
+=======
+from ..modules.qk_norm_attention import QKNormRoPEAttention
+from ..modules.rms_norm import RMSNorm
+from ..speculative import SpecMetadata
+from .modeling_speculative import SpecDecOneEngineForCausalLM
+from .modeling_utils import DecoderModel, register_auto_model
+
+
+class Qwen3Attention(QKNormRoPEAttention):
+>>>>>>> upstream/main
 
     def __init__(
         self,
         model_config: ModelConfig[Qwen3Config],
         layer_idx: Optional[int] = None,
+<<<<<<< HEAD
     ):
         config = model_config.pretrained_config
         if getattr(config, "rope_scaling", None) is not None:
             pos_embd_params = PositionalEmbeddingParams(
                 type=PositionEmbeddingType.from_string(
                     config.rope_scaling["type"]),
+=======
+        fuse_qk_norm_rope: bool = True,
+    ):
+        config = model_config.pretrained_config
+
+        if getattr(config, "rope_scaling", None) is not None:
+            if "type" in config.rope_scaling:
+                pos_type = config.rope_scaling["type"]
+            elif "rope_type" in config.rope_scaling:
+                pos_type = config.rope_scaling["rope_type"]
+            else:
+                raise ValueError(
+                    "rope_scaling must have type or rope_type field")
+            pos_embd_params = PositionalEmbeddingParams(
+                type=PositionEmbeddingType.from_string(pos_type),
+>>>>>>> upstream/main
                 rope=RopeParams.from_config(config),
             )
         else:
@@ -40,6 +77,13 @@ class Qwen3Attention(Attention):
                 rope=RopeParams.from_config(config),
             )
 
+<<<<<<< HEAD
+=======
+        # Qwen3 has accuracy issues with deep_gemm (see: https://nvbugspro.nvidia.com/bug/5461712
+        # and https://nvbugspro.nvidia.com/bug/5505402)
+        disable_deep_gemm = True
+
+>>>>>>> upstream/main
         super().__init__(
             hidden_size=config.hidden_size,
             num_attention_heads=config.num_attention_heads,
@@ -47,10 +91,15 @@ class Qwen3Attention(Attention):
             max_position_embeddings=config.max_position_embeddings,
             bias=config.attention_bias,
             pos_embd_params=pos_embd_params,
+<<<<<<< HEAD
+=======
+            fuse_qk_norm_rope=fuse_qk_norm_rope,
+>>>>>>> upstream/main
             layer_idx=layer_idx,
             dtype=config.torch_dtype,
             dense_bias=config.attention_bias,
             config=model_config,
+<<<<<<< HEAD
             qk_norm_type=QkNormType.pre_rope,
         )
 
@@ -85,6 +134,11 @@ class Qwen3Attention(Attention):
 
         return q, k
 
+=======
+            disable_deep_gemm=disable_deep_gemm,
+        )
+
+>>>>>>> upstream/main
 
 class Qwen3DecoderLayer(DecoderLayer):
 
@@ -92,7 +146,11 @@ class Qwen3DecoderLayer(DecoderLayer):
         self,
         model_config: ModelConfig[Qwen3Config],
         layer_idx: int,
+<<<<<<< HEAD
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+=======
+    ):
+>>>>>>> upstream/main
         super().__init__()
         self.layer_idx = layer_idx
         config = model_config.pretrained_config
@@ -100,20 +158,38 @@ class Qwen3DecoderLayer(DecoderLayer):
             model_config,
             layer_idx=layer_idx,
         )
+<<<<<<< HEAD
+=======
+        self.mapping = model_config.mapping
+        self.enable_attention_dp = self.mapping.enable_attention_dp
+
+        # Qwen3 has accuracy issues with deep_gemm (see: https://nvbugspro.nvidia.com/bug/5461712
+        # and https://nvbugspro.nvidia.com/bug/5505402)
+        disable_deep_gemm = True
+>>>>>>> upstream/main
 
         self.mlp = GatedMLP(
             hidden_size=config.hidden_size,
             intermediate_size=config.intermediate_size,
             bias=config.mlp_bias if hasattr(config, "mlp_bias") else False,
             dtype=config.torch_dtype,
+<<<<<<< HEAD
             config=model_config,
         )
+=======
+            overridden_tp_size=1 if self.enable_attention_dp else None,
+            config=model_config,
+            disable_deep_gemm=disable_deep_gemm,
+        )
+
+>>>>>>> upstream/main
         self.input_layernorm = RMSNorm(hidden_size=config.hidden_size,
                                        eps=config.rms_norm_eps,
                                        dtype=config.torch_dtype)
         self.post_attention_layernorm = RMSNorm(hidden_size=config.hidden_size,
                                                 eps=config.rms_norm_eps,
                                                 dtype=config.torch_dtype)
+<<<<<<< HEAD
 
     def forward(
         self,
@@ -122,6 +198,18 @@ class Qwen3DecoderLayer(DecoderLayer):
         attn_metadata: AttentionMetadata,
         residual: Optional[torch.Tensor],
         mrope_config: Optional[Tuple[torch.Tensor, int]] = None,
+=======
+        self.disable_allreduce = (self.mapping.tp_size == 1
+                                  or self.enable_attention_dp)
+
+    def forward(
+        self,
+        position_ids: torch.IntTensor,
+        hidden_states: torch.Tensor,
+        attn_metadata: AttentionMetadata,
+        residual: Optional[torch.Tensor],
+        spec_metadata: Optional[SpecMetadata] = None,
+>>>>>>> upstream/main
         **kwargs,
     ) -> torch.Tensor:
         if residual is None:
@@ -136,14 +224,33 @@ class Qwen3DecoderLayer(DecoderLayer):
             position_ids=position_ids,
             hidden_states=hidden_states,
             attn_metadata=attn_metadata,
+<<<<<<< HEAD
             mrope_config=mrope_config,
+=======
+            all_reduce_params=AllReduceParams(
+                enable_allreduce=not self.disable_allreduce),
+>>>>>>> upstream/main
             **kwargs,
         )
 
         # Fully Connected
         hidden_states, residual = self.post_attention_layernorm(
             hidden_states, residual)
+<<<<<<< HEAD
         hidden_states = self.mlp(hidden_states)
+=======
+        hidden_states = self.mlp(
+            hidden_states,
+            all_rank_num_tokens=attn_metadata.all_rank_num_tokens,
+            final_all_reduce_params=AllReduceParams(
+                enable_allreduce=not self.disable_allreduce),
+            cutlass_min_latency_mode=False,
+        )
+
+        if spec_metadata is not None:
+            spec_metadata.maybe_capture_hidden_states(self.layer_idx,
+                                                      hidden_states, residual)
+>>>>>>> upstream/main
 
         return hidden_states, residual
 
@@ -153,7 +260,10 @@ class Qwen3Model(DecoderModel):
     def __init__(self, model_config: ModelConfig[Qwen3Config]):
         super().__init__(model_config)
         config = self.model_config
+<<<<<<< HEAD
         self.padding_idx = config.pretrained_config.pad_token_id
+=======
+>>>>>>> upstream/main
 
         self.embed_tokens = Embedding(
             config.pretrained_config.vocab_size,
@@ -178,10 +288,17 @@ class Qwen3Model(DecoderModel):
     def forward(
         self,
         attn_metadata: AttentionMetadata,
+<<<<<<< HEAD
         input_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         mrope_config: Optional[Tuple[torch.Tensor, int]] = None,
+=======
+        input_ids: Optional[torch.IntTensor] = None,
+        position_ids: Optional[torch.IntTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        spec_metadata: Optional[SpecMetadata] = None,
+>>>>>>> upstream/main
         **kwargs,
     ) -> torch.Tensor:
         if (input_ids is None) ^ (inputs_embeds is not None):
@@ -201,7 +318,11 @@ class Qwen3Model(DecoderModel):
                 hidden_states=hidden_states,
                 attn_metadata=attn_metadata,
                 residual=residual,
+<<<<<<< HEAD
                 mrope_config=mrope_config,
+=======
+                spec_metadata=spec_metadata,
+>>>>>>> upstream/main
             )
 
         hidden_states, _ = self.norm(hidden_states, residual)
@@ -209,7 +330,11 @@ class Qwen3Model(DecoderModel):
 
 
 @register_auto_model("Qwen3ForCausalLM")
+<<<<<<< HEAD
 class Qwen3ForCausalLM(DecoderModelForCausalLM[Qwen3Model, Qwen3Config]):
+=======
+class Qwen3ForCausalLM(SpecDecOneEngineForCausalLM[Qwen3Model, Qwen3Config]):
+>>>>>>> upstream/main
 
     def __init__(
         self,
@@ -217,6 +342,7 @@ class Qwen3ForCausalLM(DecoderModelForCausalLM[Qwen3Model, Qwen3Config]):
     ):
         super().__init__(
             Qwen3Model(model_config),
+<<<<<<< HEAD
             config=model_config,
             hidden_size=model_config.pretrained_config.hidden_size,
             vocab_size=model_config.pretrained_config.vocab_size,
@@ -246,4 +372,7 @@ class Qwen3ForCausalLM(DecoderModelForCausalLM[Qwen3Model, Qwen3Config]):
             self.lm_head,
             attn_metadata,
             return_context_logits,
+=======
+            model_config,
+>>>>>>> upstream/main
         )

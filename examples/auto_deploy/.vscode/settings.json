@@ -2,6 +2,13 @@
 {
     // REQUIRES CUSTOMIZATION: modify according to your needs...! //////////////////////////////////
     // Please also modify the .env file accordingly
+<<<<<<< HEAD
+=======
+    "terminal.integrated.env.linux": {
+        "OMPI_MCA_opal_cuda_support": "true",
+        "LD_LIBRARY_PATH": "/lib/x86_64-linux-gnu:<PATH-TO-CONDA-ENV>/lib:${env:LD_LIBRARY_PATH}",
+    },
+>>>>>>> upstream/main
     // STANDARD SETTINGS, DO NOT MODIFY ////////////////////////////////////////////////////////////
     "python.envFile": "${workspaceFolder}/.vscode/.env",
     "editor.rulers": [

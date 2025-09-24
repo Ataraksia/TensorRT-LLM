@@ -34,7 +34,11 @@ using SizeType32 = tensorrt_llm::runtime::SizeType32;
 
 bool LogitsPostProcessor::operator()(DecoderInputBuffers& inputBuffers, bool replicateLogitsPostProcessor,
     tr::WorldConfig const& worldConfig, CudaStreamPtr const& stream,
+<<<<<<< HEAD
     std::optional<LogitsPostProcessorBatched> logitsPostProcessorBatched) const
+=======
+    std::optional<LogitsPostProcessorBatched> const& logitsPostProcessorBatched) const
+>>>>>>> upstream/main
 {
     TLLM_LOG_TRACE("%s start", __PRETTY_FUNCTION__);
     NVTX3_SCOPED_RANGE(LogitsPostProcessor);

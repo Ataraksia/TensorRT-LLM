@@ -12,8 +12,13 @@ __all__ = [
     "GenerationRequest",
     "LoRARequest",
     "PromptAdapterRequest",
+<<<<<<< HEAD
     "ExecutorBindingsWorker",
     "ExecutorBindingsProxy",
+=======
+    "GenerationExecutorWorker",
+    "GenerationExecutorProxy",
+>>>>>>> upstream/main
     "RequestError",
     "CompletionOutput",
     "GenerationResultBase",

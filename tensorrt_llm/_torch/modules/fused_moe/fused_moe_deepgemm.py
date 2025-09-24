@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 from typing import Dict, List, Optional, Union
 
 import torch
 import torch.nn.functional as F
+=======
+import math
+from typing import Dict, List, Optional, Union
+
+import torch
+>>>>>>> upstream/main
 import triton
 import triton.language as tl
 
@@ -216,6 +223,7 @@ def triton_masked_index_gather(output, input, start_offsets, row_indices):
     return
 
 
+<<<<<<< HEAD
 @nvtx_range("[DG] act")
 @torch.compile(dynamic=True)
 def swiglu_fused_moe(x):
@@ -227,11 +235,52 @@ def swiglu_fused_moe(x):
 @torch.compile(dynamic=True)
 def indexing(x, mask):
     return x[mask > 0, :].contiguous()
+=======
+@triton.jit
+def _preprocess_after_permute_kernel(
+    expert_offsets_ptr,
+    masked_m_ptr,
+    token_map_ptr,
+    total_tokens,
+    NUM_EXPERTS: tl.constexpr,
+    BLOCK_SIZE_M: tl.constexpr,
+):
+    pid_x = tl.program_id(0)
+    pid_y = tl.program_id(1)
+    if pid_y == 0:
+        token_offsets = pid_x * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
+        token_mask = token_offsets < total_tokens
+        # get expert_id for each token in the block
+        expert_ids = tl.full((BLOCK_SIZE_M, ), NUM_EXPERTS - 1, dtype=tl.int32)
+        found_mask = tl.zeros((BLOCK_SIZE_M, ), dtype=tl.int1)
+        for i in tl.static_range(NUM_EXPERTS):
+            boundary = tl.load(expert_offsets_ptr + i + 1)
+            cond = (token_offsets < boundary) & ~found_mask
+            expert_ids = tl.where(cond, i, expert_ids)
+            found_mask = found_mask | cond
+        tl.store(token_map_ptr + token_offsets,
+                 expert_ids.to(tl.int64),
+                 mask=token_mask)
+    elif pid_y == 1:
+        # get num_tokens for each expert
+        expert_mask = pid_x < NUM_EXPERTS
+        next_offset = tl.load(expert_offsets_ptr + pid_x + 1,
+                              mask=expert_mask,
+                              other=0)
+        current_offset = tl.load(expert_offsets_ptr + pid_x,
+                                 mask=expert_mask,
+                                 other=0)
+        tokens_per_expert = next_offset - current_offset
+        tl.store(masked_m_ptr + pid_x,
+                 tokens_per_expert.to(tl.int32),
+                 mask=expert_mask)
+>>>>>>> upstream/main
 
 
 @nvtx_range("[DG] preprocess_after_permute")
 def preprocess_after_permute(expert_first_token_offset_tensor,
                              permuted_data_tensor):
+<<<<<<< HEAD
     # get tokens per expert
     masked_m = expert_first_token_offset_tensor[
         1:] - expert_first_token_offset_tensor[:-1]
@@ -240,6 +289,42 @@ def preprocess_after_permute(expert_first_token_offset_tensor,
         torch.arange(permuted_data_tensor.shape[0], device='cuda'),
         right=True)
     return masked_m.to(torch.int32), token_to_expert_map
+=======
+    """
+    Python wrapper that launches a single fused kernel to get the token-to-expert map
+    and the number of tokens per expert.
+    """
+    total_tokens = permuted_data_tensor.shape[0]
+    num_experts = expert_first_token_offset_tensor.shape[0] - 1
+
+    # create output tensors
+    masked_m = torch.empty(num_experts, dtype=torch.int32, device='cuda')
+    token_to_expert_map = torch.empty(total_tokens,
+                                      dtype=torch.int64,
+                                      device='cuda')
+
+    # calculate the grid size
+    DEFAULT_BLOCK_SIZE_M = 256
+    grid_m_size = triton.cdiv(total_tokens, DEFAULT_BLOCK_SIZE_M)
+    if grid_m_size >= num_experts:
+        BLOCK_SIZE_M = DEFAULT_BLOCK_SIZE_M
+        grid = (grid_m_size, 2)
+    else:
+        block_size_m = triton.cdiv(total_tokens, num_experts)
+        BLOCK_SIZE_M = triton.next_power_of_2(block_size_m)
+        grid = (num_experts, 2)
+
+    # launch the kernel
+    _preprocess_after_permute_kernel[grid](
+        expert_first_token_offset_tensor,
+        masked_m,
+        token_to_expert_map,
+        total_tokens,
+        NUM_EXPERTS=num_experts,
+        BLOCK_SIZE_M=BLOCK_SIZE_M,
+    )
+    return masked_m, token_to_expert_map
+>>>>>>> upstream/main
 
 
 @nvtx_range("[DG]")
@@ -313,6 +398,13 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
     3. moe_finalize_scale_op: finalize the scale of the output tensor.
     """
 
+<<<<<<< HEAD
+=======
+    # To reuse pytorch memory segments allocated during graph capture.
+    allocated_buffer_in_graph_pool: dict[str, list[torch.Tensor]] = {}
+    allocated_buffer_in_runtime: dict[str, torch.Tensor] = {}
+
+>>>>>>> upstream/main
     def __init__(
         self,
         *,
@@ -358,12 +450,91 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
         )
 
     def get_workspace(self, m_max: int, group_size: int):
+<<<<<<< HEAD
         hidden_size = self.hidden_size
         intermediate_size = self.intermediate_size
+=======
+
+        def select_buffer_with_more_elements(
+                graph_buffer: Optional[torch.Tensor],
+                runtime_buffer: Optional[torch.Tensor],
+                is_capturing: bool = False
+        ) -> tuple[Optional[torch.Tensor], bool]:
+            if is_capturing and graph_buffer is not None:
+                return graph_buffer, True
+
+            if is_capturing == False and runtime_buffer is not None:
+                return runtime_buffer, False
+
+            if graph_buffer is None:
+                return runtime_buffer, False
+
+            if runtime_buffer is None:
+                return graph_buffer, True
+
+        def get_empty(tensor_shape: list[int], dtype: torch.dtype,
+                      cache_name: str) -> torch.Tensor:
+            capture_graph = torch.cuda.is_current_stream_capturing()
+            if DeepGemmFusedMoE.allocated_buffer_in_graph_pool is not None:
+                numel_like = math.prod(tensor_shape)
+                runtime_buffer = None
+                if cache_name in DeepGemmFusedMoE.allocated_buffer_in_runtime:
+                    buffer = DeepGemmFusedMoE.allocated_buffer_in_runtime[
+                        cache_name]
+                    numel_buffer = buffer.numel()
+                    runtime_buffer = buffer if numel_buffer >= numel_like else None
+
+                graph_buffer = None
+                # Safely get the list of candidates. Defaults to an empty list if key is missing.
+                candidate_buffers = DeepGemmFusedMoE.allocated_buffer_in_graph_pool.get(
+                    cache_name, [])
+                for buffer in candidate_buffers:
+                    numel_buffer = buffer.numel()
+                    # buffer just needs to be large enough.
+                    if numel_buffer >= numel_like:
+                        graph_buffer = buffer
+                        break
+
+                if capture_graph and graph_buffer is not None:
+                    return graph_buffer[0:numel_like].view(tensor_shape)
+                else:
+                    buffer, use_graph = select_buffer_with_more_elements(
+                        graph_buffer,
+                        runtime_buffer,
+                        is_capturing=capture_graph)
+                    if buffer is not None:
+                        if not use_graph and capture_graph:
+                            # move the buffer into graph buffers since it's running in graph capturing mode.
+                            DeepGemmFusedMoE.allocated_buffer_in_runtime.pop(
+                                cache_name, None)
+                            DeepGemmFusedMoE.allocated_buffer_in_graph_pool.setdefault(
+                                cache_name, []).append(buffer)
+
+                            return buffer[0:numel_like].view(tensor_shape)
+
+            # Reach here, no buffer is found. Then, we will use a new buffer to replace the small one. Release the memory first.
+            if cache_name in DeepGemmFusedMoE.allocated_buffer_in_runtime:
+                del DeepGemmFusedMoE.allocated_buffer_in_runtime[cache_name]
+
+            # If we get here, no suitable buffer was found in the cache. Create a new one.
+            new_buffer = torch.zeros(tensor_shape, device='cuda', dtype=dtype)
+            if DeepGemmFusedMoE.allocated_buffer_in_graph_pool is not None:
+                if capture_graph:
+                    DeepGemmFusedMoE.allocated_buffer_in_graph_pool.setdefault(
+                        cache_name, []).append(new_buffer)
+                else:
+                    DeepGemmFusedMoE.allocated_buffer_in_runtime[
+                        cache_name] = new_buffer
+            return new_buffer
+
+        hidden_size = self.hidden_size
+        intermediate_size = self.intermediate_size_per_partition
+>>>>>>> upstream/main
         num_experts = self.expert_size_per_partition
 
         # create workspace
         fp8_dim = max(hidden_size, intermediate_size)
+<<<<<<< HEAD
         workspace_0 = torch.empty((num_experts * m_max * fp8_dim),
                                   dtype=torch.float8_e4m3fn,
                                   device='cuda')
@@ -371,15 +542,32 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
             (num_experts * m_max * max(intermediate_size * 2, hidden_size)),
             dtype=torch.bfloat16,
             device='cuda')
+=======
+        workspace_0 = get_empty((num_experts * m_max * fp8_dim, ),
+                                dtype=torch.float8_e4m3fn,
+                                cache_name='workspace_0')
+        workspace_1 = get_empty(
+            (num_experts * m_max * max(intermediate_size * 2, hidden_size), ),
+            dtype=torch.bfloat16,
+            cache_name='workspace_1')
+>>>>>>> upstream/main
 
         # create workspace for scaling factors
         m_padded = fp8_utils.align(m_max, 4)
         scale_k = fp8_utils.ceil_div(fp8_dim, group_size)
         scale_k_padded = fp8_utils.align(scale_k, 4)
+<<<<<<< HEAD
         workspace_sf = torch.empty(
             (num_experts * (scale_k_padded // 4) * m_padded),
             dtype=torch.int32,
             device='cuda')
+=======
+
+        workspace_sf = get_empty(
+            (num_experts * (scale_k_padded // 4) * m_padded, ),
+            dtype=torch.int32,
+            cache_name='workspace_sf')
+>>>>>>> upstream/main
 
         workspace = {
             "workspace_0": workspace_0,
@@ -512,7 +700,11 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
         # grouped gemm 1
         h1 = set_strides(workspace["workspace_1"],
                          self.expert_size_per_partition, m_max,
+<<<<<<< HEAD
                          self.intermediate_size * 2)
+=======
+                         self.intermediate_size_per_partition * 2)
+>>>>>>> upstream/main
 
         deepgemm_fp8_group_blockwise_gemm(
             d=h1,
@@ -527,9 +719,15 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
         # activation and quantization
         act_input_fp8 = set_strides(workspace["workspace_0"],
                                     self.expert_size_per_partition, m_max,
+<<<<<<< HEAD
                                     self.intermediate_size)
 
         scale_k = fp8_utils.ceil_div(self.intermediate_size, 128)
+=======
+                                    self.intermediate_size_per_partition)
+
+        scale_k = fp8_utils.ceil_div(self.intermediate_size_per_partition, 128)
+>>>>>>> upstream/main
         scale_k_padded = fp8_utils.align(scale_k, 4)
         act_input_sf = set_strides(workspace["workspace_sf"],
                                    self.expert_size_per_partition,
@@ -573,7 +771,12 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
             expert_first_token_offset_tensor,
             False,  # enable_alltoall
             x.shape[0],  # num_rows
+<<<<<<< HEAD
             x.shape[1],  # hidden_size
+=======
+            x.shape[1],  # (possibly padded) hidden_size
+            self.unpadded_hidden_size,  # original hidden size
+>>>>>>> upstream/main
             self.routing_method.top_k,
             self.expert_size_per_partition,  # num_experts_per_node
             self.tp_size,
@@ -584,6 +787,7 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
 
         return final_hidden_states
 
+<<<<<<< HEAD
     def forward(
         self,
         x: Union[torch.Tensor, Fp4QuantizedTensor],
@@ -593,6 +797,18 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
         all_rank_num_tokens: Optional[List[int]] = None,
         all_rank_max_num_tokens: Optional[int] = None,
         use_dp_padding: Optional[bool] = None,
+=======
+    def forward_impl(
+        self,
+        x: Union[torch.Tensor, Fp4QuantizedTensor],
+        router_logits: torch.Tensor,
+        *,
+        do_finalize: bool = True,  # used by other MoE backends
+        output_dtype: Optional[torch.dtype] = None,
+        all_rank_num_tokens: Optional[List[int]] = None,
+        use_dp_padding: Optional[bool] = None,
+        **kwargs,
+>>>>>>> upstream/main
     ) -> torch.Tensor:
         assert do_finalize, "CutlassFusedMoE does not support do_finalize=False"
         if self.use_dp and self.parallel_size > 1:
@@ -610,7 +826,11 @@ class DeepGemmFusedMoE(CutlassFusedMoE):
                           1) // self.moe_max_num_tokens
 
         if use_dp_padding:
+<<<<<<< HEAD
             all_rank_num_tokens_padded = [all_rank_max_num_tokens
+=======
+            all_rank_num_tokens_padded = [max(all_rank_num_tokens)
+>>>>>>> upstream/main
                                           ] * len(all_rank_num_tokens)
         else:
             all_rank_num_tokens_padded = all_rank_num_tokens

@@ -1,14 +1,40 @@
+<<<<<<< HEAD
 import enum
 from typing import Optional, Tuple, Union
+=======
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import enum
+from types import EllipsisType  # https://stackoverflow.com/a/66636313
+from typing import Optional, Tuple, TypeAlias, Union, cast
+>>>>>>> upstream/main
 
 import torch
 from torch import nn
 
+<<<<<<< HEAD
 from ..custom_ops import IS_FLASHINFER_AVAILABLE
+=======
+from ..flashinfer_utils import IS_FLASHINFER_AVAILABLE
+>>>>>>> upstream/main
 
 
 class RMSNorm(nn.Module):
 
+<<<<<<< HEAD
     def __init__(self,
                  *,
                  hidden_size: int,
@@ -16,6 +42,20 @@ class RMSNorm(nn.Module):
                  dtype: Optional[torch.dtype] = None,
                  device: Optional[torch.device] = None,
                  has_weights: bool = True):
+=======
+    _ARGUMENT_NOT_SPECIFIED_SENTINEL = ...
+    _ArgumentNotSpecifiedSentinelType: TypeAlias = EllipsisType
+
+    def __init__(
+        self,
+        *,
+        hidden_size: int,
+        eps: float,
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[torch.device] = None,
+        has_weights: bool = True,
+    ):
+>>>>>>> upstream/main
         super().__init__()
         if has_weights:
             self.weight = nn.Parameter(
@@ -31,12 +71,28 @@ class RMSNorm(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
+<<<<<<< HEAD
         residual: Optional[torch.Tensor] = ...,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         if IS_FLASHINFER_AVAILABLE:
             from ..custom_ops import (flashinfer_fused_add_rmsnorm,
                                       flashinfer_rmsnorm)
             if isinstance(residual, torch.Tensor):
+=======
+        residual: Union[
+            Optional[torch.Tensor],
+            _ArgumentNotSpecifiedSentinelType] = _ARGUMENT_NOT_SPECIFIED_SENTINEL,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Optional[torch.Tensor]]]:
+        return_residual = True
+        if residual is self._ARGUMENT_NOT_SPECIFIED_SENTINEL:
+            return_residual = False
+            residual = None
+
+        if IS_FLASHINFER_AVAILABLE:
+            from ..custom_ops import (flashinfer_fused_add_rmsnorm,
+                                      flashinfer_rmsnorm)
+            if residual is not None:
+>>>>>>> upstream/main
                 flashinfer_fused_add_rmsnorm(hidden_states, residual,
                                              self.weight, self.variance_epsilon)
             else:
@@ -45,28 +101,53 @@ class RMSNorm(nn.Module):
         else:
             input_dtype = hidden_states.dtype
             hidden_states = hidden_states.to(torch.float32)
+<<<<<<< HEAD
             if isinstance(residual, torch.Tensor):
                 hidden_states = hidden_states + residual.to(torch.float32)
                 residual = hidden_states.to(input_dtype)
+=======
+            if residual is not None:
+                hidden_states = hidden_states + residual.to(torch.float32)
+                residual = hidden_states.to(input_dtype)
+
+>>>>>>> upstream/main
             variance = hidden_states.pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states * torch.rsqrt(variance +
                                                         self.variance_epsilon)
             hidden_states = self.weight * hidden_states.to(input_dtype)
 
+<<<<<<< HEAD
         if residual is ...:
             return hidden_states
         else:
             return hidden_states, residual
+=======
+        if return_residual:
+            return hidden_states, cast(Optional[torch.Tensor], residual)
+        else:
+            return hidden_states
+>>>>>>> upstream/main
 
     def skip_forward(
         self,
         hidden_states: torch.Tensor,
+<<<<<<< HEAD
         residual: Optional[torch.Tensor] = ...,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         if residual is ...:
             return hidden_states
         else:
             return hidden_states, residual
+=======
+        residual: Union[
+            Optional[torch.Tensor],
+            _ArgumentNotSpecifiedSentinelType] = _ARGUMENT_NOT_SPECIFIED_SENTINEL,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Optional[torch.Tensor]]]:
+        if residual is self._ARGUMENT_NOT_SPECIFIED_SENTINEL:
+            return hidden_states
+        else:
+            return hidden_states, cast(Optional[torch.Tensor], residual)
+>>>>>>> upstream/main
 
 
 class GroupRMSNormKernelSelection(enum.Enum):

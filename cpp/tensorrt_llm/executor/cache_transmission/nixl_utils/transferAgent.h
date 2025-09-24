@@ -30,8 +30,17 @@ struct NixlHelper
     [[nodiscard]] static nixl_mem_t convert(MemoryType type);
     [[nodiscard]] static nixlBasicDesc convert(MemoryDesc const& desc);
     [[nodiscard]] static nixl_reg_dlist_t convertRegDlist(RegisterDescs const& descs);
+<<<<<<< HEAD
     [[nodiscard]] static nixl_xfer_op_t convert(TransferOp const& op);
     [[nodiscard]] static nixl_xfer_dlist_t convertXferDist(TransferDescs const& descs);
+=======
+    [[nodiscard]] static nixl_reg_dlist_t convertRegDlist(FileDescs const& descs);
+    [[nodiscard]] static nixl_xfer_op_t convert(TransferOp const& op);
+    [[nodiscard]] static nixl_xfer_dlist_t convertXferDist(TransferDescs const& descs);
+    [[nodiscard]] static nixl_xfer_dlist_t convertXferDist(FileDescs const& descs);
+    static void posixGpuToFileFallback(MemoryDescs const& memoryDesc, FileDescs const& fileDescs);
+    static void posixFileToGpuFallback(MemoryDescs const& memoryDesc, FileDescs const& fileDescs);
+>>>>>>> upstream/main
 };
 
 class NixlTransferStatus final : public TransferStatus
@@ -97,6 +106,31 @@ private:
     std::vector<char> mDRamDstBuffer;
 };
 
+<<<<<<< HEAD
+=======
+class NixlLoopbackAgent final : public BaseLoopbackAgent
+{
+public:
+    NixlLoopbackAgent(BaseAgentConfig const& config);
+    virtual ~NixlLoopbackAgent() = default;
+
+    virtual void executeLoopbackRequest(
+        MemoryDescs const& memoryDescs, FileDescs const& fileDescs, bool isOffload) override;
+
+private:
+    int registerMemory(MemoryDescs const& descs);
+    int deregisterMemory(MemoryDescs const& descs);
+    int registerFiles(FileDescs const& descs);
+    int deregisterFiles(FileDescs const& descs);
+
+    [[nodiscard]] std::unique_ptr<TransferStatus> submitLoopbackRequests(
+        MemoryDescs const& memoryDescs, FileDescs const& filedescs, bool isOffload);
+
+    std::unique_ptr<nixlAgent> mRawAgent;
+    std::string mName;
+};
+
+>>>>>>> upstream/main
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
@@ -107,6 +141,14 @@ extern "C"
     [[nodiscard]] std::unique_ptr<BaseTransferAgent> createNixlTransferAgent(BaseAgentConfig const* config);
 }
 
+<<<<<<< HEAD
+=======
+extern "C"
+{
+    [[nodiscard]] std::shared_ptr<BaseLoopbackAgent> createNixlLoopbackAgent(BaseAgentConfig const* config);
+}
+
+>>>>>>> upstream/main
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif

@@ -63,8 +63,15 @@ struct GemmData
     {
         // The matrix A. The data type is controlled by options.mDtypeA.
         //
+<<<<<<< HEAD
         // When transposeMatrixA is false, the shape is [M, K].
         // Otherwise, the shape is [K, M].
+=======
+        // When layoutA is MatrixLayout::MajorK, the shape is [M, K].
+        // When LayoutA is MatrixLayout::MajorMn, the shape is [K, M].
+        // When LayoutA is MatrixLayout::BlockMajorK, the shape is [K / blockK, M, blockK] where blockK
+        // is 128B.
+>>>>>>> upstream/main
         // The rightmost dimension is contiguous in memory.
         void const* mPtrA{nullptr};
 
@@ -100,8 +107,15 @@ struct GemmData
 
         // The matrix B. The data type is controlled by options.mDtypeB.
         //
+<<<<<<< HEAD
         // When transposeMatrixB is true, the shape is [N, K].
         // Otherwise, the shape is [K, N].
+=======
+        // When layoutB is MatrixLayout::MajorK, the shape is [N, K].
+        // When layoutB is MatrixLayout::MajorMn, the shape is [K, N].
+        // When layoutB is MatrixLayout::BlockMajorK, the shape is [K / blockK, N, blockK] where blockK
+        // is 128B.
+>>>>>>> upstream/main
         // The rightmost dimension is contiguous in memory.
         void const* mPtrB{nullptr};
 
@@ -142,8 +156,38 @@ struct GemmData
         // The shape is [N]
         void const* mPtrPerTokenSfB{nullptr};
 
+<<<<<<< HEAD
         // The output tensor scaling factor for MxFp{4,8}, Fp8, NvFp4 and DeepSeek FP8 quantization.
         // TensorRT-LLM API requires a scaling factor on the device.
+=======
+        // The bias applied after the GEMM.
+        // The bias is applied before applying the global scaling factor. I.e.
+        // C' = (A * B + bias') * scaleC
+        // scaleC = dequantA * dequantB * quantC
+        // Thus, the bias' = bias / (dequantA * dequantB), where the bias is the original bias.
+        //
+        // if BiasType is N, the shape is [N].
+        // The bias is broadcasted along the M dimension.
+        //
+        // if BiasType is M, the shape is [M].
+        // The bias is broadcasted along the N dimension.
+        //
+        // The dtype is float32.
+        void const* mPtrBias{nullptr};
+
+        // The output tensor scaling factor for Fp8 (not DeepSeek FP8) and NvFp4 quantization.
+        // TensorRT-LLM API requires a scaling factor on the device.
+        // scaleC = dequantA * dequantB * quantC,
+        // where dequantA is global dequantization scaling factor of A
+        //    if dtypeA is FP8, it transforms the range from [-448, 448] to [-amaxA, amaxA]
+        //    if dtypeA is NvFp4, it transforms the range from [-448 * 6, 448 * 6] to [-amaxA, amaxA],
+        //    otherwise it is 1.
+        // dequantB is defined similarly to dequantA.
+        // quantC is the quantization scaling factor of C.
+        //    if dtypeC is FP8, it transforms the range from [-amaxC, amaxC] to [-448, 448]
+        //    if dtypeC is NvFp4, it transforms the range from [-amaxC, amaxC] to [-448 * 6, 448 * 6],
+        //    otherwise it is 1.
+>>>>>>> upstream/main
         // Shape is [1].
         void* mPtrScaleC{nullptr};
     };
@@ -230,7 +274,11 @@ public:
     // Launch the cubin from the provided config. It calls all necessary memsets for internal buffers.
     // Provided config must be validated with isValidConfig before the call.
     int32_t run(GemmConfig const& config, void* workspace, GemmData const& options, void* cudaStream,
+<<<<<<< HEAD
         int32_t multiProcessorCount,
+=======
+        int32_t multiProcessorCount, bool usePdl = true,
+>>>>>>> upstream/main
         std::optional<std::reference_wrapper<ModuleCache>> moduleCache = std::nullopt) const;
 
     // Initializes the buffers before the world sync. Must be called before run.
@@ -378,7 +426,11 @@ bool GemmInterface::isValidConfig(GemmConfig const& config, GemmData const& data
     auto options = getOptionsFromConfigAndData(config, data);
 
     // Is Blackwell?
+<<<<<<< HEAD
     bool isBlackwell = config.mSm == SmVersion::Sm100a;
+=======
+    bool isBlackwell = isSmVersionBlackwell(config.mSm);
+>>>>>>> upstream/main
 
     // Check options without modifications.
     return checkAndUpdateGemmOptions(options, isBlackwell, data.mProblemDimensions.mWorldSize,
@@ -388,8 +440,16 @@ bool GemmInterface::isValidConfig(GemmConfig const& config, GemmData const& data
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int32_t GemmInterface::run(GemmConfig const& config, void* workspace, GemmData const& data, void* cudaStream,
+<<<<<<< HEAD
     int32_t multiProcessorCount, std::optional<std::reference_wrapper<ModuleCache>> moduleCache) const
 {
+=======
+    int32_t multiProcessorCount, bool usePdl, std::optional<std::reference_wrapper<ModuleCache>> moduleCache) const
+{
+    // Might be used.
+    (void) usePdl;
+    (void) moduleCache;
+>>>>>>> upstream/main
     // Get options from config and data.
     auto options = getOptionsFromConfigAndData(config, data);
 
@@ -417,6 +477,7 @@ int32_t GemmInterface::run(GemmConfig const& config, void* workspace, GemmData c
     int numTilesN = gemm::divUp(options.mN, options.mTileN);
 
     // Create kernel params.
+<<<<<<< HEAD
     auto kernelParams = gemm::KernelParams::setKernelParams(options, data.mInputBuffers.mPtrA,
         data.mInputBuffers.mPtrSfA, data.mInputBuffers.mPtrPerTokenSfA, data.mInputBuffers.mPtrB,
         data.mInputBuffers.mPtrSfB, data.mInputBuffers.mPtrPerTokenSfB, data.mOutputBuffers.mPtrC,
@@ -426,6 +487,16 @@ int32_t GemmInterface::run(GemmConfig const& config, void* workspace, GemmData c
         dPtrSplitKCompletionBars,
         /* dPtrNumNonExitingCtas */ nullptr, data.mProblemDimensions.mRank, data.mProblemDimensions.mWorldSize);
 
+=======
+    auto kernelParams = gemm::KernelParamsSetup::setKernelParams(options, data.mInputBuffers.mPtrA,
+        data.mInputBuffers.mPtrSfA, data.mInputBuffers.mPtrPerTokenSfA, data.mInputBuffers.mPtrB,
+        data.mInputBuffers.mPtrSfB, data.mInputBuffers.mPtrPerTokenSfB, data.mInputBuffers.mPtrBias,
+        data.mOutputBuffers.mPtrC, data.mOutputBuffers.mPtrSfC, data.mOutputBuffers.mPtrMultiMemC,
+        (float*) data.mInputBuffers.mPtrScaleC, dSplitKSlices, data.mAllReduceBuffers.mPtrTileBars,
+        data.mAllReduceBuffers.mPtrMultiMemTileBars, data.mAllReduceBuffers.mPtrCompletionBars,
+        data.mAllReduceBuffers.mPtrMultiMemCompletionBars, dPtrSplitKCompletionBars,
+        /* dPtrNumNonExitingCtas */ nullptr, data.mProblemDimensions.mRank, data.mProblemDimensions.mWorldSize);
+>>>>>>> upstream/main
     // The size of the grid.
     std::vector<int32_t> grid{numTilesM, numTilesN, options.mNumSlicesForSplitK};
 
@@ -443,16 +514,25 @@ int32_t GemmInterface::run(GemmConfig const& config, void* workspace, GemmData c
 #ifdef TLLM_GEN_EXPORT_INTERFACE
     CUmodule cuModule;
     CUfunction cuFunction;
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/main
     if (moduleCache.has_value())
     {
         ModuleCache& moduleCacheRef = moduleCache.value().get();
 
+<<<<<<< HEAD
         // Modules are associated with a specific context so include the ctxId in the key
+=======
+        // Modules are associated with a specific context, so the context is included in the key
+>>>>>>> upstream/main
         CUcontext ctx;
         unsigned long long ctxId;
         cuCtxGetCurrent(&ctx);
         cuCtxGetId(ctx, &ctxId);
 
+<<<<<<< HEAD
         // Reinterpret the ctxId as a string to avoid needing a custom hash or converting it to a string in decimal
         // representation.
         std::string const ctxName
@@ -463,6 +543,17 @@ int32_t GemmInterface::run(GemmConfig const& config, void* workspace, GemmData c
         auto module = moduleCacheRef.find(moduleKey);
 
         // Check if module exists in cache. Otherwise, load it
+=======
+        // Reinterpret the ctxId as a string to avoid needing a custom hash or converting it to a
+        // string in decimal representation.
+        std::string const ctxName
+            = std::string(reinterpret_cast<char*>(&ctxId), sizeof(unsigned long long) / sizeof(char));
+        std::string const funcName = std::string(config.mFunctionName);
+        auto const moduleKey = ctxName + funcName;
+        auto module = moduleCacheRef.find(moduleKey);
+
+        // Use cache if module is found, otherwise load and insert into cache
+>>>>>>> upstream/main
         if (module != moduleCacheRef.end())
         {
             cuFunction = std::get<1>(module->second);
@@ -492,17 +583,30 @@ int32_t GemmInterface::run(GemmConfig const& config, void* workspace, GemmData c
     // Run the kernel.
     auto result = trtllm::gen::launchKernel((void*) &kernelParams, cudaStream, config.mSharedMemSize, cuFunction,
         block3, grid3, cluster3,
+<<<<<<< HEAD
         config.mOptions.mGridWaitForPrimaryEarlyExit | config.mOptions.mGridWaitForPrimaryA
             | config.mOptions.mGridWaitForPrimaryB);
     if (result != CUDA_SUCCESS)
     {
         return -1;
     }
+=======
+        usePdl
+            && (config.mOptions.mGridWaitForPrimaryEarlyExit | config.mOptions.mGridWaitForPrimaryA
+                | config.mOptions.mGridWaitForPrimaryB));
+>>>>>>> upstream/main
     // If a module cache has not been given, unload the module to avoid leaking
     if (!moduleCache.has_value())
     {
         cuModuleUnload(cuModule);
     }
+<<<<<<< HEAD
+=======
+    if (result != CUDA_SUCCESS)
+    {
+        return -1;
+    }
+>>>>>>> upstream/main
 #else
     config.mCudaRunner->run((void*) &kernelParams, (void*) cudaStream, grid);
 #endif

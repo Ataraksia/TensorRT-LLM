@@ -1,6 +1,10 @@
 # Dynasor
 
+<<<<<<< HEAD
 This document shows how to speed up reasoning models without training or fine‑tuning by using **Dynasor** ([Efficiently Serving LLM Reasoning Programs with Certaindex](https://arxiv.org/abs/2412.20993)) in TensorRT‑LLM.
+=======
+This document shows how to speed up reasoning models without training or fine‑tuning by using **Dynasor** ([Efficiently Scaling LLM Reasoning with Certaindex](https://arxiv.org/abs/2412.20993)) in TensorRT‑LLM.
+>>>>>>> upstream/main
 
 ## Overview
 
@@ -42,8 +46,13 @@ Lowering either value saves more tokens but may risk accuracy.
  If you use Dynasor for your research, please cite our [paper](https://arxiv.org/abs/2412.20993):
  ```
  @article{fu2024efficiently,
+<<<<<<< HEAD
    title={Efficiently Serving LLM Reasoning Programs with Certaindex},
    author={Fu, Yichao and Chen, Junda and Zhu, Siqi and Fu, Zheyu and Dai, Zhongdongming and Qiao, Aurick and Zhang, Hao},
+=======
+   title={Efficiently Scaling LLM Reasoning with Certaindex},
+   author={Fu, Yichao and Chen, Junda and Zhu, Siqi and Fu, Zheyu and Dai, Zhongdongming and Zhuang, Yonghao and Ma, Yian and Qiao, Aurick and Rosing, Tajana and Stoica, Ion and Zhang, Hao},
+>>>>>>> upstream/main
    journal={arXiv preprint arXiv:2412.20993},
    year={2024}
  }

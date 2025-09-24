@@ -1,9 +1,31 @@
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> upstream/main
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from transformers import (AutoTokenizer, PreTrainedTokenizerBase,
                           PreTrainedTokenizerFast)
 
+<<<<<<< HEAD
+=======
+from .._utils import nvtx_range_debug
+from ..logger import logger
+
+TLLM_INCREMENTAL_DETOKENIZATION_BACKEND = os.environ.get(
+    "TLLM_INCREMENTAL_DETOKENIZATION_BACKEND", "HF")
+TLLM_STREAM_INTERVAL_THRESHOLD = int(
+    os.environ.get("TLLM_STREAM_INTERVAL_THRESHOLD", "24"))
+try:
+    from tokenizers.decoders import DecodeStream  # noqa
+except ImportError:
+    logger.warning(
+        f"HF incremental detokenization is unsupported by tokenizer<0.21.0; fallback to TRTLLM incremental detokenization."
+    )
+    TLLM_INCREMENTAL_DETOKENIZATION_BACKEND = "TRTLLM"
+
+>>>>>>> upstream/main
 
 class TokenizerBase(PreTrainedTokenizerBase):
     ''' This is a protocol for the tokenizer. Users can implement their own tokenizer by inheriting this class.  '''
@@ -41,6 +63,14 @@ class TransformersTokenizer(TokenizerBase):
     def batch_encode_plus(self, texts: List[str], *args, **kwargs) -> dict:
         return self.tokenizer.batch_encode_plus(texts, *args, **kwargs)
 
+<<<<<<< HEAD
+=======
+    def get_chat_template(self,
+                          chat_template: Optional[str] = None,
+                          tools: Optional[List[Dict]] = None) -> str:
+        return self.tokenizer.get_chat_template(chat_template, tools)
+
+>>>>>>> upstream/main
     def apply_chat_template(
             self, conversation: Union[List[Dict[str, str]],
                                       List[List[Dict[str, str]]]], *args,
@@ -113,6 +143,10 @@ class TransformersTokenizer(TokenizerBase):
         else:
             return "".join(sub_texts)
 
+<<<<<<< HEAD
+=======
+    @nvtx_range_debug("decode_incrementally")
+>>>>>>> upstream/main
     def decode_incrementally(
             self,
             token_ids: List[int],
@@ -121,8 +155,14 @@ class TransformersTokenizer(TokenizerBase):
             *,
             flush: bool = False,
             skip_special_tokens: bool = False,
+<<<<<<< HEAD
             clean_up_tokenization_spaces: bool = None,
             spaces_between_special_tokens: bool = True) -> Tuple[str, dict]:
+=======
+            clean_up_tokenization_spaces: Optional[bool] = None,
+            spaces_between_special_tokens: bool = True,
+            stream_interval: int = 1) -> Tuple[str, dict]:
+>>>>>>> upstream/main
         """Incremental detokenization, typically used for streaming generation.
 
         Args:
@@ -133,11 +173,49 @@ class TransformersTokenizer(TokenizerBase):
             skip_special_tokens (bool): Whether to remove special tokens in the decoding.
             clean_up_tokenization_spaces (bool): Whether to clean up tokenization spaces.
             spaces_between_special_tokens (bool): Whether to add spaces between special tokens.
+<<<<<<< HEAD
+=======
+            stream_interval (int): The iteration interval to create responses under the streaming mode.
+>>>>>>> upstream/main
 
         Returns:
             text, states (Tuple[str, dict]): text is the current decoded text, states is the current incremental detokenization states.
             They should be passed to next incremental detokenization iteration, if any.
         """
+<<<<<<< HEAD
+=======
+        # HF incremental detokenization implementation is faster than TRTLLM when stream_interval is smaller.
+        if (TLLM_INCREMENTAL_DETOKENIZATION_BACKEND == "TRTLLM"
+                or stream_interval >= TLLM_STREAM_INTERVAL_THRESHOLD
+                or spaces_between_special_tokens is False
+                or not hasattr(self.tokenizer, "_tokenizer")):
+            return self.trtllm_decode_incrementally(
+                token_ids,
+                prev_text,
+                states,
+                flush=flush,
+                skip_special_tokens=skip_special_tokens,
+                clean_up_tokenization_spaces=clean_up_tokenization_spaces,
+                spaces_between_special_tokens=spaces_between_special_tokens)
+        else:
+            return self.hf_decode_incrementally(
+                token_ids,
+                prev_text,
+                states,
+                skip_special_tokens=skip_special_tokens,
+                clean_up_tokenization_spaces=clean_up_tokenization_spaces)
+
+    def trtllm_decode_incrementally(
+            self,
+            token_ids: List[int],
+            prev_text: Optional[str] = None,
+            states: Optional[dict] = None,
+            *,
+            flush: bool = False,
+            skip_special_tokens: bool = False,
+            clean_up_tokenization_spaces: Optional[bool] = None,
+            spaces_between_special_tokens: bool = True) -> Tuple[str, dict]:
+>>>>>>> upstream/main
         # Adapted from
         # https://github.com/vllm-project/vllm/blob/v0.6.3/vllm/transformers_utils/detokenizer.py#L238
         if prev_text is None:
@@ -179,6 +257,41 @@ class TransformersTokenizer(TokenizerBase):
             curr_new_text = self.clean_up_tokenization(curr_new_text)
         return prev_text + curr_new_text, {'last_new_tokens': pending_tokens}
 
+<<<<<<< HEAD
+=======
+    def hf_decode_incrementally(
+        self,
+        token_ids: List[int],
+        prev_text: Optional[str] = None,
+        states: Optional[dict] = None,
+        *,
+        skip_special_tokens: bool = False,
+        clean_up_tokenization_spaces: Optional[bool] = None
+    ) -> Tuple[str, dict]:
+        if states is None:
+            states = {
+                'decode_stream':
+                DecodeStream(skip_special_tokens=skip_special_tokens)
+            }
+
+        decode_stream = states.get('decode_stream')
+        results = [
+            result for tid in token_ids
+            if (result := decode_stream.step(self.tokenizer._tokenizer, tid)
+                ) is not None
+        ]
+        curr_new_text = "".join(results)
+        if clean_up_tokenization_spaces is None:
+            clean_up_tokenization_spaces = self.clean_up_tokenization_spaces
+        if clean_up_tokenization_spaces:
+            curr_new_text = self.clean_up_tokenization(curr_new_text)
+
+        if prev_text is None:
+            return curr_new_text, states
+        else:
+            return prev_text + curr_new_text, states
+
+>>>>>>> upstream/main
 
 def tokenizer_factory(obj: Optional[Union[str, Path, PreTrainedTokenizerBase,
                                           TokenizerBase]] = None,
@@ -239,9 +352,23 @@ def _xgrammar_tokenizer_info(tokenizer):
         raise ValueError(f"Unsupported tokenizer type: {type(tokenizer)}")
 
 
+<<<<<<< HEAD
 def load_hf_tokenizer(model_dir: str,
                       trust_remote_code: bool = True,
                       use_fast: bool = True) -> Optional[TransformersTokenizer]:
+=======
+def _llguidance_tokenizer_info(tokenizer):
+    tokenizer_info = _xgrammar_tokenizer_info(tokenizer)
+    if tokenizer_info.get("tokenizer_str") is None:
+        raise ValueError("missing tokenizer_str")
+    return tokenizer_info
+
+
+def load_hf_tokenizer(model_dir: str,
+                      trust_remote_code: bool = True,
+                      use_fast: bool = True,
+                      **kwargs) -> Optional[TransformersTokenizer]:
+>>>>>>> upstream/main
     ''' Load a tokenizer from a Hugging Face model directory.
 
     Args:
@@ -260,7 +387,17 @@ def load_hf_tokenizer(model_dir: str,
             padding_side='left',
             truncation_side='left',
             trust_remote_code=trust_remote_code,
+<<<<<<< HEAD
             use_fast=use_fast)
 
     except Exception:
+=======
+            use_fast=use_fast,
+            **kwargs)
+
+    except Exception as e:
+        logger.warning(
+            f"Failed to load hf tokenizer from {model_dir}, encounter error: {e}"
+        )
+>>>>>>> upstream/main
         return None

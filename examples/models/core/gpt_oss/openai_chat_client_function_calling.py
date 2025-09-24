@@ -1,5 +1,6 @@
 import argparse
 import json
+<<<<<<< HEAD
 import re
 
 from openai import OpenAI
@@ -77,6 +78,61 @@ schema_get_multiple_weathers = {
         },
     },
     "required": ["locations"],
+=======
+
+from openai import OpenAI
+
+tool_get_current_weather = {
+    "type": "function",
+    "function": {
+        "name": "get_current_weather",
+        "description": "Gets the current weather in the provided location.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA",
+                },
+                "format": {
+                    "type": "string",
+                    "description": "default: celsius",
+                    "enum": ["celsius", "fahrenheit"],
+                },
+            },
+            "required": ["location"],
+        }
+    }
+}
+
+tool_get_multiple_weathers = {
+    "type": "function",
+    "function": {
+        "name": "get_multiple_weathers",
+        "description":
+        "Gets the current weather in the provided list of locations.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "locations": {
+                    "type":
+                    "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description":
+                    'List of city and state, e.g. ["San Francisco, CA", "New York, NY"]',
+                },
+                "format": {
+                    "type": "string",
+                    "description": "default: celsius",
+                    "enum": ["celsius", "fahrenheit"],
+                },
+            },
+            "required": ["locations"],
+        }
+    }
+>>>>>>> upstream/main
 }
 
 
@@ -104,6 +160,7 @@ def main():
 
     messages = [
         {
+<<<<<<< HEAD
             "role": "system",
             "content": system_prompt,
         },
@@ -112,6 +169,8 @@ def main():
             "content": developer_prompt,
         },
         {
+=======
+>>>>>>> upstream/main
             "role": "user",
             "content": args.prompt,
         },
@@ -122,6 +181,7 @@ def main():
         model=args.model,
         messages=messages,
         max_completion_tokens=500,
+<<<<<<< HEAD
         response_format={
             "type":
             "structural_tag",
@@ -163,24 +223,57 @@ def main():
 
     kwargs = json.loads(match.group(2))
     print(f"[FUNCTION CALL] {tool.__name__}(**{kwargs})")
+=======
+        tools=[tool_get_current_weather, tool_get_multiple_weathers],
+    )
+    tools = {
+        "get_current_weather": get_current_weather,
+        "get_multiple_weathers": get_multiple_weathers
+    }
+    message = chat_completion.choices[0].message
+    assert message, "Empty Message"
+    assert message.tool_calls, "Empty tool calls"
+    assert message.content is None, "Empty content expected"
+    reasoning = message.reasoning if hasattr(message, "reasoning") else None
+    tool_call = message.tool_calls[0]
+    func_name = tool_call.function.name
+    assert func_name in tools, "Invalid function name"
+    kwargs = json.loads(tool_call.function.arguments)
+
+    tool = tools[func_name]
+    print(f"[RESPONSE 1] [COT] {reasoning}")
+    print(f"[RESPONSE 1] [FUNCTION CALL] {tool.__name__}(**{kwargs})")
+>>>>>>> upstream/main
     answer = tool(**kwargs)
 
     messages.extend([{
         "role": "assistant",
+<<<<<<< HEAD
         "content": match.group(0),
     }, {
         "role": f"{tool.__name__} to=assistant",
         "content": json.dumps(answer),
+=======
+        "reasoning": reasoning,
+        "tool_calls": [tool_call],
+    }, {
+        "role": "tool",
+        "content": json.dumps(answer),
+        "tool_call_id": tool_call.id
+>>>>>>> upstream/main
     }])
 
     chat_completion = client.chat.completions.create(
         model=args.model,
         messages=messages,
         max_completion_tokens=500,
+<<<<<<< HEAD
         extra_body={
             "skip_special_tokens": False,
             "include_stop_str_in_output": True,
         },
+=======
+>>>>>>> upstream/main
     )
 
     response_text = chat_completion.choices[0].message.content

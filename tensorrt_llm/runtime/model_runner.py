@@ -86,7 +86,11 @@ def _builder_to_model_config(config: dict) -> Tuple[ModelConfig, dict]:
     dtype = builder_config['precision']
     tp_size = builder_config['tensor_parallel']
     pp_size = builder_config.get('pipeline_parallel', 1)
+<<<<<<< HEAD
     kv_cache_type = KVCacheType(builder_config.get('kv_cache_type'))
+=======
+    kv_cache_type = KVCacheType.from_string(builder_config.get('kv_cache_type'))
+>>>>>>> upstream/main
     world_size = tp_size * pp_size
     assert world_size == mpi_world_size(), \
         f'Engine world size ({tp_size} * {pp_size}) != Runtime world size ({mpi_world_size()})'
@@ -646,6 +650,10 @@ class ModelRunner(ModelRunnerMixin):
         gpu_weights_percent: float = 1,
         enable_context_fmha_fp32_acc: Optional[bool] = None,
         multi_block_mode: Optional[bool] = None,
+<<<<<<< HEAD
+=======
+        fail_fast_on_attention_window_too_large: bool = False,
+>>>>>>> upstream/main
     ) -> 'ModelRunner':
         """
         Create a ModelRunner instance from an engine directory.
@@ -667,6 +675,12 @@ class ModelRunner(ModelRunnerMixin):
                 Stream to use.
             multi_block_mode (bool):
                 Whether to distribute the work across multiple CUDA thread-blocks on the GPU for masked MHA kernel.
+<<<<<<< HEAD
+=======
+            fail_fast_on_attention_window_too_large (bool):
+                Exit with runtime error when attention window is too large to fit even a single sequence in the KV cache.
+                Note: This parameter is only applicable to C++ runtime (ModelRunnerCpp).
+>>>>>>> upstream/main
         Returns:
             ModelRunner: An instance of ModelRunner.
         """

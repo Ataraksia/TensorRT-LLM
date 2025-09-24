@@ -6,7 +6,11 @@ from .common import ReduceOp, get_rank_world_size, is_ompi
 try:
     from ....mapping import Mapping
     from ...distributed import AllReduce, allgather
+<<<<<<< HEAD
     from ...modules.linear import AllReduceFusionOp, AllReduceParams
+=======
+    from ...modules.linear import AllReduceFusionOp, AllReduceParams, AllReduceStrategy
+>>>>>>> upstream/main
 
     def trtllm_allgather(tensor, dim, sizes=None):
         rank, world_size = get_rank_world_size()
@@ -17,7 +21,12 @@ try:
         rank, world_size = get_rank_world_size()
         assert op == ReduceOp.SUM, "TRT-LLM all reduce only supports SUM op."
         p_config = Mapping(world_size=world_size, tp_size=world_size, rank=rank)
+<<<<<<< HEAD
         torch_op = AllReduce(p_config)
+=======
+        # Use Strategy.NCCL until https://nvbugspro.nvidia.com/bug/5331013 is fixed, then change to Strategy.AUTO
+        torch_op = AllReduce(mapping=p_config, strategy=AllReduceStrategy.NCCL)
+>>>>>>> upstream/main
         return torch_op(tensor, all_reduce_params=all_reduce_params)
 
     @torch.library.custom_op(

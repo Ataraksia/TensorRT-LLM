@@ -10,11 +10,20 @@ from torch.fx import GraphModule, Interpreter
 from torch.fx.passes.split_module import split_module
 
 from tensorrt_llm.llmapi.utils import enable_llm_debug
+<<<<<<< HEAD
 from tensorrt_llm.logger import logger
 
 from ..utils import get_piecewise_cuda_graph_flag, make_weak_ref
 from .utils import (get_arg, get_enable_piecewise_cuda_graph_capture_flag,
                     is_call_function)
+=======
+
+from ..utils import (get_model_extra_attrs,
+                     get_per_request_piecewise_cuda_graph_flag,
+                     get_piecewise_cuda_graph_flag, make_weak_ref)
+from .multi_stream.auto_multi_stream import multi_stream_schedule
+from .utils import get_capture_piecewise_cuda_graph_flag, is_call_function
+>>>>>>> upstream/main
 
 
 class PiecewiseInterpreter(Interpreter):
@@ -24,21 +33,38 @@ class PiecewiseInterpreter(Interpreter):
         module: GraphModule,
         enable_inductor: bool,
         compile_time_num_tokens: Union[int | torch.SymInt],
+<<<<<<< HEAD
         cuda_graph_batch_sizes: list[int],
+=======
+        capture_num_tokens: list[int],
+>>>>>>> upstream/main
         exclude_modules_id: list[int],
         graph_pool_handle: tuple[int, int],
         garbage_collect_values: bool = True,
         graph=None,
+<<<<<<< HEAD
+=======
+        max_num_streams: int = 1,
+>>>>>>> upstream/main
     ):
         super().__init__(module, garbage_collect_values, graph)
 
         self.fake_mode = detect_fake_mode()
 
         self.compile_time_num_tokens = compile_time_num_tokens
+<<<<<<< HEAD
         self.cuda_graph_batch_sizes = cuda_graph_batch_sizes
         self.exclude_modules = [f"submod_{i}" for i in exclude_modules_id]
         self.graph_pool_handle = graph_pool_handle
         self.enable_inductor = enable_inductor
+=======
+        self.capture_num_tokens = capture_num_tokens
+        self.exclude_modules = [f"submod_{i}" for i in exclude_modules_id]
+        self.graph_pool_handle = graph_pool_handle
+        self.enable_inductor = enable_inductor
+        self.num_events = 0
+        self.max_num_streams = max_num_streams
+>>>>>>> upstream/main
 
     def run(self, *args):
         fake_args = [
@@ -72,12 +98,24 @@ class PiecewiseInterpreter(Interpreter):
                                     found_dynamic_shape = True
                                     break
 
+<<<<<<< HEAD
+=======
+            if self.max_num_streams > 1 and not self.enable_inductor:
+                num_events = multi_stream_schedule(submod, self.max_num_streams)
+                self.num_events = max(self.num_events, num_events)
+                submod.recompile()
+
+>>>>>>> upstream/main
             self.module.__dict__[target] = PiecewiseRunner(
                 submod,
                 target,
                 self.compile_time_num_tokens,
                 runtime_num_tokens_idx,
+<<<<<<< HEAD
                 self.cuda_graph_batch_sizes,
+=======
+                self.capture_num_tokens,
+>>>>>>> upstream/main
                 self.graph_pool_handle,
                 compile_fx(submod, args) if self.enable_inductor else submod,
                 self.enable_inductor,
@@ -111,7 +149,11 @@ class PiecewiseRunner(object):
         name: str,
         compile_time_num_tokens: Union[int | torch.SymInt],
         runtime_num_tokens_idx: tuple[int],
+<<<<<<< HEAD
         cuda_graph_batch_sizes: List[int],
+=======
+        capture_num_tokens: List[int],
+>>>>>>> upstream/main
         graph_pool_handle,
         default_callable: Callable,
         enable_inductor: bool,
@@ -130,9 +172,15 @@ class PiecewiseRunner(object):
 
         self.entries: dict[int, Entry] = {}
 
+<<<<<<< HEAD
         for bs in cuda_graph_batch_sizes:
             self.entries[bs] = Entry(
                 bs,
+=======
+        for num_tokens in capture_num_tokens:
+            self.entries[num_tokens] = Entry(
+                num_tokens,
+>>>>>>> upstream/main
                 enable_inductor=self.enable_inductor,
                 callable=default_callable,
             )
@@ -146,8 +194,15 @@ class PiecewiseRunner(object):
         elif isinstance(self.compile_time_num_tokens, int):
             runtime_num_of_token = self.compile_time_num_tokens
 
+<<<<<<< HEAD
         if runtime_num_of_token is None or runtime_num_of_token not in self.entries or not get_piecewise_cuda_graph_flag(
         ):
+=======
+        if (runtime_num_of_token is None
+                or runtime_num_of_token not in self.entries
+                or not get_piecewise_cuda_graph_flag()
+                or not get_per_request_piecewise_cuda_graph_flag()):
+>>>>>>> upstream/main
             return self.default_callable(*args)
 
         entry = self.entries[runtime_num_of_token]
@@ -158,6 +213,7 @@ class PiecewiseRunner(object):
 
         if entry.cuda_graph is None:
 
+<<<<<<< HEAD
             if not get_enable_piecewise_cuda_graph_capture_flag():
                 logger.warning(
                     f"Unexpectedly capture cuda graph for {self.name} with runtime_num_of_token {runtime_num_of_token}. Will fallback to non-CUDA graph execution."
@@ -167,6 +223,14 @@ class PiecewiseRunner(object):
             if entry.warmup_count < 2:
                 entry.warmup_count += 1
                 return self.default_callable(*args)
+=======
+            if not get_capture_piecewise_cuda_graph_flag():
+                return entry.callable(*args)
+
+            if entry.warmup_count < 3:
+                entry.warmup_count += 1
+                return entry.callable(*args)
+>>>>>>> upstream/main
 
             entry.input_addresses = [
                 i.data_ptr() for i in args if isinstance(i, torch.Tensor)
@@ -179,8 +243,17 @@ class PiecewiseRunner(object):
             with patch("gc.collect", lambda: None):
                 # TODO: consider to use `make_graphed_callables()` when
                 # it's ready rather than capture it ourselves
+<<<<<<< HEAD
                 with torch.cuda.graph(graph, pool=self.graph_pool_handle):
                     output = entry.callable(*args)
+=======
+                # Graph Capture would override the stream. We need to setup the stream correctly.
+                extra_attrs = get_model_extra_attrs()
+                with torch.cuda.graph(graph, pool=self.graph_pool_handle):
+                    extra_attrs["global_stream"] = torch.cuda.current_stream()
+                    output = entry.callable(*args)
+                extra_attrs["global_stream"] = torch.cuda.current_stream()
+>>>>>>> upstream/main
 
             entry.cuda_graph = graph
             # Mark weak ref here. The intermediate activation tensor should be freed properly.
@@ -190,12 +263,18 @@ class PiecewiseRunner(object):
                 i.data_ptr() for i in output if isinstance(i, torch.Tensor)
             ]
 
+<<<<<<< HEAD
+=======
+            entry.cuda_graph.replay()
+
+>>>>>>> upstream/main
             return output
 
         if enable_llm_debug():
             runtime_input_addresses = [
                 i.data_ptr() for i in args if isinstance(i, torch.Tensor)
             ]
+<<<<<<< HEAD
             runtime_output_addresses = [
                 i.data_ptr() for i in output if isinstance(i, torch.Tensor)
             ]
@@ -205,6 +284,11 @@ class PiecewiseRunner(object):
             assert (
                 entry.output_addresses == runtime_output_addresses
             ), f"{entry.output_addresses} vs\n {runtime_output_addresses}"
+=======
+
+            assert (entry.input_addresses == runtime_input_addresses
+                    ), f"{entry.input_addresses} vs\n {runtime_input_addresses}"
+>>>>>>> upstream/main
 
         entry.cuda_graph.replay()
 
@@ -216,6 +300,7 @@ def piecewise_optimizer(
     example_inputs: List[torch.Tensor],
     enable_inductor: bool,
     input_num_tokens: Union[int | torch.SymInt],
+<<<<<<< HEAD
     cuda_graph_batch_sizes: Sequence[int],
     graph_pool_handle: tuple[int, int],
 ) -> GraphModule:
@@ -267,6 +352,14 @@ def piecewise_optimizer(
         graph.erase_node(node)
 
     gm.recompile()
+=======
+    capture_num_tokens: Sequence[int],
+    graph_pool_handle: tuple[int, int],
+    max_num_streams: int = 1,
+) -> tuple[GraphModule, int]:
+    graph_pool_handle = torch.cuda.graph_pool_handle()
+    graph = gm.graph
+>>>>>>> upstream/main
 
     stop_partition = False
     node_to_graph_id = {}
@@ -277,16 +370,26 @@ def piecewise_optimizer(
         if node.op in ("output", "placeholder"):
             continue
         if (not stop_partition and is_call_function(node, [
+<<<<<<< HEAD
                 torch.ops.trtllm.attention_inplace.default,
+=======
+                torch.ops.trtllm.attn_custom_op_inplace.default,
+                torch.ops.trtllm.mla_custom_op_inplace.default,
+>>>>>>> upstream/main
                 torch.ops.aten.index.Tensor,
                 torch.ops.aten.cumsum.default,
         ])):
             idx += 1
             node_to_graph_id[node] = idx
             exclude_modules_id.append(idx)
+<<<<<<< HEAD
             if node.target != torch.ops.trtllm.attention_inplace.default:
                 # We only know it is safe to continue splitting after attention
                 # since attention_inplace will not produce any new tensor
+=======
+            if node.target != torch.ops.trtllm.attn_custom_op_inplace.default and node.target != torch.ops.trtllm.mla_custom_op_inplace.default:
+                # We only know it is safe to continue splitting after attention
+>>>>>>> upstream/main
                 stop_partition = True
             else:
                 idx += 1
@@ -298,6 +401,7 @@ def piecewise_optimizer(
                       lambda node: node_to_graph_id[node],
                       keep_original_order=True)
 
+<<<<<<< HEAD
     PiecewiseInterpreter(
         gm,
         enable_inductor,
@@ -308,3 +412,18 @@ def piecewise_optimizer(
     ).run(*example_inputs)
 
     return gm
+=======
+    interpreter = PiecewiseInterpreter(
+        gm,
+        enable_inductor,
+        input_num_tokens,
+        capture_num_tokens,
+        exclude_modules_id,
+        graph_pool_handle,
+        max_num_streams=max_num_streams,
+    )
+
+    interpreter.run(*example_inputs)
+
+    return gm, interpreter.num_events
+>>>>>>> upstream/main

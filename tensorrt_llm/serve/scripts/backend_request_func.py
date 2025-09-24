@@ -46,6 +46,10 @@ class RequestFuncOutput:
     prompt_len: int = 0
     error: str = ""
     avg_decoded_tokens_per_iter: float = 0.0  # Average tokens decoded per iteration
+<<<<<<< HEAD
+=======
+    exception_type: str = None  # unset
+>>>>>>> upstream/main
 
 
 async def async_request_trt_llm(
@@ -132,10 +136,18 @@ async def async_request_trt_llm(
             else:
                 output.error = response.reason or ""
                 output.success = False
+<<<<<<< HEAD
     except Exception:
         output.success = False
         exc_info = sys.exc_info()
         output.error = "".join(traceback.format_exception(*exc_info))
+=======
+    except Exception as e:
+        output.success = False
+        exc_info = sys.exc_info()
+        output.error = "".join(traceback.format_exception(*exc_info))
+        output.exception_type = e.__class__.__name__
+>>>>>>> upstream/main
     finally:
         if session is None:
             await request_session.close()
@@ -259,12 +271,23 @@ async def async_request_openai_completions(
                         output.avg_decoded_tokens_per_iter = choice[
                             "avg_decoded_tokens_per_iter"]
             else:
+<<<<<<< HEAD
                 output.error = response.reason or ""
                 output.success = False
     except Exception:
         output.success = False
         exc_info = sys.exc_info()
         output.error = "".join(traceback.format_exception(*exc_info))
+=======
+                print(f"HTTP Error {response.status}: {response}")
+                output.error = response.reason or ""
+                output.success = False
+    except Exception as e:
+        output.success = False
+        exc_info = sys.exc_info()
+        output.error = "".join(traceback.format_exception(*exc_info))
+        output.exception_type = e.__class__.__name__
+>>>>>>> upstream/main
     finally:
         if session is None:
             await request_session.close()
@@ -392,12 +415,23 @@ async def async_request_openai_chat_completions(
                             "avg_decoded_tokens_per_iter"]
 
             else:
+<<<<<<< HEAD
                 output.error = response.reason or ""
                 output.success = False
     except Exception:
         output.success = False
         exc_info = sys.exc_info()
         output.error = "".join(traceback.format_exception(*exc_info))
+=======
+                # TODO: Need to store the status code to debug and report
+                output.error = response.reason or ""
+                output.success = False
+    except Exception as e:
+        output.success = False
+        exc_info = sys.exc_info()
+        output.error = "".join(traceback.format_exception(*exc_info))
+        output.exception_type = e.__class__.__name__
+>>>>>>> upstream/main
     finally:
         if session is None:
             await request_session.close()

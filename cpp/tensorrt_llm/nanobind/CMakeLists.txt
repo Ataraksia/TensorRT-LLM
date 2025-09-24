@@ -10,6 +10,10 @@ set(SRCS
     batch_manager/kvCacheConnector.cpp
     batch_manager/kvCacheManager.cpp
     batch_manager/llmRequest.cpp
+<<<<<<< HEAD
+=======
+    common/tllmExceptions.cpp
+>>>>>>> upstream/main
     executor/bindings.cpp
     executor/executor.cpp
     executor/executorConfig.cpp

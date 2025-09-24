@@ -127,7 +127,11 @@ class BenchmarkStatistics(BaseModel):
     issue_rate_ns: float
 
     # Speculative Information
+<<<<<<< HEAD
     acceptance_rate: float
+=======
+    acceptance_length: float
+>>>>>>> upstream/main
 
     # Percentile-related Statistics
     request_latency_percentiles: Optional[PercentileStats] = None
@@ -137,7 +141,15 @@ class BenchmarkStatistics(BaseModel):
     ttft_percentiles: Optional[PercentileStats] = None
     generation_tp_percentiles: Optional[PercentileStats] = None
     generation_latency_percentiles: Optional[PercentileStats] = None
+<<<<<<< HEAD
     acceptance_percentiles: Optional[PercentileStats] = None
+=======
+    # Percentile-related Speculative Statistics
+    num_draft_tokens_percentiles: Optional[PercentileStats] = None
+    num_accepted_draft_tokens_percentiles: Optional[PercentileStats] = None
+    draft_acceptance_rate_percentiles: Optional[PercentileStats] = None
+    acceptance_length_percentiles: Optional[PercentileStats] = None
+>>>>>>> upstream/main
 
     @computed_field
     def sum_per_request_latencies_ns(self) -> float:

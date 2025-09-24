@@ -45,7 +45,11 @@ bool KvCacheRetentionConfig::TokenRangeRetentionConfig::operator==(TokenRangeRet
 KvCacheRetentionConfig::KvCacheRetentionConfig(
     std::vector<KvCacheRetentionConfig::TokenRangeRetentionConfig> const& tokenRangeRetentionPriorities,
     RetentionPriority decodeRetentionPriority, std::optional<std::chrono::milliseconds> decodeDurationMs,
+<<<<<<< HEAD
     KvCacheTransferMode transferMode, std::optional<std::string> directory)
+=======
+    KvCacheTransferMode transferMode, std::string const& directory)
+>>>>>>> upstream/main
     : mTokenRangeRetentionConfigs(std::vector<TokenRangeRetentionConfig>(tokenRangeRetentionPriorities))
     , mDecodeRetentionPriority{decodeRetentionPriority}
     , mDecodeDurationMs{decodeDurationMs}
@@ -117,7 +121,11 @@ KvCacheTransferMode KvCacheRetentionConfig::getTransferMode() const
     return mTransferMode;
 }
 
+<<<<<<< HEAD
 std::optional<std::string> KvCacheRetentionConfig::getDirectory() const
+=======
+std::string const& KvCacheRetentionConfig::getDirectory() const
+>>>>>>> upstream/main
 {
     return mDirectory;
 }

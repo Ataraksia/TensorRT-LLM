@@ -388,11 +388,19 @@ class LlamaAttentionExtend(LlamaAttention):
         self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
+<<<<<<< HEAD
         position_ids: Optional[torch.LongTensor] = None,
         past_key_value: "Optional[Cache]" = None,
         output_attentions: bool = False,
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
+=======
+        position_ids: Optional[torch.IntTensor] = None,
+        past_key_value: "Optional[Cache]" = None,
+        output_attentions: bool = False,
+        use_cache: bool = False,
+        cache_position: Optional[torch.IntTensor] = None,
+>>>>>>> upstream/main
         **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor],
                Optional[Tuple[torch.Tensor]]]:

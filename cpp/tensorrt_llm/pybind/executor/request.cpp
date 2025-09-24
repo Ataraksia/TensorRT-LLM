@@ -364,7 +364,11 @@ void initRequestBindings(pybind11::module_& m)
         return tle::KvCacheRetentionConfig(
             state[0].cast<std::vector<tle::KvCacheRetentionConfig::TokenRangeRetentionConfig>>(),
             state[1].cast<tle::RetentionPriority>(), state[2].cast<std::optional<std::chrono::milliseconds>>(),
+<<<<<<< HEAD
             state[3].cast<tle::KvCacheTransferMode>(), state[4].cast<std::optional<std::string>>());
+=======
+            state[3].cast<tle::KvCacheTransferMode>(), state[4].cast<std::string>());
+>>>>>>> upstream/main
     };
 
     auto kvCacheRetentionConfig = py::class_<tle::KvCacheRetentionConfig>(m, "KvCacheRetentionConfig");
@@ -386,7 +390,11 @@ void initRequestBindings(pybind11::module_& m)
     // TokenRangeRetentionPriority bindings have been defined.
     kvCacheRetentionConfig
         .def(py::init<std::vector<tle::KvCacheRetentionConfig::TokenRangeRetentionConfig>, tle::RetentionPriority,
+<<<<<<< HEAD
                  std::optional<std::chrono::milliseconds>, tle::KvCacheTransferMode, std::optional<std::string>>(),
+=======
+                 std::optional<std::chrono::milliseconds>, tle::KvCacheTransferMode, std::string>(),
+>>>>>>> upstream/main
             py::arg("token_range_retention_configs"),
             py::arg("decode_retention_priority") = tle::KvCacheRetentionConfig::kDefaultRetentionPriority,
             py::arg("decode_duration_ms") = py::none(),
@@ -526,11 +534,19 @@ void initRequestBindings(pybind11::module_& m)
             self.getClientId(), self.getReturnAllGeneratedTokens(), self.getPriority(), self.getRequestType(),
             self.getContextPhaseParams(), self.getEncoderInputFeatures(), self.getEncoderOutputLength(),
             self.getCrossAttentionMask(), self.getEagleConfig(), self.getSkipCrossAttnBlocks(),
+<<<<<<< HEAD
             self.getGuidedDecodingParams());
     };
     auto requestSetstate = [](py::tuple const& state)
     {
         if (state.size() != 33)
+=======
+            self.getGuidedDecodingParams(), self.getCacheSaltID());
+    };
+    auto requestSetstate = [](py::tuple const& state)
+    {
+        if (state.size() != 34)
+>>>>>>> upstream/main
         {
             throw std::runtime_error("Invalid Request state!");
         }
@@ -550,7 +566,12 @@ void initRequestBindings(pybind11::module_& m)
             state[25].cast<tle::RequestType>(), state[26].cast<std::optional<tle::ContextPhaseParams>>(),
             state[27].cast<std::optional<tle::Tensor>>(), state[28].cast<std::optional<SizeType32>>(),
             state[29].cast<std::optional<tle::Tensor>>(), 1, state[30].cast<std::optional<tle::EagleConfig>>(),
+<<<<<<< HEAD
             state[31].cast<std::optional<tle::Tensor>>(), state[32].cast<std::optional<tle::GuidedDecodingParams>>());
+=======
+            state[31].cast<std::optional<tle::Tensor>>(), state[32].cast<std::optional<tle::GuidedDecodingParams>>(),
+            state[33].cast<std::optional<tle::CacheSaltIDType>>());
+>>>>>>> upstream/main
     };
 
     py::class_<tle::Request> request(m, "Request", pybind11::dynamic_attr());
@@ -590,7 +611,12 @@ void initRequestBindings(pybind11::module_& m)
                  std::optional<tle::Tensor>,                    // skipCrossAttnBlocks
                  std::optional<tle::GuidedDecodingParams>,      // guidedDecodingParams
                  std::optional<tle::SizeType32>,                // languageAdapterUid
+<<<<<<< HEAD
                  std::optional<tle::MillisecondsType>           // allottedTimeMs
+=======
+                 std::optional<tle::MillisecondsType>,          // allottedTimeMs
+                 std::optional<tle::CacheSaltIDType>            // cacheSaltID
+>>>>>>> upstream/main
                  >(),
             // clang-format off
         py::arg("input_token_ids"),
@@ -630,8 +656,14 @@ void initRequestBindings(pybind11::module_& m)
         py::arg("skip_cross_attn_blocks") = py::none(),
         py::arg("guided_decoding_params") = py::none(),
         py::arg("language_adapter_uid") = py::none(),
+<<<<<<< HEAD
         py::arg("allotted_time_ms") = py::none()
     )          // clang-format on
+=======
+        py::arg("allotted_time_ms") = py::none(),
+        py::arg("cache_salt_id") = py::none()
+    )             // clang-format on
+>>>>>>> upstream/main
         .def_property_readonly("input_token_ids", &tle::Request::getInputTokenIds)
         .def_property_readonly("max_tokens", &tle::Request::getMaxTokens)
         .def_property("streaming", &tle::Request::getStreaming, &tle::Request::setStreaming)
@@ -675,6 +707,10 @@ void initRequestBindings(pybind11::module_& m)
         .def_property(
             "guided_decoding_params", &tle::Request::getGuidedDecodingParams, &tle::Request::setGuidedDecodingParams)
         .def_property("allotted_time_ms", &tle::Request::getAllottedTimeMs, &tle::Request::setAllottedTimeMs)
+<<<<<<< HEAD
+=======
+        .def_property("cache_salt_id", &tle::Request::getCacheSaltID, &tle::Request::setCacheSaltID)
+>>>>>>> upstream/main
         .def_property(
             "context_phase_params", &tle::Request::getContextPhaseParams, &tle::Request::setContextPhaseParams)
         .def(py::pickle(requestGetstate, requestSetstate));

@@ -144,7 +144,16 @@ def calculate_metrics(
     e2els: list[float] = []
     tput_user: list[float] = []
     latest_avg_decoded_tokens_per_iter: float = 0.0
+<<<<<<< HEAD
     for i in range(len(outputs)):
+=======
+    error_counts: dict[str, int] = {}
+    for i in range(len(outputs)):
+        if outputs[i].exception_type:
+            exception_type = outputs[i].exception_type
+            error_counts[exception_type] = error_counts.get(exception_type,
+                                                            0) + 1
+>>>>>>> upstream/main
         if outputs[i].success:
             output_len = outputs[i].output_tokens
             if not output_len:
@@ -179,6 +188,14 @@ def calculate_metrics(
         else:
             actual_output_lens.append(0)
 
+<<<<<<< HEAD
+=======
+    total_error_count = sum(error_counts.values())
+    for exception_type, count in error_counts.items():
+        print(f"Error type: {exception_type}, Count: {count} requests")
+    print(f"Total failed requests: {total_error_count}")
+
+>>>>>>> upstream/main
     if goodput_config_dict:
         valid_metrics = []
         slo_values = []
@@ -336,7 +353,12 @@ async def benchmark(
     print(f"Burstiness factor: {burstiness} ({distribution})")
     print(f"Maximum request concurrency: {max_concurrency}")
 
+<<<<<<< HEAD
     pbar = None if disable_tqdm else tqdm(total=len(input_requests))
+=======
+    pbar = None if disable_tqdm else tqdm(total=len(input_requests),
+                                          desc="Benchmarking")
+>>>>>>> upstream/main
 
     # This can be used once the minimum Python version is 3.10 or higher,
     # and it will simplify the code in limited_request_func.
@@ -433,7 +455,14 @@ async def benchmark(
     )
 
     print("{s:{c}^{n}}".format(s=' Serving Benchmark Result ', n=50, c='='))
+<<<<<<< HEAD
     print("{:<40} {:<10}".format("Successful requests:", metrics.completed))
+=======
+    print("{:<40} {:<10}".format("Total requests:", len(outputs)))
+    print("{:<40} {:<10}".format("Successful requests:", metrics.completed))
+    print("{:<40} {:<10}".format("Failed requests:",
+                                 len(outputs) - metrics.completed))
+>>>>>>> upstream/main
     print("{:<40} {:<10.2f}".format("Benchmark duration (s):",
                                     benchmark_duration))
     print("{:<40} {:<10}".format("Total input tokens:", metrics.total_input))
@@ -455,6 +484,15 @@ async def benchmark(
     if metrics.avg_decoded_tokens_per_iter > 0.0:
         print("{:<40} {:<10.2f}".format("Avg Decoded Tokens per Iter:",
                                         metrics.avg_decoded_tokens_per_iter))
+<<<<<<< HEAD
+=======
+    if len(outputs) - metrics.completed > 0:
+        print(
+            f"=======================!FAILED REQUESTS!=======================")
+        print(f"Total failed requests: {len(outputs) - metrics.completed}")
+        print(
+            f"=====================!CHECK LOG FOR ERRORS!====================")
+>>>>>>> upstream/main
 
     result = {
         "duration": benchmark_duration,
@@ -774,9 +812,14 @@ def main(args: argparse.Namespace):
     if "temperature" not in sampling_params:
         sampling_params["temperature"] = 0.0  # Default to greedy decoding.
 
+<<<<<<< HEAD
     # Avoid GC processing "static" data - reduce pause times.
     gc.collect()
     gc.freeze()
+=======
+    # Avoid GC - reduce pause times.
+    gc.disable()
+>>>>>>> upstream/main
 
     benchmark_result = asyncio.run(
         benchmark(

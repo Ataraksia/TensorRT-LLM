@@ -17,6 +17,10 @@
 
 #include "tensorrt_llm/common/mcastDevMemUtils.h"
 #include "tensorrt_llm/runtime/ipcNvlsMemory.h"
+<<<<<<< HEAD
+=======
+#include "tensorrt_llm/runtime/utils/mpiUtils.h"
+>>>>>>> upstream/main
 #include <cstddef>
 #include <cstdint>
 #include <cuda.h>
@@ -42,7 +46,12 @@ public:
     McastDeviceMemory(McastDeviceMemory const&) = delete;
     McastDeviceMemory& operator=(McastDeviceMemory const&) = delete;
 
+<<<<<<< HEAD
     McastDeviceMemory(size_t bufSize, uint32_t groupSize, uint32_t groupRank, int deviceIdx, bool mnNvlink);
+=======
+    McastDeviceMemory(
+        size_t bufSize, uint32_t groupSize, uint32_t groupRank, uint32_t splitColor, int deviceIdx, bool mnNvlink);
+>>>>>>> upstream/main
 
     // We don't register the pointer in these two functions since we don't expect any python-level code would call
     // to obtain the raw pointers.
@@ -98,6 +107,11 @@ private:
     CUmemGenericAllocationHandle mMcHandle;
     std::vector<CUmemGenericAllocationHandle> mUcHandles;
 
+<<<<<<< HEAD
+=======
+    tensorrt_llm::mpi::MpiComm mGroupComm; //!< The MPI communicator for the group
+
+>>>>>>> upstream/main
     // Host array of pointers
     std::vector<CUdeviceptr> mUcPtrs;
     std::vector<CUdeviceptr> mSignalPads;

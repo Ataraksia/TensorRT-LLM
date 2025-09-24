@@ -44,7 +44,11 @@ __forceinline__ __device__ void routingTopKExperts(cg::thread_block_tile<WarpSiz
 {
     DataType minScore = DataType{-INFINITY};
     DataType maxScore = minScore;
+<<<<<<< HEAD
     int32_t maxExpertIdx{-1};
+=======
+    int32_t maxExpertIdx{0};
+>>>>>>> upstream/main
     using DataTypeVec = std::conditional_t<sizeof(DataType) == 2, float2, float4>;
 
     // Non-vectorized loading: directly access ptrScores with expertIdx
@@ -111,7 +115,11 @@ __global__ void __launch_bounds__(WarpSize) routingIndicesWarpKernel(KernelParam
     }
 #endif
 
+<<<<<<< HEAD
     if (params.mPtrScores != nullptr)
+=======
+    if (params.mPtrScores != nullptr && params.mPtrTopKIds == nullptr)
+>>>>>>> upstream/main
     {
         // if we use `mPtrScores` as input, we need to perform the top-1 reduction
         // for each token, we load the scores then use `reduceTopK` for this.
@@ -134,33 +142,73 @@ __global__ void __launch_bounds__(WarpSize) routingIndicesWarpKernel(KernelParam
                 smemExpertTokenCountFull[tokenIdx][warpMaxExpertIdx[0] / ExpertsPerThread] = expertTokenCount;
                 // we also compute the final score here and write it out if required
                 auto finalScore = OutputT{sigmoid_accurate(float{warpMaxScore[0]})};
+<<<<<<< HEAD
                 if (params.mPtrExpertWeights != nullptr)
                 {
                     params.mPtrExpertWeights[tokenIdx] = finalScore;
+=======
+                if (params.mPtrTopKWeights != nullptr)
+                {
+                    params.mPtrTopKWeights[tokenIdx] = finalScore;
+>>>>>>> upstream/main
                 }
             }
         }
     }
     else
     {
+<<<<<<< HEAD
         // if we do not have `mPtrScores` as input, we expect that `mPtrExpertWeights`
         // contains the top-1 packed score and index already.
         // Each thread represents a token here, and we extract the relevant score
         // The assumption is that the #tokens is limited by warp-size
         static_assert(WarpKernelMaxNumTokens <= WarpSize);
         TypePacked scoreIdx = threadIdx.x < params.mNumTokens ? params.mPtrExpertIdx[threadIdx.x] : TypePacked{};
+=======
+        // if we do not have `mPtrScores` as input, we expect that `params.mPtrTopKPacked` or `params.mPtrTopKIds` and
+        // `params.mPtrTopKWeights` contains the top-1 packed score and index already. Each thread represents a token
+        // here, and we extract the relevant score The assumption is that the #tokens is limited by warp-size
+        static_assert(WarpKernelMaxNumTokens <= WarpSize);
+        TypePacked scoreIdx = TypePacked{};
+        if (params.mPtrTopKIds != nullptr)
+        {
+            if (threadIdx.x < params.mNumTokens)
+            {
+                scoreIdx = TypePacked{static_cast<OutputT>(params.mPtrTopKWeights[threadIdx.x]),
+                    static_cast<int16_t>(params.mPtrTopKIds[threadIdx.x])};
+            }
+        }
+        else
+        {
+            if (threadIdx.x < params.mNumTokens)
+            {
+                scoreIdx = TypePacked{static_cast<OutputT>(params.mPtrTopKPacked[threadIdx.x].score),
+                    static_cast<int16_t>(params.mPtrTopKPacked[threadIdx.x].idx)};
+                if (params.mPtrTopKWeights != nullptr)
+                {
+                    // we also compute the final score here and write it out if required
+                    auto finalScore = OutputT{sigmoid_accurate(float{scoreIdx.score})};
+                    params.mPtrTopKWeights[threadIdx.x] = finalScore;
+                }
+            }
+        }
+
+>>>>>>> upstream/main
         int32_t expertTokenCount = 0;
         setBits</* IsZero= */ true>(expertTokenCount, 1, scoreIdx.idx % ExpertsPerThread);
         if (threadIdx.x < params.mNumTokens)
         {
             smemExpertTokenCountFull[threadIdx.x][scoreIdx.idx / ExpertsPerThread] = expertTokenCount;
         }
+<<<<<<< HEAD
         // we also compute the final score here and write it out if required
         auto finalScore = OutputT{sigmoid_accurate(float{scoreIdx.score})};
         if (params.mPtrExpertWeights != nullptr && threadIdx.x < params.mNumTokens)
         {
             params.mPtrExpertWeights[threadIdx.x] = finalScore;
         }
+=======
+>>>>>>> upstream/main
     }
 
     // make the full table available to all threads
@@ -319,7 +367,20 @@ __global__ void __cluster_dims__(NumBlocksPerCluster, 1, 1) __launch_bounds__(Nu
         cudaGridDependencySynchronize();
     }
 
+<<<<<<< HEAD
     if (params.mPtrScores != nullptr)
+=======
+    if (params.mPtrTopKIds != nullptr)
+    {
+        if (validToken)
+        {
+            TypePacked packedScore{static_cast<OutputT>(params.mPtrTopKWeights[warpTokenIdx]),
+                static_cast<int16_t>(params.mPtrTopKIds[warpTokenIdx])};
+            smemPackedScoreIdx[warpIdx] = packedScore;
+        }
+    }
+    else if (params.mPtrScores != nullptr)
+>>>>>>> upstream/main
     {
         // in this case, each warp represents a token
         // we then exchange all token max scores, s.t. afterwards, each thread
@@ -338,6 +399,7 @@ __global__ void __cluster_dims__(NumBlocksPerCluster, 1, 1) __launch_bounds__(Nu
                 smemPackedScoreIdx[warpIdx] = packedScore;
             }
         }
+<<<<<<< HEAD
         // make packed scores available to all threads in cluster
         __cluster_barrier_arrive();
         __cluster_barrier_wait();
@@ -345,6 +407,31 @@ __global__ void __cluster_dims__(NumBlocksPerCluster, 1, 1) __launch_bounds__(Nu
 
     routingPermutation<KernelParams, OutputT, NumThreads, NumWarps, MaxNumTopExperts,
         /*LoadExpertIdxFromGlobal=*/false>(params, smemPackedScoreIdx, warpIdx, clusterBlockRank);
+=======
+    }
+    else
+    {
+        if (validToken)
+        {
+            smemPackedScoreIdx[warpIdx] = params.mPtrTopKPacked[warpTokenIdx];
+        }
+    }
+
+    // make packed scores available to all threads in cluster
+    __cluster_barrier_arrive();
+    __cluster_barrier_wait();
+
+    if (params.mPtrTopKIds != nullptr || params.mPtrScores != nullptr)
+    {
+        routingPermutation<KernelParams, OutputT, NumThreads, NumWarps, MaxNumTopExperts,
+            /*LoadExpertIdxFromGlobal=*/false>(params, smemPackedScoreIdx, warpIdx, clusterBlockRank);
+    }
+    else
+    {
+        routingPermutation<KernelParams, OutputT, NumThreads, NumWarps, MaxNumTopExperts,
+            /*LoadExpertIdxFromGlobal=*/true>(params, smemPackedScoreIdx, warpIdx, clusterBlockRank);
+    }
+>>>>>>> upstream/main
 }
 #else
 __global__ void routingIndicesClusterKernel(KernelParams params)
@@ -376,8 +463,13 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesHistogramScoresK
 
     // initialize the mPtrExpertCounts
     int32_t expertCountsNum = 2 * params.mNumExperts;
+<<<<<<< HEAD
     int32_t globalThreadIdx = blockIdx.x * NumThreads + threadIdx.x;
     int32_t globalThreadStride = gridDim.x * NumThreads;
+=======
+    int32_t globalThreadIdx = blockIdx.x * NumThreadsHist + threadIdx.x;
+    int32_t globalThreadStride = gridDim.x * NumThreadsHist;
+>>>>>>> upstream/main
     initArr(globalThreadIdx, expertCountsNum, globalThreadStride, params.mPtrExpertCounts, 0);
 
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 900))
@@ -397,14 +489,42 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesHistogramScoresK
         int32_t warpMaxExpertIdx[MaxNumTopExperts];
         InputT warpMaxScore[MaxNumTopExperts];
 
+<<<<<<< HEAD
         routingTopKExperts<InputT, MaxNumExperts / WarpSize>(
             warp, warpMaxScore, warpMaxExpertIdx, laneIdx, params.mNumExperts, params.mPtrScores + scoreOffset);
+=======
+        if (params.mPtrTopKIds != nullptr)
+        {
+            if (laneIdx < MaxNumTopExperts)
+            {
+                warpMaxExpertIdx[laneIdx] = params.mPtrTopKIds[tokenIdx];
+                warpMaxScore[laneIdx] = static_cast<InputT>(params.mPtrTopKWeights[tokenIdx]);
+            }
+        }
+        else if (params.mPtrScores != nullptr)
+        {
+            routingTopKExperts<InputT, MaxNumExperts / WarpSize>(
+                warp, warpMaxScore, warpMaxExpertIdx, laneIdx, params.mNumExperts, params.mPtrScores + scoreOffset);
+        }
+        else
+        {
+            if (laneIdx < MaxNumTopExperts)
+            {
+                warpMaxExpertIdx[laneIdx] = params.mPtrTopKPacked[tokenIdx].idx;
+                warpMaxScore[laneIdx] = params.mPtrTopKPacked[tokenIdx].score;
+            }
+        }
+>>>>>>> upstream/main
 
         if (cute::elect_one_sync())
         {
             auto finalScore = OutputT{sigmoid_accurate(float{warpMaxScore[0]})};
             TypePacked packedScore{finalScore, static_cast<int16_t>(warpMaxExpertIdx[0])};
+<<<<<<< HEAD
             params.mPtrExpertIdx[tokenIdx] = packedScore;
+=======
+            params.mPtrTopKPacked[tokenIdx] = packedScore;
+>>>>>>> upstream/main
         }
     }
 }
@@ -413,15 +533,30 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesHistogramScoresK
 
 void run(Data const& data, void* stream)
 {
+<<<<<<< HEAD
     TLLM_CHECK_WITH_INFO(data.mPtrExpertIdx != nullptr || data.mPtrScores != nullptr,
         "Routing kernel requires at least one input parameter");
+=======
+    TLLM_CHECK_WITH_INFO(data.mPtrTopKPacked != nullptr || data.mPtrScores != nullptr || data.mPtrTopKIds != nullptr,
+        "Routing kernel requires at least one input parameter");
+    if (data.mPtrTopKIds != nullptr)
+    {
+        TLLM_CHECK_WITH_INFO(data.mPtrTopKWeights != nullptr,
+            "When mPtrTopKIds is provided, mPtrTopKWeights must also be provided for Llama4 routing.");
+    }
+>>>>>>> upstream/main
     TLLM_CHECK_WITH_INFO(data.mPtrPermutedIdxSize != nullptr && data.mPtrCtaIdxXyToBatchIdx != nullptr
             && data.mPtrCtaIdxXyToMnLimit != nullptr && data.mPtrNumNonExitingCtas != nullptr,
         "Llama4 routing kernel expects permuted idx and grouped Gemm launch config buffers");
     TLLM_CHECK_WITH_INFO(data.mTopK <= MaxNumTopExperts, "Routing kernel expects topK experts <= %d, got %d",
         MaxNumTopExperts, data.mTopK);
+<<<<<<< HEAD
     TLLM_CHECK_WITH_INFO(data.mNumExperts <= MaxNumExperts,
         "Routing kernel expects #experts %d to be at most max #experts %d", data.mNumExperts, MaxNumExperts);
+=======
+    TLLM_CHECK_WITH_INFO(data.mNumExperts <= MaxNumExperts, "Routing kernel expects #experts %d to be no more than %d",
+        data.mNumExperts, MaxNumExperts);
+>>>>>>> upstream/main
     static_assert(MaxNumExperts <= NumThreads, "#experts must be bounded by #threads");
     static_assert(MaxNumExperts <= NumThreadsHist, "#experts must be bounded by #threads");
     TLLM_CHECK_WITH_INFO(
@@ -430,12 +565,22 @@ void run(Data const& data, void* stream)
 
     bool const useSingleWarp = (data.mPtrScores == nullptr && data.mNumTokens <= WarpKernelMaxNumTokens)
         || data.mNumTokens < WarpKernelMaxNumTokens;
+<<<<<<< HEAD
     bool const useSingleCluster
         = data.mNumTokens <= (data.mPtrScores != nullptr ? MaxNumTokensSingleClusterScores : MaxNumTokensSingleCluster);
     if (!useSingleCluster)
     {
         TLLM_CHECK_WITH_INFO(
             data.mPtrExpertIdx != nullptr, "When #tokens is large, `mPtrExpertIdx` is a required input.");
+=======
+    bool const useSingleCluster = data.mNumTokens <= ((data.mPtrScores != nullptr || data.mPtrTopKIds != nullptr)
+                                          ? MaxNumTokensSingleClusterScores
+                                          : MaxNumTokensSingleCluster);
+    if (!useSingleCluster)
+    {
+        TLLM_CHECK_WITH_INFO((data.mPtrTopKPacked != nullptr || data.mPtrTopKIds != nullptr),
+            "When #tokens is large, `mPtrTopKPacked` or `mPtrTopKIds` is a required input.");
+>>>>>>> upstream/main
         TLLM_CHECK_WITH_INFO(
             data.mPtrExpertCounts != nullptr, "When #tokens is large, `mPtrExpertCounts` is a required input.");
     }
@@ -469,7 +614,11 @@ void run(Data const& data, void* stream)
         int const numBlocksOffsets
             = std::min((expandedIdxSize + offsetEltsPerBlock - 1) / offsetEltsPerBlock, maxNumBlocks);
 
+<<<<<<< HEAD
         if (data.mPtrScores != nullptr)
+=======
+        if (data.mPtrScores != nullptr && data.mPtrTopKIds == nullptr)
+>>>>>>> upstream/main
         {
             LAUNCH_ROUTING(data,
                 /*coopLaunch=*/false, routingIndicesHistogramScoresKernel, maxNumBlocks, NumThreadsHist,
@@ -479,8 +628,15 @@ void run(Data const& data, void* stream)
         else
         {
             // Reset the global histograms.
+<<<<<<< HEAD
             TLLM_CUDA_CHECK(cudaMemsetAsync(data.mPtrExpertCounts, 0,
                 static_cast<size_t>(2 * NumThreads) * sizeof(int32_t), (cudaStream_t) stream));
+=======
+            LAUNCH_ROUTING(data, false, routingInitExpertCounts, (2 * data.mNumExperts - 1) / NumThreadsHist + 1,
+                NumThreadsHist,
+                /*smemSize=*/0, // No dynamic smem
+                stream);
+>>>>>>> upstream/main
         }
         LAUNCH_ROUTING(data,
             /*coopLaunch=*/false, routingIndicesHistogramKernel, numBlocksHistogram, NumThreadsHist,

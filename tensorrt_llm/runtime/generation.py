@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Union
 
 import numpy as np
+<<<<<<< HEAD
 
 # isort: off
 import torch
@@ -31,6 +32,18 @@ import tensorrt as trt
 # isort: on
 from cuda import cudart
 
+=======
+
+# isort: off
+import torch
+import tensorrt as trt
+# isort: on
+try:
+    from cuda.bindings import runtime as cudart
+except ImportError:
+    from cuda import cudart
+
+>>>>>>> upstream/main
 from tensorrt_llm.runtime.memory_pools.memory_pools_allocator import \
     MemoryPoolsAllocator
 from tensorrt_llm.runtime.memory_pools.pools_kv_cache_manager import \

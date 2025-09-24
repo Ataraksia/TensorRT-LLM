@@ -78,6 +78,10 @@ def llama_7b_tp2_path(engine_path: Path) -> Path:
     return path
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5488280")
+>>>>>>> upstream/main
 @pytest.mark.skipif(WORLD_SIZE != 1, reason="Must run on single MPI rank")
 def test_generation_bs2(llama_7b_bs2_path: Path):
     tokenizer = TransformersTokenizer.from_pretrained(llama_7b_bs2_path)
@@ -99,6 +103,10 @@ def test_generation_bs2(llama_7b_bs2_path: Path):
                        'E F G H I K L M')
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5488280")
+>>>>>>> upstream/main
 @pytest.mark.skipif(WORLD_SIZE != 1, reason="Must run on single MPI rank")
 def test_sync_generation(llama_7b_path: Path):
     tokenizer = TransformersTokenizer.from_pretrained(llama_7b_path)
@@ -394,7 +402,11 @@ def test_ZeroMqQueue_serialization_complicated_dataclass():
     TokenRangeRetentionConfig = tllm.KvCacheRetentionConfig.TokenRangeRetentionConfig
     kvcache_config = tllm.KvCacheRetentionConfig(
         [TokenRangeRetentionConfig(0, 2, 30, datetime.timedelta(seconds=30))],
+<<<<<<< HEAD
         80)
+=======
+        80, None, tllm.KvCacheTransferMode.DRAM, "test_dir")
+>>>>>>> upstream/main
 
     sampling_params = SamplingParams(max_tokens=4,
                                      embedding_bias=torch.randn(2, 2))

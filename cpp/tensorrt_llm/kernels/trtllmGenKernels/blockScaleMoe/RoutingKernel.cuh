@@ -118,6 +118,7 @@ __device__ void initArr(int startIdx, int numElts, int stride, DataType* arr, Da
 template <typename DataType, int VecSize>
 __device__ void calcSoftmax(cg::thread_block_tile<WarpSize> const& warp, DataType (&scores)[VecSize])
 {
+<<<<<<< HEAD
     DataType maxScore = DataType{-INFINITY};
     DataType sumScore = DataType{0.f};
 
@@ -127,21 +128,48 @@ __device__ void calcSoftmax(cg::thread_block_tile<WarpSize> const& warp, DataTyp
         maxScore = scores[i] >= maxScore ? scores[i] : maxScore;
     }
     maxScore = cg::reduce(warp, maxScore, cg::greater<DataType>());
+=======
+    // Compute in float to support half/bfloat16 inputs safely.
+    float maxScore = -INFINITY;
+    float sumScore = 0.f;
+    // Get the max score for each token
+#pragma unroll
+    for (int i = 0; i < VecSize; ++i)
+    {
+        float si = static_cast<float>(scores[i]);
+        maxScore = si >= maxScore ? si : maxScore;
+    }
+    maxScore = cg::reduce(warp, maxScore, cg::greater<float>());
+>>>>>>> upstream/main
 
     // Get the summation of scores for each token
 #pragma unroll
     for (int i = 0; i < VecSize; ++i)
     {
+<<<<<<< HEAD
         scores[i] = static_cast<DataType>(exp(scores[i] - maxScore));
         sumScore += scores[i];
     }
     sumScore = cg::reduce(warp, sumScore, cg::plus<DataType>());
+=======
+        float si = static_cast<float>(scores[i]);
+        float e = expf(si - maxScore);
+        scores[i] = static_cast<DataType>(e);
+        sumScore += e;
+    }
+    sumScore = cg::reduce(warp, sumScore, cg::plus<float>());
+>>>>>>> upstream/main
 
     // Normalize the scores
 #pragma unroll
     for (int i = 0; i < VecSize; ++i)
     {
+<<<<<<< HEAD
         scores[i] = static_cast<DataType>(scores[i] / sumScore);
+=======
+        float si = static_cast<float>(scores[i]) / sumScore;
+        scores[i] = static_cast<DataType>(si);
+>>>>>>> upstream/main
     }
 }
 
@@ -232,8 +260,21 @@ __device__ void routingPermutation(KernelParams params, PackedScoreIdx<BaseType>
         TypePacked scoreIdx;
         if constexpr (LoadExpertIdxFromGlobal)
         {
+<<<<<<< HEAD
             scoreIdx = TypePacked{static_cast<BaseType>(params.mPtrExpertIdx[expandedIdx].score),
                 static_cast<int16_t>(params.mPtrExpertIdx[expandedIdx].idx)};
+=======
+            if (params.mPtrTopKIds != nullptr)
+            {
+                scoreIdx = TypePacked{static_cast<BaseType>(params.mPtrTopKWeights[expandedIdx]),
+                    static_cast<int16_t>(params.mPtrTopKIds[expandedIdx])};
+            }
+            else
+            {
+                scoreIdx = TypePacked{static_cast<BaseType>(params.mPtrTopKPacked[expandedIdx].score),
+                    static_cast<int16_t>(params.mPtrTopKPacked[expandedIdx].idx)};
+            }
+>>>>>>> upstream/main
         }
         else
         {
@@ -248,9 +289,15 @@ __device__ void routingPermutation(KernelParams params, PackedScoreIdx<BaseType>
         auto isLocalExpert = localExpertIdx >= 0 && localExpertIdx < localExpertExtent
             && (localExpertIdx & params.mLocalExpertsStrideLog2) == 0;
         expertOffsets[ii] = isLocalExpert ? atomicAdd(smemExpertCount + scoreIdx.idx, 1) : 0;
+<<<<<<< HEAD
         if (params.mPtrExpertWeights != nullptr)
         {
             params.mPtrExpertWeights[expandedIdx] = OutputT{scoreIdx.score};
+=======
+        if (params.mPtrTopKWeights != nullptr && params.mPtrTopKIds == nullptr)
+        {
+            params.mPtrTopKWeights[expandedIdx] = OutputT{scoreIdx.score};
+>>>>>>> upstream/main
         }
     };
 
@@ -459,19 +506,44 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesHistogramKernel(
     // Define a lambda to avoid code duplication in branches.
     auto loopBody = [&](int expandedIdx)
     {
+<<<<<<< HEAD
         PackedScoreIdx<OutputT> scoreIdx = params.mPtrExpertIdx[expandedIdx];
         // check whether this expert is local to our GPU at all and ignore if not
         auto localExpertIdx = scoreIdx.idx - params.mLocalExpertsStartIdx;
+=======
+        PackedScoreIdx<OutputT> scoreIdx;
+        int idx;
+        if (params.mPtrTopKIds != nullptr)
+        {
+            idx = params.mPtrTopKIds[expandedIdx];
+        }
+        else
+        {
+            // If params.mPtrTopKIds != nullptr, we don't need to store the weights
+            if (params.mPtrTopKWeights != nullptr)
+            {
+                scoreIdx = params.mPtrTopKPacked[expandedIdx];
+                idx = scoreIdx.idx;
+                params.mPtrTopKWeights[expandedIdx] = static_cast<OutputT>(scoreIdx.score);
+            }
+        }
+        // check whether this expert is local to our GPU at all and ignore if not
+        auto localExpertIdx = idx - params.mLocalExpertsStartIdx;
+>>>>>>> upstream/main
         auto isLocalExpert = localExpertIdx >= 0 && localExpertIdx < localExpertExtent
             && (localExpertIdx & params.mLocalExpertsStrideLog2) == 0;
         if (isLocalExpert)
         {
+<<<<<<< HEAD
             atomicAdd(&smemExpertCount[scoreIdx.idx], 1);
         }
 
         if (params.mPtrExpertWeights != nullptr)
         {
             params.mPtrExpertWeights[expandedIdx] = static_cast<OutputT>(scoreIdx.score);
+=======
+            atomicAdd(&smemExpertCount[idx], 1);
+>>>>>>> upstream/main
         }
     };
 
@@ -625,6 +697,7 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesOffsetsKernel(Ke
         // Define a lambda to avoid code duplication in branches.
         auto loopBody = [&](int ii, int expandedIdx)
         {
+<<<<<<< HEAD
             PackedScoreIdx<OutputT> scoreIdx = params.mPtrExpertIdx[expandedIdx];
             expertIndexes[ii] = scoreIdx.idx;
             // check whether this expert is local to our GPU at all and ignore if not
@@ -632,6 +705,15 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesOffsetsKernel(Ke
             auto isLocalExpert = localExpertIdx >= 0 && localExpertIdx < localExpertExtent
                 && (localExpertIdx & params.mLocalExpertsStrideLog2) == 0;
             expertOffsets[ii] = isLocalExpert ? atomicAdd(smemExpertCount + scoreIdx.idx, 1) : 0;
+=======
+            expertIndexes[ii]
+                = params.mPtrTopKIds ? params.mPtrTopKIds[expandedIdx] : params.mPtrTopKPacked[expandedIdx].idx;
+            // check whether this expert is local to our GPU at all and ignore if not
+            auto localExpertIdx = expertIndexes[ii] - params.mLocalExpertsStartIdx;
+            auto isLocalExpert = localExpertIdx >= 0 && localExpertIdx < localExpertExtent
+                && (localExpertIdx & params.mLocalExpertsStrideLog2) == 0;
+            expertOffsets[ii] = isLocalExpert ? atomicAdd(smemExpertCount + expertIndexes[ii], 1) : 0;
+>>>>>>> upstream/main
         };
 
         // For all tiles but the last, all indices are in bounds.
@@ -767,5 +849,36 @@ __global__ void __launch_bounds__(NumThreadsHist) routingIndicesOffsetsKernel(Ke
 #endif // if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 900))
 }
 
+<<<<<<< HEAD
+=======
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename KernelParams>
+__global__ void __launch_bounds__(NumThreadsHist) routingInitExpertCounts(KernelParams params)
+{
+    // initialize the mPtrExpertCounts
+    int32_t expertCountsNum = 2 * params.mNumExperts;
+    int32_t globalThreadIdx = blockIdx.x * NumThreadsHist + threadIdx.x;
+    int32_t globalThreadStride = gridDim.x * NumThreadsHist;
+
+#if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 900))
+    // Wait on primary grid.
+    if constexpr (KernelParams::UsePdl)
+    {
+        cudaGridDependencySynchronize();
+    }
+#endif // if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 900))
+
+    initArr(globalThreadIdx, expertCountsNum, globalThreadStride, params.mPtrExpertCounts, 0);
+
+#if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 900))
+    // Wait on primary grid.
+    if constexpr (KernelParams::UsePdl)
+    {
+        cudaTriggerProgrammaticLaunchCompletion();
+    }
+#endif // if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 900))
+}
+>>>>>>> upstream/main
 } // namespace routing
 } // namespace moe::dev

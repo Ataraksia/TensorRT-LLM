@@ -49,8 +49,13 @@ public:
     using VecTokens = Base::VecTokens;
     using VecTokenExtraIds = Base::VecTokenExtraIds;
     using LogitsPostProcessor = Base::LogitsPostProcessor;
+<<<<<<< HEAD
 
     // 49 parameters
+=======
+    using CacheSaltIDType = Base::CacheSaltIDType;
+
+>>>>>>> upstream/main
     LlmRequest(RequestIdType requestId, SizeType32 maxNewTokens, std::vector<TokenIdType> inputTokens,
         runtime::SamplingConfig samplingConfig, bool isStreaming, std::optional<SizeType32> endId = std::nullopt,
         std::optional<SizeType32> padId = std::nullopt, std::optional<TensorPtr> embeddingBias = std::nullopt,
@@ -84,7 +89,13 @@ public:
         std::optional<executor::GuidedDecodingParams> guidedDecodingParams = std::nullopt,
         std::optional<SizeType32> languageAdapterUid = std::nullopt,
         std::optional<MillisecondsType> allottedTimeMs = std::nullopt,
+<<<<<<< HEAD
         std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt)
+=======
+        std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt,
+        std::optional<CacheSaltIDType> cacheSaltID = std::nullopt,
+        std::optional<TimePoint> arrivalTime = std::nullopt)
+>>>>>>> upstream/main
         : Base(requestId,                                                                                       //
             maxNewTokens,                                                                                       //
             std::make_shared<std::vector<TokenIdType>>(std::move(inputTokens)),                                 //
@@ -145,7 +156,13 @@ public:
             guidedDecodingParams,                                                                                //
             languageAdapterUid,                                                                                  //
             allottedTimeMs,                                                                                      //
+<<<<<<< HEAD
             contextPhaseParams                                                                                   //
+=======
+            contextPhaseParams,                                                                                  //
+            cacheSaltID,                                                                                         //
+            arrivalTime                                                                                          //
+>>>>>>> upstream/main
         )
     {
     }

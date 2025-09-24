@@ -112,6 +112,7 @@ def benchmark(
             f"runs: {sum(latencies) / len(latencies): 0.2f} (millisecond)"
         )
 
+<<<<<<< HEAD
     if results_path is not None:
         results = {
             "benchmark_results": {
@@ -123,3 +124,16 @@ def benchmark(
         results_path.parent.mkdir(parents=True, exist_ok=True)
         with results_path.open("w") as results_file:
             json.dump(results, results_file)
+=======
+    return {
+        "avg_latency_ms": sum(latencies) / len(latencies),
+        "avg_latency_num_runs": num_runs if not use_nsys_profiling else 0,
+    }
+
+
+def store_benchmark_results(results: dict, results_path: str):
+    results_path = pathlib.Path(results_path)
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    with results_path.open("w") as results_file:
+        json.dump(results, results_file)
+>>>>>>> upstream/main

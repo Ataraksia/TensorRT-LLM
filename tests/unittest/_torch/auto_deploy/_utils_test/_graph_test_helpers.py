@@ -1,5 +1,9 @@
 import copy
+<<<<<<< HEAD
 from typing import Callable, Dict, List, Optional
+=======
+from typing import Any, Callable, Dict, List, Optional, Sequence
+>>>>>>> upstream/main
 
 import numpy as np
 import torch
@@ -39,6 +43,7 @@ class FakeFactory(ModelFactory):
 
 
 class SequenceEmbeddingInfo(SequenceInfo):
+<<<<<<< HEAD
     hidden_size: int
     dtype: torch.dtype
 
@@ -52,6 +57,47 @@ class SequenceEmbeddingInfo(SequenceInfo):
             dtype=self.dtype,
         )
 
+=======
+    """A sequence info object for testing that replaces the input_ids with an embedding tensor.
+
+    This is useful to run tests without the tokenizer in the loop.
+    """
+
+    def _add_hidden_dim(self, input_ids: Sequence[Sequence[Any]]) -> torch.Tensor:
+        return torch.rand(
+            *input_ids.shape,
+            self.hidden_size,
+            device=self.device,
+            dtype=self.dtype,
+        )
+
+    def __init__(self, *args, hidden_size: int, dtype: torch.dtype, **kwargs):
+        self._initialized = False
+        super().__init__(*args, **kwargs)
+
+        # overwrite input_ids with an embedding tensor and run reset again
+        self.hidden_size = hidden_size
+        self.dtype = dtype
+        self._args_device["input_ids"] = self._add_hidden_dim(self._args_device["input_ids"])
+        self._args_host["input_ids"] = self._args_device["input_ids"].cpu()
+        self._initialized = True
+        self.reset()
+
+    def nest_sequences(self, input_ids: Sequence[Sequence[Any]], *args, **kwargs) -> None:
+        # convert input_ids to an embedding tensor if needed
+        if not (isinstance(input_ids, torch.Tensor) and input_ids.ndim == 3) and self._initialized:
+            # first convert to a list of tensors
+            input_embeds = [
+                torch.tensor(ids, device=self.device, dtype=self.dtype) for ids in input_ids
+            ]
+            # then add the hidden dimension to every tensor
+            input_embeds = [self._add_hidden_dim(ids) for ids in input_embeds]
+        else:
+            input_embeds = input_ids
+
+        super().nest_sequences(input_embeds, *args, **kwargs)
+
+>>>>>>> upstream/main
 
 def count_parameters(model: torch.nn.Module):
     for n, p in model.named_parameters():
@@ -238,5 +284,10 @@ def run_sharding_pattern_detection_test(
     # Convert to sets for unordered comparison
     detected_set = set(detected_transformations)
     expected_set = set(expected_transformations)
+<<<<<<< HEAD
+=======
+    print("detected_set", detected_set)
+    print("expected_set", expected_set)
+>>>>>>> upstream/main
 
     assert detected_set == expected_set, "Expected sharding pattern does not match detected pattern"

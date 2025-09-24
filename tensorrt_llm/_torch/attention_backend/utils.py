@@ -1,7 +1,11 @@
 from typing import Optional, Type
 
 from ...models.modeling_utils import QuantConfig
+<<<<<<< HEAD
 from . import IS_FLASHINFER_AVAILABLE
+=======
+from ..flashinfer_utils import IS_FLASHINFER_AVAILABLE
+>>>>>>> upstream/main
 from .interface import AttentionBackend, MLAParams, PositionalEmbeddingParams
 from .trtllm import TrtllmAttention
 from .vanilla import VanillaAttention
@@ -41,7 +45,15 @@ def create_attention(
     v_head_dim: Optional[int] = None,
     predicted_tokens_per_seq: Optional[int] = 1,
     skip_create_weights_in_init: bool = False,
+<<<<<<< HEAD
 ):
+=======
+    attention_chunk_size: Optional[int] = None,
+):
+    if attention_chunk_size is not None and backend_name.upper() != "TRTLLM":
+        raise ValueError(
+            f"Backend {backend_name} does not support chunked attention.")
+>>>>>>> upstream/main
 
     attn_cls = get_attention_backend(backend_name)
 
@@ -71,4 +83,8 @@ def create_attention(
         pos_embd_params=pos_embd_params,
         mla_params=mla_params,
         skip_create_weights_in_init=skip_create_weights_in_init,
+<<<<<<< HEAD
+=======
+        attention_chunk_size=attention_chunk_size,
+>>>>>>> upstream/main
     )

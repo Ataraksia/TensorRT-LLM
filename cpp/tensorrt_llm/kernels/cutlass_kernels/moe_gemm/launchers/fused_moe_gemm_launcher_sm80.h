@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+<<<<<<< HEAD
 namespace tensorrt_llm::kernels::cutlass_kernels
+=======
+namespace tensorrt_llm::kernels::cutlass_kernels_oss
+>>>>>>> upstream/main
 {
 template <typename ElementType_, typename CutlassWeightType_, int MaxTileM_, int TileN_, int TileK_, int Stages_,
     typename EpilogueTag>

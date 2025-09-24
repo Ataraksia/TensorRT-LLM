@@ -2,3 +2,8 @@
 !.vscode
 benchmark_results.json
 *.png
+<<<<<<< HEAD
+=======
+# ignore config files that users might put here for debugging
+*.yaml
+>>>>>>> upstream/main

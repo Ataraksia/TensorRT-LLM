@@ -5,7 +5,15 @@ from typing import Dict, Tuple, Union
 
 import pynvml
 import torch
+<<<<<<< HEAD
 from cuda import cudart
+=======
+
+try:
+    from cuda.bindings import runtime as cudart
+except ImportError:
+    from cuda import cudart
+>>>>>>> upstream/main
 
 from tensorrt_llm._utils import DictConversion
 from tensorrt_llm.logger import logger

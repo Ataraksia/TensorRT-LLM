@@ -59,8 +59,14 @@ namespace tensorrt_llm
 {
 namespace kernels
 {
+<<<<<<< HEAD
 namespace cutlass_kernels
 {
+=======
+namespace cutlass_kernels_oss
+{
+using namespace tensorrt_llm::kernels::cutlass_kernels;
+>>>>>>> upstream/main
 using EpilogueFusion = TmaWarpSpecializedGroupedGemmInput::EpilogueFusion;
 
 // Constructs an object with specific arguments only if flag is true
@@ -137,6 +143,16 @@ void tma_warp_specialized_generic_moe_gemm_kernelLauncher(TmaWarpSpecializedGrou
         TLLM_THROW("Please recompile with support for blackwell by passing 100-real as an arch to build_wheel.py.");
     }
 #endif
+<<<<<<< HEAD
+=======
+#ifndef COMPILE_BLACKWELL_SM103_TMA_GROUPED_GEMMS
+    else if constexpr (ArchTag::kMinComputeCapability == 103)
+    {
+        // fallback sm100f logic is done in dispatchMoeGemmFinalDispatchTmaWarpSpecialized
+        TLLM_THROW("Please recompile with support for blackwell by passing 103-real as an arch to build_wheel.py.");
+    }
+#endif
+>>>>>>> upstream/main
 #ifndef COMPILE_BLACKWELL_SM120_TMA_GROUPED_GEMMS
     else if constexpr (ArchTag::kMinComputeCapability >= 120)
     {
@@ -205,7 +221,12 @@ using namespace cutlass::epilogue;
         constexpr static bool DYNAMIC_CGA = DYNAMIC_CGA_;                                                                                                                                                                                                                                                                   \
         constexpr static bool SwapAB = SWAP_AB_;                                                                                                                                                                                                                                                                            \
         constexpr bool IsBlackwell = ArchTag::kMinComputeCapability >= 100;                                                                                                                                                                                                                                                 \
+<<<<<<< HEAD
         constexpr bool IsSM100 = ArchTag::kMinComputeCapability >= 100 && ArchTag::kMinComputeCapability < 120;                                                                                                                                                                                                             \
+=======
+        constexpr static bool IsSM10x = ArchTag::kMinComputeCapability >= 100 && ArchTag::kMinComputeCapability < 120;                                                                                                                                                                                                      \
+        constexpr static bool IsSM103 = ArchTag::kMinComputeCapability == 103;                                                                                                                                                                                                                                              \
+>>>>>>> upstream/main
         constexpr bool IsSM120 = ArchTag::kMinComputeCapability == 120 || ArchTag::kMinComputeCapability == 121;                                                                                                                                                                                                            \
         /* constexpr static bool BIAS = BIAS_; */ /* Always false */                                                                                                                                                                                                                                                        \
         using T = DataType_;                                                                                                                                                                                                                                                                                                \
@@ -213,10 +234,18 @@ using namespace cutlass::epilogue;
         using OutputType = OutputType_;                                                                                                                                                                                                                                                                                     \
         using EpilogueTag = tensorrt_llm::cutlass_extensions::EpilogueTag_;                                                                                                                                                                                                                                                 \
         using InputClusterShape = cute::Shape<cute::Int<CGA_M_>, cute::Int<CGA_N_>, cute::Int<CGA_K_>>;                                                                                                                                                                                                                     \
+<<<<<<< HEAD
         constexpr static bool Is2SM = IsSM100 && cute::size<0>(InputClusterShape{}) == 2;                                                                                                                                                                                                                                   \
         using ClusterShape                                                                                                                                                                                                                                                                                                  \
             = std::conditional_t<DYNAMIC_CGA, cute::Shape<int32_t, int32_t, cute::_1>, InputClusterShape>;                                                                                                                                                                                                                  \
         using MmaTileShape = cute::Shape<cute::Int<CTA_M_*(Is2SM ? 2 : 1)>, cute::Int<CTA_N_>, cute::Int<CTA_K_>>;                                                                                                                                                                                                          \
+=======
+        constexpr static bool Is2SM = IsSM10x && cute::size<0>(InputClusterShape{}) == 2;                                                                                                                                                                                                                                   \
+        using ClusterShape                                                                                                                                                                                                                                                                                                  \
+            = std::conditional_t<DYNAMIC_CGA, cute::Shape<int32_t, int32_t, cute::_1>, InputClusterShape>;                                                                                                                                                                                                                  \
+        using MmaTileShape                                                                                                                                                                                                                                                                                                  \
+            = cute::Shape<cute::Int<CTA_M_*(Is2SM ? 2 : 1)>, cute::Int<CTA_N_>, cute::Int<CTA_K_*(IsSM103 ? 3 : 1)>>;                                                                                                                                                                                                       \
+>>>>>>> upstream/main
         using InputEpilogueSchedule = EpilogueSchedule_;                                                                                                                                                                                                                                                                    \
         if constexpr (!COMPILE_HOPPER_TMA_GROUPED_GEMMS_ENABLED && ArchTag::kMinComputeCapability >= 90                                                                                                                                                                                                                     \
             && ArchTag::kMinComputeCapability < 100)                                                                                                                                                                                                                                                                        \
@@ -262,6 +291,11 @@ using namespace cutlass::epilogue;
             static_assert(FUSION == EpilogueFusion::NONE || FUSION == EpilogueFusion::FINALIZE,                                                                                                                                                                                                                             \
                 "Unimplemented fusion provided to TMA WS MoE gemm launcher");                                                                                                                                                                                                                                               \
             constexpr static bool IsFinalizeFusion = FUSION == EpilogueFusion::FINALIZE;                                                                                                                                                                                                                                    \
+<<<<<<< HEAD
+=======
+            constexpr bool IsTmaSM10xEpilogue                                                                                                                                                                                                                                                                               \
+                = std::is_same_v<InputEpilogueSchedule, cutlass::epilogue::PtrArrayTmaWarpSpecialized>;                                                                                                                                                                                                                     \
+>>>>>>> upstream/main
                                                                                                                                                                                                                                                                                                                             \
             static_assert(cutlass::platform::is_same<T, SafeBF16>::value || cutlass::platform::is_same<T, half>::value                                                                                                                                                                                                      \
                     || cutlass::platform::is_same<T, float>::value || IsFP8 || IsFP4,                                                                                                                                                                                                                                       \
@@ -324,9 +358,18 @@ using namespace cutlass::epilogue;
                                                             // units of elements (up to 16 bytes)*/                                                                                                                                                                                                                         \
                                                                                                                                                                                                                                                                                                                             \
             /* D matrix configuration */                                                                                                                                                                                                                                                                                    \
+<<<<<<< HEAD
             constexpr static int AlignmentD                                                                                                                                                                                                                                                                                 \
                 = 128 / cutlass::sizeof_bits<ElementD>::value; /* Memory access granularity/alignment of D matrix                                                                                                                                                                                                           \
                                                                // in units of elements (up to 16 bytes) */                                                                                                                                                                                                                  \
+=======
+            constexpr static int AlignmentDBits = (IsSM10x && !IsTmaSM10xEpilogue)                                                                                                                                                                                                                                          \
+                ? 256                                                                                                                                                                                                                                                                                                       \
+                : 128; /* For NoSmem epilogue schedule, we need to align to 256 bits */                                                                                                                                                                                                                                     \
+            constexpr static int AlignmentD = AlignmentDBits                                                                                                                                                                                                                                                                \
+                / cutlass::sizeof_bits<ElementD>::value; /* Memory access granularity/alignment of D matrix                                                                                                                                                                                                                 \
+                                              // in units of elements (up to 16 bytes) */                                                                                                                                                                                                                                   \
+>>>>>>> upstream/main
                                                                                                                                                                                                                                                                                                                             \
             static_assert(                                                                                                                                                                                                                                                                                                  \
                 cutlass::platform::is_same<EpilogueTag, tensorrt_llm::cutlass_extensions::EpilogueOpDefault>::value,                                                                                                                                                                                                        \
@@ -343,20 +386,31 @@ using namespace cutlass::epilogue;
             //        >;*/                                                                                                                                                                                                                                                                                                  \
             using EpilogueScheduleSM90 = cutlass::epilogue::PtrArrayTmaWarpSpecializedCooperative;                                                                                                                                                                                                                          \
                                                                                                                                                                                                                                                                                                                             \
+<<<<<<< HEAD
             constexpr bool IsTmaSM10xEpilogue                                                                                                                                                                                                                                                                               \
                 = std::is_same_v<InputEpilogueSchedule, cutlass::epilogue::PtrArrayTmaWarpSpecialized>;                                                                                                                                                                                                                     \
+=======
+>>>>>>> upstream/main
             using EpilogueScheduleSM10x = std::conditional_t<IsTmaSM10xEpilogue,                                                                                                                                                                                                                                            \
                 std::conditional_t<Is2SM, cutlass::epilogue::PtrArrayTmaWarpSpecialized2Sm,                                                                                                                                                                                                                                 \
                     cutlass::epilogue::PtrArrayTmaWarpSpecialized1Sm>,                                                                                                                                                                                                                                                      \
                 std::conditional_t<Is2SM, cutlass::epilogue::PtrArrayNoSmemWarpSpecialized2Sm,                                                                                                                                                                                                                              \
                     cutlass::epilogue::PtrArrayNoSmemWarpSpecialized1Sm>>;                                                                                                                                                                                                                                                  \
             using EpilogueScheduleSM120 = cutlass::epilogue::TmaWarpSpecialized;                                                                                                                                                                                                                                            \
+<<<<<<< HEAD
             using EpilogueSchedule = std::conditional_t<IsSM100, EpilogueScheduleSM10x,                                                                                                                                                                                                                                     \
+=======
+            using EpilogueSchedule = std::conditional_t<IsSM10x, EpilogueScheduleSM10x,                                                                                                                                                                                                                                     \
+>>>>>>> upstream/main
                 std::conditional_t<IsSM120, EpilogueScheduleSM120, EpilogueScheduleSM90>>;                                                                                                                                                                                                                                  \
             using EpilogueElementC = std::conditional_t<IsSM120, ElementCSafe, ElementC>;                                                                                                                                                                                                                                   \
             using EpilogueTensorOp = std::conditional_t<IsBlackwell && IsBlockScaled,                                                                                                                                                                                                                                       \
                 cutlass::arch::OpClassBlockScaledTensorOp, cutlass::arch::OpClassTensorOp>;                                                                                                                                                                                                                                 \
+<<<<<<< HEAD
             using EpilogueScheduleSM10xFinalize = std::conditional_t<!IsFinalizeFusion && IsSM100,                                                                                                                                                                                                                          \
+=======
+            using EpilogueScheduleSM10xFinalize = std::conditional_t<!IsFinalizeFusion && IsSM10x,                                                                                                                                                                                                                          \
+>>>>>>> upstream/main
                 std::conditional_t<Is2SM, cutlass::epilogue::PtrArrayTmaWarpSpecialized2Sm,                                                                                                                                                                                                                                 \
                     cutlass::epilogue::PtrArrayTmaWarpSpecialized1Sm>,                                                                                                                                                                                                                                                      \
                 EpilogueSchedule>; /* This still needs to be valid when finalize fusion is disabled */                                                                                                                                                                                                                      \
@@ -424,8 +478,17 @@ using namespace cutlass::epilogue;
                     cutlass::gemm::KernelPtrArrayTmaWarpSpecialized2SmSm100>,                                                                                                                                                                                                                                               \
                 std::conditional_t<IsBlockScaled, KernelSchedule1SmSm100BlockScaled,                                                                                                                                                                                                                                        \
                     cutlass::gemm::KernelPtrArrayTmaWarpSpecialized1SmSm100>>;                                                                                                                                                                                                                                              \
+<<<<<<< HEAD
             using KernelScheduleSM120 = cutlass ::gemm ::collective::KernelScheduleAuto;                                                                                                                                                                                                                                    \
             using KernelScheduleBW = std::conditional_t<IsSM120, KernelScheduleSM120, KernelScheduleSM100>;                                                                                                                                                                                                                 \
+=======
+            using KernelScheduleSM103 = std::conditional_t<Is2SM,                                                                                                                                                                                                                                                           \
+                cutlass::gemm::KernelPtrArrayTmaWarpSpecialized2SmBlockScaledMxNvf4UltraVs16Sm103,                                                                                                                                                                                                                          \
+                cutlass::gemm::KernelPtrArrayTmaWarpSpecialized1SmBlockScaledMxNvf4UltraVs16Sm103>;                                                                                                                                                                                                                         \
+            using KernelScheduleSM10x = std::conditional_t<IsSM103, KernelScheduleSM103, KernelScheduleSM100>;                                                                                                                                                                                                              \
+            using KernelScheduleSM120 = cutlass ::gemm ::collective::KernelScheduleAuto;                                                                                                                                                                                                                                    \
+            using KernelScheduleBW = std::conditional_t<IsSM120, KernelScheduleSM120, KernelScheduleSM10x>;                                                                                                                                                                                                                 \
+>>>>>>> upstream/main
                                                                                                                                                                                                                                                                                                                             \
             using KernelSchedule = std::conditional_t<IsBlackwell, KernelScheduleBW, KernelScheduleSM90>;                                                                                                                                                                                                                   \
                                                                                                                                                                                                                                                                                                                             \
@@ -688,6 +751,10 @@ using namespace cutlass::epilogue;
         cute::Shape<int32_t, int32_t, cute::_1> dynamic_cluster_shape,                                                                                                                                                                                                                                                      \
         cute::Shape<int32_t, int32_t, cute::_1> fallback_cluster_shape);
 
+<<<<<<< HEAD
 } // namespace cutlass_kernels
+=======
+} // namespace cutlass_kernels_oss
+>>>>>>> upstream/main
 } // namespace kernels
 } // namespace tensorrt_llm

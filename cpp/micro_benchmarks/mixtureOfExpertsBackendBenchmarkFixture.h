@@ -549,6 +549,12 @@ public:
     ActivationType mActType = ActivationType::Relu;
 
     constexpr static int64_t NUM_BUFFERS = 32;
+<<<<<<< HEAD
+=======
+    int64_t mNumWorkspaceBuffers = NUM_BUFFERS;
+    int64_t mNumInputBuffers = NUM_BUFFERS;
+    int64_t mNumGemmProfilerBuffers = NUM_BUFFERS;
+>>>>>>> upstream/main
 
     std::array<QuantParams, NUM_BUFFERS> mQuantParams{};
     bool mUseLora = false;
@@ -619,12 +625,20 @@ public:
 
         if (gemm_to_profile == GemmToProfile::LAYER)
         {
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
             mWorkspaceSize = mMoERunner.getWorkspaceSize(mTotalTokens, mHiddenSize, mInterSize, mNumExperts, mK,
                 mActType, parallelism_config, mUseLora, /*use_deepseek_fp8_block_scale=*/false,
                 /*min_latency_mode=*/false, mUsePrequantScale);
 
+<<<<<<< HEAD
             mWorkspace = allocBuffer<char>(mWorkspaceSize * NUM_BUFFERS);
+=======
+            mNumWorkspaceBuffers = mWorkspaceSize > 1024 * 1024 * 1024 ? 2 : NUM_BUFFERS;
+            mWorkspace = allocBuffer<char>(mWorkspaceSize * mNumWorkspaceBuffers);
+>>>>>>> upstream/main
 
             mExpertBias1 = nullptr;
             mExpertBias2 = nullptr;
@@ -690,9 +704,16 @@ public:
             mScaleProbsSize = padSize(mTotalTokens * mK);
             mScaleProbs = allocBuffer<float>(mScaleProbsSize * NUM_BUFFERS);
             mInputTensorSize = padSize(mTotalTokens * mHiddenSize);
+<<<<<<< HEAD
             mInputTensor = allocBuffer<DataType>(mInputTensorSize * NUM_BUFFERS);
             mFinalOutputSize = padSize(mTotalTokens * mHiddenSize);
             mFinalOutput = allocBuffer<OutputType>(mFinalOutputSize * NUM_BUFFERS);
+=======
+            mNumInputBuffers = mInputTensorSize > 1024 * 1024 * 1024 ? 2 : NUM_BUFFERS;
+            mInputTensor = allocBuffer<DataType>(mInputTensorSize * mNumInputBuffers);
+            mFinalOutputSize = padSize(mTotalTokens * mHiddenSize);
+            mFinalOutput = allocBuffer<OutputType>(mFinalOutputSize * mNumInputBuffers);
+>>>>>>> upstream/main
 
             mSourceToExpandedMapSize = padSize(mTotalTokens * mK);
             mSourceToExpandedMap = allocBuffer<int>(mSourceToExpandedMapSize * NUM_BUFFERS);
@@ -732,10 +753,18 @@ public:
                 = std::max(mGemmProfilerWorkspaceSize, mGemmProfilerBackend.getWorkspaceSize(mTotalTokens));
         }
 
+<<<<<<< HEAD
         int64_t num_gemm_buffers = gemm_to_profile == GemmToProfile::LAYER ? 1 : NUM_BUFFERS;
         mGemmProfilerWorkspaceSize = padSize(mGemmProfilerWorkspaceSize);
         mGemmProfilerWorkspace = mGemmProfilerWorkspaceSize > 0
             ? allocBuffer<char>(mGemmProfilerWorkspaceSize * num_gemm_buffers)
+=======
+        mGemmProfilerWorkspaceSize = padSize(mGemmProfilerWorkspaceSize);
+        mNumGemmProfilerBuffers = mGemmProfilerWorkspaceSize > 1024 * 1024 * 1024 ? 2 : NUM_BUFFERS;
+        mNumGemmProfilerBuffers = gemm_to_profile == GemmToProfile::LAYER ? 1 : mNumGemmProfilerBuffers;
+        mGemmProfilerWorkspace = mGemmProfilerWorkspaceSize > 0
+            ? allocBuffer<char>(mGemmProfilerWorkspaceSize * mNumGemmProfilerBuffers)
+>>>>>>> upstream/main
             : nullptr;
 
         check_cuda_error(cudaStreamSynchronize(streamPtr->get()));
@@ -748,7 +777,12 @@ public:
         mGemmProfilerBackend.mGemmToProfile = static_cast<GemmProfilerBackend::GemmToProfile>(gemm_to_profile);
         auto* expert_weights = gemm_to_profile == GemmToProfile::GEMM_1 ? mExpertWeight1 : mExpertWeight2;
         auto expert_weights_size = gemm_to_profile == GemmToProfile::GEMM_1 ? mExpertWeight1Size : mExpertWeight2Size;
+<<<<<<< HEAD
         mGemmProfilerBackend.prepare(mTotalTokens, mGemmProfilerWorkspace + mGemmProfilerWorkspaceSize * mBufferIndex,
+=======
+        mGemmProfilerBackend.prepare(mTotalTokens,
+            mGemmProfilerWorkspace + mGemmProfilerWorkspaceSize * (mBufferIndex % mNumGemmProfilerBuffers),
+>>>>>>> upstream/main
             /*expert_weights=*/expert_weights + expert_weights_size * mBufferIndex, streamPtr->get());
     }
 
@@ -865,7 +899,11 @@ public:
                 }
 
                 // Profile all samples or for 1 sec
+<<<<<<< HEAD
                 int const max_iters = mGemmProfilerBackend.NUM_ROUTING_SAMPLES;
+=======
+                int const max_iters = mGemmProfilerBackend.NUM_ROUTING_SAMPLES * 2;
+>>>>>>> upstream/main
                 float const max_time_ms = 1000.f;
 
                 float time = 0.f;
@@ -974,7 +1012,11 @@ public:
             }
             mGemmProfilerBackend.mSampleIndex = mBufferIndex % mGemmProfilerBackend.NUM_ROUTING_SAMPLES;
             mGemmProfilerBackend.runProfiler(mTotalTokens, tactics,
+<<<<<<< HEAD
                 mGemmProfilerWorkspace + mGemmProfilerWorkspaceSize * mBufferIndex,
+=======
+                mGemmProfilerWorkspace + mGemmProfilerWorkspaceSize * (mBufferIndex % mNumGemmProfilerBuffers),
+>>>>>>> upstream/main
                 /*expert_weights=*/expert_weights + expert_weights_size * mBufferIndex, streamPtr->get());
             break;
         }
@@ -983,26 +1025,46 @@ public:
             auto stream = streamPtr->get();
             MoeMinLatencyParams min_latency_params;
 #ifdef USING_OSS_CUTLASS_MOE_GEMM
+<<<<<<< HEAD
             mMoERunner.runMoe(mInputTensor + mInputTensorSize * mBufferIndex, nullptr, true,
+=======
+            mMoERunner.runMoe(mInputTensor + mInputTensorSize * (mBufferIndex % mNumInputBuffers), nullptr, true,
+>>>>>>> upstream/main
                 mSelectedExperts + mSelectedExpertsSize * mBufferIndex,
                 mUseFinalScale ? mScaleProbs + mScaleProbsSize * mBufferIndex : nullptr,
                 mExpertWeight1 + mExpertWeight1Size * mBufferIndex, mExpertBias1 + mExpertBias1Size * mBufferIndex,
                 ActivationParams(mActType), mExpertWeight2 + mExpertWeight2Size * mBufferIndex,
                 mExpertBias2 + mExpertBias2Size * mBufferIndex, mQuantParams[mBufferIndex], mTotalTokens, mHiddenSize,
+<<<<<<< HEAD
                 mHiddenSize, mInterSize, mNumExperts, mK, mWorkspace + mWorkspaceSize * mBufferIndex,
                 mFinalOutput + mFinalOutputSize * mBufferIndex,
+=======
+                mHiddenSize, mInterSize, mNumExperts, mK,
+                mWorkspace + mWorkspaceSize * (mBufferIndex % mNumWorkspaceBuffers),
+                mFinalOutput + mFinalOutputSize * (mBufferIndex % mNumInputBuffers),
+>>>>>>> upstream/main
                 mSourceToExpandedMap + mSourceToExpandedMapSize * mBufferIndex, parallelism_config,
                 /*enable_alltoall=*/false, mUseLora, mLoraParams[mBufferIndex],
                 /*use_fp8_block_scaling=*/false, /*min_latency_mode=*/false, min_latency_params, stream);
 #else
+<<<<<<< HEAD
             mMoERunner.runMoe(mInputTensor + mInputTensorSize * mBufferIndex, nullptr, true,
+=======
+            mMoERunner.runMoe(mInputTensor + mInputTensorSize * (mBufferIndex % mNumInputBuffers), nullptr, true,
+>>>>>>> upstream/main
                 mSelectedExperts + mSelectedExpertsSize * mBufferIndex,
                 mUseFinalScale ? mScaleProbs + mScaleProbsSize * mBufferIndex : nullptr,
                 mExpertWeight1 + mExpertWeight1Size * mBufferIndex, mExpertBias1 + mExpertBias1Size * mBufferIndex,
                 ActivationParams(mActType), mExpertWeight2 + mExpertWeight2Size * mBufferIndex,
                 mExpertBias2 + mExpertBias2Size * mBufferIndex, mQuantParams[mBufferIndex], mTotalTokens, mHiddenSize,
+<<<<<<< HEAD
                 mHiddenSize, mInterSize, mNumExperts, mK, mWorkspace + mWorkspaceSize * mBufferIndex,
                 mFinalOutput + mFinalOutputSize * mBufferIndex,
+=======
+                mHiddenSize, mInterSize, mNumExperts, mK,
+                mWorkspace + mWorkspaceSize * (mBufferIndex % mNumWorkspaceBuffers),
+                mFinalOutput + mFinalOutputSize * (mBufferIndex % mNumInputBuffers),
+>>>>>>> upstream/main
                 mSourceToExpandedMap + mSourceToExpandedMapSize * mBufferIndex, parallelism_config,
                 /*enable_alltoall=*/false, mUseLora, mLoraParams[mBufferIndex],
                 /*use_fp8_block_scaling=*/false, /*min_latency_mode=*/false, min_latency_params, stream);

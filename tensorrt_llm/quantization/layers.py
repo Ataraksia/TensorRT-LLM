@@ -32,6 +32,10 @@ from ..layers.embedding import Embedding
 from ..layers.linear import Linear, RowLinear
 from ..module import Module
 from ..parameter import Parameter
+<<<<<<< HEAD
+=======
+from .utils import fp4_utils
+>>>>>>> upstream/main
 
 # isort: off
 from .functional import (
@@ -42,7 +46,11 @@ from .functional import (
     quantize_per_token, quantize_tensor, validate_group_size, smooth_quant_gemm,
     smooth_quant_layer_norm, smooth_quant_rms_norm,
     weight_only_groupwise_quant_matmul, weight_only_quant_matmul,
+<<<<<<< HEAD
     qserve_gemm_per_group, qserve_gemm_per_channel)
+=======
+    qserve_gemm_per_group, qserve_gemm_per_channel, fp8_rowwise_layer_norm)
+>>>>>>> upstream/main
 # isort: on
 from .mode import GroupwiseQuantAlgo, QuantMode
 
@@ -2113,10 +2121,19 @@ class FP4Linear(Linear):
             shape=(self.out_features,
                    self.in_features // self.scaling_vector_size),
             dtype=trt.fp8)
+<<<<<<< HEAD
         self.weights_block_scaling_factor_interleaved = Parameter(
             shape=(self.out_features,
                    self.in_features // self.scaling_vector_size),
             dtype=trt.fp8)
+=======
+        nrows = fp4_utils.pad_up(self.out_features, 128)
+        ncols = fp4_utils.pad_up(self.in_features // self.scaling_vector_size,
+                                 4)
+        self.weights_block_scaling_factor_interleaved = Parameter(shape=(nrows,
+                                                                         ncols),
+                                                                  dtype=trt.fp8)
+>>>>>>> upstream/main
         self.weights_global_scaling_factor = Parameter(shape=(1, ),
                                                        dtype=trt.float32)
         self.activation_global_scaling_factor = Parameter(shape=(1, ),
@@ -2215,7 +2232,11 @@ class FP4Linear(Linear):
                     qkv_block_scale,
                     tllm_key.replace(
                         'weight', "weights_block_scaling_factor_interleaved"):
+<<<<<<< HEAD
                     torch.ops.tensorrt_llm.nvfp4_block_scale_interleave(
+=======
+                    torch.ops.trtllm.block_scale_interleave(
+>>>>>>> upstream/main
                         qkv_block_scale.view(
                             torch.uint8).cpu().contiguous()).reshape(
                                 qkv_block_scale.shape).view(
@@ -2235,7 +2256,11 @@ class FP4Linear(Linear):
             elif tllm_key.endswith("weights_block_scaling_factor"):
                 return weights
             elif tllm_key.endswith("weights_block_scaling_factor_interleaved"):
+<<<<<<< HEAD
                 return torch.ops.tensorrt_llm.nvfp4_block_scale_interleave(
+=======
+                return torch.ops.trtllm.block_scale_interleave(
+>>>>>>> upstream/main
                     weights.view(torch.uint8).cpu().contiguous()).reshape(
                         weights.shape).view(torch.float8_e4m3fn)
             elif tllm_key.endswith("weights_global_scaling_factor"):
@@ -2274,10 +2299,19 @@ class FP4RowLinear(RowLinear):
             shape=(self.out_features,
                    self.in_features // self.scaling_vector_size),
             dtype=trt.fp8)
+<<<<<<< HEAD
         self.weights_block_scaling_factor_interleaved = Parameter(
             shape=(self.out_features,
                    self.in_features // self.scaling_vector_size),
             dtype=trt.fp8)
+=======
+        nrows = fp4_utils.pad_up(self.out_features, 128)
+        ncols = fp4_utils.pad_up(self.in_features // self.scaling_vector_size,
+                                 4)
+        self.weights_block_scaling_factor_interleaved = Parameter(shape=(nrows,
+                                                                         ncols),
+                                                                  dtype=trt.fp8)
+>>>>>>> upstream/main
         self.weights_global_scaling_factor = Parameter(shape=(1, ),
                                                        dtype=trt.float32)
         self.activation_global_scaling_factor = Parameter(shape=(1, ),
@@ -2374,7 +2408,11 @@ class FP4RowLinear(RowLinear):
         elif tllm_key.endswith("weights_block_scaling_factor"):
             return weights
         elif tllm_key.endswith("weights_block_scaling_factor_interleaved"):
+<<<<<<< HEAD
             return torch.ops.tensorrt_llm.nvfp4_block_scale_interleave(
+=======
+            return torch.ops.trtllm.block_scale_interleave(
+>>>>>>> upstream/main
                 weights.view(torch.uint8).cpu().contiguous()).reshape(
                     weights.shape).view(torch.float8_e4m3fn)
         elif tllm_key.endswith("weights_global_scaling_factor"):
@@ -3313,3 +3351,62 @@ class QServeAttention(Module):
             return (context, past_key_value)
 
         return context
+
+
+class Fp8RowwiseLayerNorm(Module):
+
+    def __init__(
+            self,
+            normalized_shape,
+            eps=1e-05,
+            elementwise_affine=True,
+            dtype=None,
+            quant_mode=QuantMode(0),
+            bias=False,
+            clamp_val=None,
+    ):
+        super().__init__()
+        if isinstance(normalized_shape, int):
+            normalized_shape = (normalized_shape, )
+        if not quant_mode.has_fp8_rowwise():
+            raise ValueError(
+                "Fp8 Rowwise Layer norm has to have some quantization mode set")
+        self.normalized_shape = tuple(normalized_shape)
+        self.elementwise_affine = elementwise_affine
+        if self.elementwise_affine:
+            self.weight = Parameter(shape=self.normalized_shape, dtype=dtype)
+        else:
+            self.register_parameter('weight', None)
+
+        if bias:
+            self.bias = Parameter(shape=self.normalized_shape, dtype=dtype)
+        else:
+            self.register_parameter('bias', None)
+
+        if clamp_val:
+            if not (isinstance(clamp_val, list) and len(clamp_val) == 2):
+                raise ValueError(f'unsupported clamp_val {clamp_val}')
+            self.clamp_val = Parameter(np.array(clamp_val, dtype=np.float32),
+                                       dtype='float32',
+                                       is_buffer=True)
+        else:
+            self.register_parameter('clamp_val', None)
+
+        self.eps = eps
+        self.dtype = dtype
+        self.quant_mode = quant_mode
+
+    def forward(self, x):
+        weight = None if self.weight is None else self.weight.value
+        bias = None if self.bias is None else self.bias.value
+        scale = None
+        clamp_val = None if self.clamp_val is None else self.clamp_val.value
+        return fp8_rowwise_layer_norm(
+            x,
+            self.normalized_shape,
+            weight,
+            bias,
+            scale,
+            clamp_val,
+            self.eps,
+            dynamic_act_scaling=self.quant_mode.has_fp8_rowwise())

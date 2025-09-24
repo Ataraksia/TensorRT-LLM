@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Quick Start Recipe for Llama3.3 70B on TensorRT-LLM - Blackwell & Hopper Hardware
 
 ## Introduction
@@ -5,6 +6,15 @@
 This deployment guide provides step-by-step instructions for running the Llama 3.3-70B Instruct model using TensorRT-LLM with FP8 and NVFP4 quantization, optimized for NVIDIA GPUs. It covers the complete setup required; from accessing model weights and preparing the software environment to configuring TensorRT-LLM parameters, launching the server, and validating inference output.
 
 The guide is intended for developers and practitioners seeking high-throughput or low-latency inference using NVIDIA’s accelerated stack—starting with the PyTorch container from NGC, then installing TensorRT-LLM for model serving, FlashInfer for optimized CUDA kernels, and ModelOpt to enable FP8 and NVFP4 quantized execution.
+=======
+# Quick Start Recipe for Llama3.3 70B on TensorRT LLM - Blackwell & Hopper Hardware
+
+## Introduction
+
+This deployment guide provides step-by-step instructions for running the Llama 3.3-70B Instruct model using TensorRT LLM with FP8 and NVFP4 quantization, optimized for NVIDIA GPUs. It covers the complete setup required; from accessing model weights and preparing the software environment to configuring TensorRT LLM parameters, launching the server, and validating inference output.
+
+The guide is intended for developers and practitioners seeking high-throughput or low-latency inference using NVIDIA’s accelerated stack—starting with the PyTorch container from NGC, then installing TensorRT LLM for model serving, FlashInfer for optimized CUDA kernels, and ModelOpt to enable FP8 and NVFP4 quantized execution.
+>>>>>>> upstream/main
 
 ## Access & Licensing
 
@@ -12,15 +22,26 @@ To use Llama 3.3-70B, you must first agree to Meta’s Llama 3 Community License
 
 ## Prerequisites
 
+<<<<<<< HEAD
 GPU: NVIDIA Blackwell or Hopper Architecture
 OS: Linux
 Drivers: CUDA Driver 575 or Later
 Docker with NVIDIA Container Toolkit installed
+=======
+GPU: NVIDIA Blackwell or Hopper Architecture  
+OS: Linux  
+Drivers: CUDA Driver 575 or Later  
+Docker with NVIDIA Container Toolkit installed  
+>>>>>>> upstream/main
 Python3 and python3-pip (Optional, for accuracy evaluation only)
 
 ## Models
 
+<<<<<<< HEAD
 * FP8 model: [Llama-3.3-70B-Instruct-FP8](https://huggingface.co/nvidia/Llama-3.3-70B-Instruct-FP8)
+=======
+* FP8 model: [Llama-3.3-70B-Instruct-FP8](https://huggingface.co/nvidia/Llama-3.3-70B-Instruct-FP8)  
+>>>>>>> upstream/main
 * NVFP4 model: [Llama-3.3-70B-Instruct-FP4](https://huggingface.co/nvidia/Llama-3.3-70B-Instruct-FP4)
 
 
@@ -30,7 +51,11 @@ Note that NVFP4 is only supported on NVIDIA Blackwell
 
 ### Run Docker Container
 
+<<<<<<< HEAD
 Run the docker container using the TensorRT-LLM NVIDIA NGC image.
+=======
+Run the docker container using the TensorRT LLM NVIDIA NGC image.
+>>>>>>> upstream/main
 
 ```shell
 docker run --rm -it \
@@ -43,6 +68,7 @@ nvcr.io/nvidia/tensorrt-llm/release:1.0.0rc6 \
 /bin/bash
 ```
 
+<<<<<<< HEAD
 Note:
 
 * The command mounts your user `.cache` directory to save the downloaded model checkpoints which are saved to `~/.cache/huggingface/hub/` by default. This prevents having to redownload the weights each time you rerun the container. If the `~/.cache` directory doesn’t exist please create it using `$ mkdir ~/.cache`.
@@ -55,6 +81,20 @@ If you want to use latest main branch, you can choose to build from source to in
 ### Creating the TRT-LLM Server config
 
 We create a YAML configuration file `/tmp/config.yml` for the TensorRT-LLM Server and populate it with the following recommended performance settings.
+=======
+Note: 
+
+* You can mount additional directories and paths using the \-v \<local\_path\>:\<path\> flag if needed, such as mounting the downloaded weight paths.  
+* The command mounts your user .cache directory to save the downloaded model checkpoints which are saved to \~/.cache/huggingface/hub/ by default. This prevents having to redownload the weights each time you rerun the container. If the \~/.cache directory doesn’t exist please create it using  mkdir \~/.cache  
+* The command also maps port **8000** from the container to your host so you can access the LLM API endpoint from your host  
+* See the [https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release/tags](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release/tags) for all the available containers. The containers published in the main branch weekly have “rcN” suffix, while the monthly release with QA tests has no “rcN” suffix. Use the rc release to get the latest model and feature support.
+
+If you want to use latest main branch, you can choose to build from source to install TensorRT LLM, the steps refer to [https://nvidia.github.io/TensorRT-LLM/latest/installation/build-from-source-linux.html](https://nvidia.github.io/TensorRT-LLM/latest/installation/build-from-source-linux.html) 
+
+### Creating the TRT-LLM Server config
+
+We create a YAML configuration file /tmp/config.yml for the TensorRT LLM Server and populate it with the following recommended performance settings.
+>>>>>>> upstream/main
 
 ```shell
 EXTRA_LLM_API_FILE=/tmp/config.yml
@@ -64,7 +104,11 @@ enable_attention_dp: false
 cuda_graph_config:
   enable_padding: true
   max_batch_size: 1024
+<<<<<<< HEAD
 kv_cache_config:
+=======
+kv_cache_config:     
+>>>>>>> upstream/main
   dtype: fp8
 EOF
 ```
@@ -93,6 +137,7 @@ After the server is set up, the client can now send prompt requests to the serve
 ### Configs and Parameters
 
 These options are used directly on the command line when you start the `trtllm-serve` process.
+<<<<<<< HEAD
 
 #### `--tp_size`
 
@@ -126,10 +171,46 @@ These options are used directly on the command line when you start the `trtllm-s
 #### `--trust_remote_code`
 
 * **Description:** Allows TensorRT-LLM to download models and tokenizers from Hugging Face. This flag is passed directly to the Hugging Face API.
+=======
+#### `--tp_size`
+
+&emsp;**Description:** Sets the **tensor-parallel size**. This should typically match the number of GPUs you intend to use for a single model instance.
+
+#### `--ep_size`
+
+&emsp;**Description:** Sets the **expert-parallel size** for Mixture-of-Experts (MoE) models. Like `tp_size`, this should generally match the number of GPUs you're using. This setting has no effect on non-MoE models.
+
+#### `--kv_cache_free_gpu_memory_fraction`
+
+&emsp;**Description:** A value between 0.0 and 1.0 that specifies the fraction of free GPU memory to reserve for the KV cache after the model is loaded. Since memory usage can fluctuate, this buffer helps prevent out-of-memory (OOM) errors.
+
+&emsp;**Recommendation:** If you experience OOM errors, try reducing this value to **0.8** or lower.
+
+#### `--backend pytorch`
+
+&emsp;**Description:** Tells TensorRT LLM to use the **pytorch** backend.
+
+#### `--max_batch_size`
+
+&emsp;**Description:** The maximum number of user requests that can be grouped into a single batch for processing.
+
+#### `--max_num_tokens`
+
+&emsp;**Description:** The maximum total number of tokens (across all requests) allowed inside a single scheduled batch.
+
+#### `--max_seq_len`
+
+&emsp;**Description:** The maximum possible sequence length for a single request, including both input and generated output tokens.
+
+#### `--trust_remote_code`
+
+&emsp;**Description:** Allows TensorRT LLM to download models and tokenizers from Hugging Face. This flag is passed directly to the Hugging Face API.
+>>>>>>> upstream/main
 
 
 #### Extra LLM API Options (YAML Configuration)
 
+<<<<<<< HEAD
 These options provide finer control over performance and are set within a YAML file passed to the `trtllm-serve` command via the `--extra_llm_api_options` argument.
 
 #### `kv_cache_config`
@@ -177,12 +258,67 @@ These options provide finer control over performance and are set within a YAML f
 * **Default**: `TRTLLM`
 
 See the [`TorchLlmArgs` class](https://nvidia.github.io/TensorRT-LLM/llm-api/reference.html#tensorrt_llm.llmapi.TorchLlmArgs) for the full list of options which can be used in the `extra_llm_api_options`.
+=======
+These options provide finer control over performance and are set within a YAML file passed to the trtllm-serve command via the \--extra\_llm\_api\_options argument.
+
+#### `kv_cache_config`
+
+&emsp;**Description**: A section for configuring the Key-Value (KV) cache.
+
+&emsp;**Options**: 
+
+&emsp;&emsp;dtype: Sets the data type for the KV cache.
+
+&emsp;&emsp;**Default**: auto (uses the data type specified in the model checkpoint).
+
+#### `cuda_graph_config`
+
+&emsp;**Description**: A section for configuring CUDA graphs to optimize performance.
+
+&emsp;**Options**:
+
+&emsp;&emsp;enable\_padding: If true, input batches are padded to the nearest cuda\_graph\_batch\_size. This can significantly improve performance.
+
+&emsp;&emsp;**Default**: false
+
+&emsp;&emsp;max\_batch\_size: Sets the maximum batch size for which a CUDA graph will be created.
+
+&emsp;&emsp;**Default**: 0
+
+&emsp;&emsp;**Recommendation**: Set this to the same value as the \--max\_batch\_size command-line option.
+
+&emsp;&emsp;batch\_sizes: A specific list of batch sizes to create CUDA graphs for.
+
+&emsp;&emsp;**Default**: None
+
+#### `moe_config`
+
+&emsp;**Description**: Configuration for Mixture-of-Experts (MoE) models.
+
+&emsp;**Options**:
+
+&emsp;&emsp;backend: The backend to use for MoE operations.
+
+&emsp;&emsp;**Default**: CUTLASS
+
+#### `attention_backend`
+
+&emsp;**Description**: The backend to use for attention calculations.
+
+&emsp;**Default**: TRTLLM
+
+See the [TorchLlmArgs](https://nvidia.github.io/TensorRT-LLM/llm-api/reference.html#tensorrt_llm.llmapi.TorchLlmArgs) class for the full list of options which can be used in the `extra_llm_api_options`.
+>>>>>>> upstream/main
 
 ## Testing API Endpoint
 
 ### Basic Test
 
+<<<<<<< HEAD
 Start a new terminal on the host to test the TensorRT-LLM server you just launched.
+=======
+Start a new terminal on the host to test the TensorRT LLM server you just launched. 
+>>>>>>> upstream/main
 
 You can query the health/readiness of the server using:
 
@@ -192,7 +328,11 @@ curl -s -o /dev/null -w "Status: %{http_code}\n" "http://localhost:8000/health"
 
 When the `Status: 200` code is returned, the server is ready for queries. Note that the very first query may take longer due to initialization and compilation.
 
+<<<<<<< HEAD
 After the TRT-LLM server is set up and shows Application startup complete, you can send requests to the server.
+=======
+After the TRT-LLM server is set up and shows Application startup complete, you can send requests to the server. 
+>>>>>>> upstream/main
 
 ```shell
 curl http://localhost:8000/v1/completions -H "Content-Type: application/json"  -d '{
@@ -211,6 +351,7 @@ Here is an example response, showing that the TRT-LLM server returns “New York
 
 ### Troubleshooting Tips
 
+<<<<<<< HEAD
 * If you encounter CUDA out-of-memory errors, try reducing `max_batch_size` or `max_seq_len`.
 * Ensure your model checkpoints are compatible with the expected format.
 * For performance issues, check GPU utilization with nvidia-smi while the server is running.
@@ -222,24 +363,51 @@ Here is an example response, showing that the TRT-LLM server returns “New York
 We use the lm-eval tool to test the model’s accuracy. For more information see <https://github.com/EleutherAI/lm-evaluation-harness>.
 
 To run the evaluation harness exec into the running TensorRT-LLM container and install with this command:
+=======
+* If you encounter CUDA out-of-memory errors, try reducing max\_batch\_size or max\_seq\_len  
+* Ensure your model checkpoints are compatible with the expected format  
+* For performance issues, check GPU utilization with nvidia-smi while the server is running  
+* If the container fails to start, verify that the NVIDIA Container Toolkit is properly installed  
+* For connection issues, make sure port 8000 is not being used by another application
+
+### Running Evaluations to Verify Accuracy (Optional)
+
+We use the lm-eval tool to test the model’s accuracy. For more information see [https://github.com/EleutherAI/lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness).
+
+To run the evaluation harness exec into the running TensorRT LLM container and install with this command:
+>>>>>>> upstream/main
 
 ```shell
 docker exec -it tensorrt_llm /bin/bash
 
+<<<<<<< HEAD
 pip install lm_eval
+=======
+pip install -U lm-eval
+>>>>>>> upstream/main
 ```
 
 FP8 command for GSM8K
 
+<<<<<<< HEAD
 * Note: The tokenizer will add BOS (beginning of sentence token) before input prompt by default which leads to accuracy regression on GSM8K task for Llama 3.3 70B instruction model. So, set `add_special_tokens=False` to avoid it.
 
 ```shell
+=======
+* Note: The tokenizer will add BOS (beginning of sentence token) before input prompt by default which leads to accuracy regression on GSM8K task for Llama 3.3 70B instruction model. So, set add\_special\_tokens=False to avoid it.
+
+```
+>>>>>>> upstream/main
 MODEL_PATH=nvidia/Llama-3.3-70B-Instruct-FP8
 
 lm_eval --model local-completions  --tasks gsm8k --batch_size 256 --gen_kwargs temperature=0.0,add_special_tokens=False --num_fewshot 5 --model_args model=${MODEL_PATH},base_url=http://localhost:8000/v1/completions,num_concurrent=32,max_retries=20,tokenized_requests=False --log_samples --output_path trtllm.fp8.gsm8k
 ```
 
+<<<<<<< HEAD
 Sample result in Blackwell.
+=======
+Sample result in Blackwell. 
+>>>>>>> upstream/main
 
 ```
 |Tasks|Version|     Filter     |n-shot|  Metric   |   |Value |   |Stderr|
@@ -250,7 +418,11 @@ Sample result in Blackwell.
 
 FP4 command for GSM8K
 
+<<<<<<< HEAD
 * Note: The tokenizer will add BOS before input prompt by default, which leads to accuracy regression on GSM8K task for LLama 3.3 70B instruction model. So set `add_special_tokens=False` to avoid it.
+=======
+* Note: The tokenizer will add BOS before input prompt by default, which leads to accuracy regression on GSM8K task for LLama 3.3 70B instruction model. So set add\_special\_tokens=False to avoid it.
+>>>>>>> upstream/main
 
 ```shell
 MODEL_PATH=nvidia/Llama-3.3-70B-Instruct-FP4
@@ -260,7 +432,11 @@ lm_eval --model local-completions  --tasks gsm8k --batch_size 256 --gen_kwargs t
 
 Sample result in Blackwell
 
+<<<<<<< HEAD
 ```
+=======
+```shell
+>>>>>>> upstream/main
 |Tasks|Version|     Filter     |n-shot|  Metric   |   |Value |   |Stderr|
 |-----|------:|----------------|-----:|-----------|---|-----:|---|-----:|
 |gsm8k|      3|flexible-extract|     5|exact_match|↑  |0.9356|±  |0.0068|
@@ -269,7 +445,11 @@ Sample result in Blackwell
 
 ## Benchmarking Performance
 
+<<<<<<< HEAD
 To benchmark the performance of your TensorRT-LLM server you can leverage the built-in `benchmark_serving.py` script. To do this first creating a wrapper `bench.sh` script.
+=======
+To benchmark the performance of your TensorRT LLM server you can leverage the built-in “benchmark\_serving.py” script. To do this first creating a wrapper [bench.sh](http://bench.sh) script.
+>>>>>>> upstream/main
 
 ```shell
 cat <<EOF >  bench.sh
@@ -299,7 +479,11 @@ EOF
 chmod +x bench.sh
 ```
 
+<<<<<<< HEAD
 To benchmark the FP4 model, replace `--model nvidia/Llama-3.3-70B-Instruct-FP8` with `--model nvidia/Llama-3.3-70B-Instruct-FP4`.
+=======
+To benchmark the FP4 model, replace \--model nvidia/Llama-3.3-70B-Instruct-FP8 with \--model nvidia/Llama-3.3-70B-Instruct-FP4.
+>>>>>>> upstream/main
 
 If you want to save the results to a file add the following options.
 
@@ -309,15 +493,25 @@ If you want to save the results to a file add the following options.
 --result-filename "concurrency_${concurrency}.json"
 ```
 
+<<<<<<< HEAD
 For more benchmarking options see <https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt\_llm/serve/scripts/benchmark\_serving.py>.
 
 Run `bench.sh` to begin a serving benchmark. This will take a long time if you run all the concurrencies mentioned in the above `bench.sh` script.
+=======
+For more benchmarking options see. [https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt\_llm/serve/scripts/benchmark\_serving.py](https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt_llm/serve/scripts/benchmark_serving.py) 
+
+Run bench.sh to begin a serving benchmark. This will take a long time if you run all the concurrencies mentioned in the above bench.sh script.
+>>>>>>> upstream/main
 
 ```shell
 ./bench.sh
 ```
 
+<<<<<<< HEAD
 Sample TensorRT-LLM serving benchmark output. Your results may vary due to ongoing software optimizations.
+=======
+Sample TensorRT LLM serving benchmark output. Your results may vary due to ongoing software optimizations.
+>>>>>>> upstream/main
 
 ```
 ============ Serving Benchmark Result ============
@@ -350,6 +544,7 @@ P99 E2EL (ms):                            [result]
 
 ### Key Metrics
 
+<<<<<<< HEAD
 * Median Time to First Token (TTFT)
   * The typical time elapsed from when a request is sent until the first output token is generated.
 * Median Time Per Output Token (TPOT)
@@ -360,3 +555,15 @@ P99 E2EL (ms):                            [result]
   * The typical total time from when a request is submitted until the final token of the response is received.
 * Total Token Throughput
   * The combined rate at which the system processes both input (prompt) tokens and output (generated) tokens.
+=======
+* Median Time to First Token (TTFT)  
+  * The typical time elapsed from when a request is sent until the first output token is generated.  
+* Median Time Per Output Token (TPOT)  
+  * The typical time required to generate each token *after* the first one.   
+* Median Inter-Token Latency (ITL)  
+  * The typical time delay between the completion of one token and the completion of the next.  
+* Median End-to-End Latency (E2EL)  
+  * The typical total time from when a request is submitted until the final token of the response is received.   
+* Total Token Throughput  
+  * The combined rate at which the system processes both input (prompt) tokens and output (generated) tokens. 
+>>>>>>> upstream/main

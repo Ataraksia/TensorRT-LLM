@@ -106,9 +106,16 @@ public:
         int32_t nGroups, int32_t topkGroups, int32_t localExpertOffset, int32_t localNumExperts,
         float routedScalingFactor, int32_t* routingExpertIndexes, int32_t* expertCountHistogram,
         int32_t* permutedIdxSize, int32_t* expandedIdxToPermutedIdx, int32_t* permutedIdxToExpandedIdx,
+<<<<<<< HEAD
         int32_t* permutedIdxToTokenIdx, void* expertWeights, int32_t* numTokensPerExpert, int32_t* ctaIdxXyToBatchIdx,
         int32_t* ctaIdxXyToMnLimit, int32_t* numNonExitingCtas, batchedGemm::trtllm::gen::Dtype dtypeElt,
         bool useRoutingScalesOnInput, bool useDeepSeekFp8, RoutingMethodType routingMethodType, cudaStream_t stream);
+=======
+        int32_t* permutedIdxToTokenIdx, void* expertWeights, int32_t* expertIds, int32_t* numTokensPerExpert,
+        int32_t* ctaIdxXyToBatchIdx, int32_t* ctaIdxXyToMnLimit, int32_t* numNonExitingCtas,
+        batchedGemm::trtllm::gen::Dtype dtypeElt, bool useRoutingScalesOnInput, bool useDeepSeekFp8,
+        RoutingMethodType routingMethodType, cudaStream_t stream);
+>>>>>>> upstream/main
 
 private:
     int32_t mTileTokensDim;
@@ -198,6 +205,13 @@ struct MoERunnerArgs
     // and [num_tokens, hidden_size/16] in float for e2m1
     void* hidden_states_scale = nullptr;
 
+<<<<<<< HEAD
+=======
+    // Optional inputs:
+    void* topk_weights = nullptr; // [num_tokens, top_k]  with quantized weights
+    int32_t* topk_ids = nullptr;  // [num_tokens, top_k] with expert ids in int32_t
+
+>>>>>>> upstream/main
     // Gemm input:
     void* gemm1_weights = nullptr;
     void* gemm1_weights_scale = nullptr;

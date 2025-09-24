@@ -22,6 +22,12 @@
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #endif
+<<<<<<< HEAD
+=======
+namespace gemmGatedAct
+{
+
+>>>>>>> upstream/main
 namespace trtllm
 {
 namespace gen
@@ -89,3 +95,8 @@ inline CUresult launchKernel(void* kernelParams, void* cudaStream, int32_t smemS
 
 } // namespace gen
 } // namespace trtllm
+<<<<<<< HEAD
+=======
+
+} // namespace gemmGatedAct
+>>>>>>> upstream/main

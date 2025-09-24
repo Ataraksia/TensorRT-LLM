@@ -1,13 +1,21 @@
 # Falcon-180B on a single H200 GPU with INT4 AWQ, and 6.7x faster Llama-70B over A100
 
+<<<<<<< HEAD
 H200's large capacity & high memory bandwidth, paired with TensorRT-LLM's
+=======
+H200's large capacity & high memory bandwidth, paired with TensorRT LLM's
+>>>>>>> upstream/main
 optimizations, maximizes inference performance.
 
 ## Falcon-180B on a single H200 with INT4 AWQ
 [Falcon-180B](https://huggingface.co/tiiuae/falcon-180B), one of the largest &
 most accurate open source models available, can run on a *single* H200 GPU.
 
+<<<<<<< HEAD
 The 141GB of memory on H200, paired with TensorRT-LLM running INT4 AWQ with
+=======
+The 141GB of memory on H200, paired with TensorRT LLM running INT4 AWQ with
+>>>>>>> upstream/main
 FP8, allows for the entire large language model to fit on a single GPU, where
 previously eight A100s were required. H200 Falcon-180B provides up to **800**
 tok/s and retains high accuracy.
@@ -30,7 +38,11 @@ BS: (in order) 256, 128 </sup>
 
 **Model Accuracy:**
 Often quantization can have adverse impacts on the accuracy of the model,
+<<<<<<< HEAD
 however, TensorRT-LLM's AWQ decreases memory footprint of the model by **4x**
+=======
+however, TensorRT LLM's AWQ decreases memory footprint of the model by **4x**
+>>>>>>> upstream/main
 while maintaining high accuracy.
 
 <img src="https://github.com/NVIDIA/TensorRT-LLM/blob/5aec7af45fc0abd876fa68a9ae8c8cae084f3af3/docs/source/blogs/media/Falcon180B-H200_acc.png?raw=true" alt="Falcon-180B accuracy comparison" width="600" height="auto">
@@ -52,18 +64,32 @@ retain higher accuracy than other 4bit methods and reduce memory usage, but
 requires special kernels capable of handling the change in precision
 performantly.
 
+<<<<<<< HEAD
 TensorRT-LLM has implemented custom kernels for AWQ, and taken the technique a
 step further by performing FP8 computation on Hopper GPUs instead of the
 standard FP16.
 
 Similar examples running Falcon-180B with quantization in TensorRT-LLM are
+=======
+TensorRT LLM has implemented custom kernels for AWQ, and taken the technique a
+step further by performing FP8 computation on Hopper GPUs instead of the
+standard FP16.
+
+Similar examples running Falcon-180B with quantization in TensorRT LLM are
+>>>>>>> upstream/main
 available in [examples/models/contrib/falcon](/examples/models/contrib/falcon).
 
 ## Llama-70B on H200 up to 6.7x A100
 
+<<<<<<< HEAD
 TensorRT-LLM has improved its Group Query Attention (GQA) kernels, in the
 generation phase, providing up to 2.4x improvement on Llama-70B over
 TensorRT-LLM v0.5, achieving over **3,800** tok/s/gpu at up to **6.7x** faster
+=======
+TensorRT LLM has improved its Group Query Attention (GQA) kernels, in the
+generation phase, providing up to 2.4x improvement on Llama-70B over
+TensorRT LLM v0.5, achieving over **3,800** tok/s/gpu at up to **6.7x** faster
+>>>>>>> upstream/main
 than A100.
 
 **H200 6.7x A100**
@@ -106,7 +132,11 @@ BS 192 </sup>
 [**Grouped Query Attention (GQA)**](https://arxiv.org/abs/2305.13245v2)
 (Ainslie et al., 2023), used in Llama-70B, is a variant of Multihead Attention
 (MHA) which groups key-value (KV) heads together, resulting in fewer KV heads
+<<<<<<< HEAD
 than query (Q) heads. TensorRT-LLM has a custom implementation of MHA which
+=======
+than query (Q) heads. TensorRT LLM has a custom implementation of MHA which
+>>>>>>> upstream/main
 supports GQA, multi-query attention (MQA) and standard MHA. It leverages Tensor
 Cores, including in the generation phase, and delivers great performance on
 NVIDIA GPUs.
@@ -116,7 +146,11 @@ NVIDIA GPUs.
 These improvements will be published in the `main` branch soon, and will be
 included in the v0.7 & v0.8 releases.
 
+<<<<<<< HEAD
 Similar examples running Llama-70B in TensorRT-LLM are published in
+=======
+Similar examples running Llama-70B in TensorRT LLM are published in
+>>>>>>> upstream/main
 [examples/models/core/llama](/examples/models/core/llama).
 
 For more information about H200, please see the [H200 announcement blog](./H200launch.md).

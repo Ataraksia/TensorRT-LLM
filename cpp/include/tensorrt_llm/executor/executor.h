@@ -582,14 +582,22 @@ public:
     explicit KvCacheRetentionConfig(std::vector<TokenRangeRetentionConfig> const& tokenRangeRetentionPriorities,
         RetentionPriority decodeRetentionPriority = kDefaultRetentionPriority,
         std::optional<std::chrono::milliseconds> decodeDurationMs = std::nullopt,
+<<<<<<< HEAD
         KvCacheTransferMode transferMode = KvCacheTransferMode::DRAM,
         std::optional<std::string> directory = std::nullopt);
+=======
+        KvCacheTransferMode transferMode = KvCacheTransferMode::DRAM, std::string const& directory = "");
+>>>>>>> upstream/main
 
     [[nodiscard]] std::vector<TokenRangeRetentionConfig> getTokenRangeRetentionConfigs() const;
     [[nodiscard]] RetentionPriority getDecodeRetentionPriority() const;
     [[nodiscard]] std::optional<std::chrono::milliseconds> getDecodeDurationMs() const;
     [[nodiscard]] KvCacheTransferMode getTransferMode() const;
+<<<<<<< HEAD
     [[nodiscard]] std::optional<std::string> getDirectory() const;
+=======
+    [[nodiscard]] std::string const& getDirectory() const;
+>>>>>>> upstream/main
 
     /// @brief Convert the token range data into an entry per kv block. Returns a tuple of vectors corresponding to the
     /// priorities and durations for each block.
@@ -616,7 +624,11 @@ private:
     /// @brief The transfer mode for the block.
     KvCacheTransferMode mTransferMode;
     /// @brief Name of the directory if transfer mode is GDS or POSIX_DEBUG_FALLBACK.
+<<<<<<< HEAD
     std::optional<std::string> mDirectory;
+=======
+    std::string mDirectory;
+>>>>>>> upstream/main
 };
 
 /// @brief A class that holds information about the request
@@ -670,7 +682,11 @@ public:
     /// @param allottedTimeMs The allotted time in milliseconds after which the request is cancelled with a timedOut
     /// finish reason. The request may exceed this time slightly, but at most by 1 forward pass (in pipeline parallelism
     /// that may involve multiple micro-batches). A request can be timed-out before ever being scheduled.
+<<<<<<< HEAD
     // 34 parameters
+=======
+    /// @param cacheSaltID Salt ID for KV cache blocks to limit the kv cache reuse to the requests with the same string.
+>>>>>>> upstream/main
     Request(VecTokens inputTokenIds, SizeType32 maxTokens, bool streaming = false,
         SamplingConfig const& samplingConfig = SamplingConfig(), OutputConfig const& outputConfig = OutputConfig(),
         std::optional<SizeType32> const& endId = std::nullopt, std::optional<SizeType32> const& padId = std::nullopt,
@@ -697,7 +713,12 @@ public:
         std::optional<EagleConfig> eagleConfig = std::nullopt, std::optional<Tensor> skipCrossAttnBlocks = std::nullopt,
         std::optional<GuidedDecodingParams> guidedDecodingParams = std::nullopt,
         std::optional<SizeType32> languageAdapterUid = std::nullopt,
+<<<<<<< HEAD
         std::optional<MillisecondsType> allottedTimeMs = std::nullopt);
+=======
+        std::optional<MillisecondsType> allottedTimeMs = std::nullopt,
+        std::optional<CacheSaltIDType> cacheSaltID = std::nullopt);
+>>>>>>> upstream/main
 
     /// @brief This logits postprocessor name will dispatch to the batched logits postprocessor
     static auto constexpr kBatchedPostProcessorName = "batched";
@@ -745,6 +766,10 @@ public:
     [[nodiscard]] std::optional<GuidedDecodingParams> getGuidedDecodingParams() const;
     [[nodiscard]] std::optional<SizeType32> getLanguageAdapterUid() const;
     [[nodiscard]] std::optional<MillisecondsType> getAllottedTimeMs() const;
+<<<<<<< HEAD
+=======
+    [[nodiscard]] std::optional<CacheSaltIDType> getCacheSaltID() const;
+>>>>>>> upstream/main
     [[nodiscard]] std::optional<std::vector<std::string>> getAdditionalOutputNames() const;
 
     void setStreaming(bool streaming);
@@ -780,6 +805,10 @@ public:
     void setGuidedDecodingParams(GuidedDecodingParams const& guidedDecodingParams);
     void setLanguageAdapterUid(SizeType32 languageAdapterUid);
     void setAllottedTimeMs(MillisecondsType allottedTimeMs);
+<<<<<<< HEAD
+=======
+    void setCacheSaltID(CacheSaltIDType cacheSaltID);
+>>>>>>> upstream/main
 
 private:
     friend class Serialization;

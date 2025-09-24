@@ -56,8 +56,11 @@ def generate_result_file_name(test_list: List[str],
 
 def generate_excluded_test_list(test_list):
     if "gpt" in test_list:
+<<<<<<< HEAD
         if "gpt_session" not in test_list:
             yield "GptSession"
+=======
+>>>>>>> upstream/main
         if "gpt_executor" not in test_list:
             yield "GptExecutor"
         if "gpt_tests" not in test_list:
@@ -84,11 +87,26 @@ def find_root_dir(start_dir: Optional[_pl.Path] = None) -> _pl.Path:
     return find_dir_containing(("scripts", "examples", "cpp"), start_dir)
 
 
+<<<<<<< HEAD
 def find_build_dir():
     root_dir = find_root_dir()
     dir = get_trt_llm_build_dir(None, "Release")
 
     return dir if dir.is_absolute() else root_dir / dir
+=======
+def find_build_dir(build_type: str) -> _pl.Path:
+    """Resolve the TRT-LLM C++ build directory for the given CMake build type.
+
+    Args:
+        build_type: CMake build type (e.g., "Release", "RelWithDebInfo", "Debug").
+
+    Returns:
+        Absolute path to the C++ build directory.
+    """
+    root_dir = find_root_dir()
+    build_dir = get_trt_llm_build_dir(None, build_type)
+    return build_dir if build_dir.is_absolute() else root_dir / build_dir
+>>>>>>> upstream/main
 
 
 def run_command(command: Sequence[str],

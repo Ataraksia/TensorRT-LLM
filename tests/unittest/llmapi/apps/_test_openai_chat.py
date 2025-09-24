@@ -141,6 +141,7 @@ def test_single_chat_session(client: openai.OpenAI, model_name: str):
     message = chat_completion.choices[0].message
     assert message.content is not None
     assert message.role == "assistant"
+<<<<<<< HEAD
 
 
 def test_single_chat_session_with_logprobs(client: openai.OpenAI,
@@ -156,12 +157,16 @@ def test_single_chat_session_with_logprobs(client: openai.OpenAI,
         "content": "what is 1+1?"
     }]
 
+=======
+    # test logprobs
+>>>>>>> upstream/main
     chat_completion = client.chat.completions.create(
         model=model_name,
         messages=messages,
         max_completion_tokens=10,
         logprobs=True,
     )
+<<<<<<< HEAD
     assert chat_completion.id is not None
     assert len(chat_completion.choices) == 1
     message = chat_completion.choices[0].message
@@ -177,6 +182,9 @@ def test_single_chat_session_with_logprobs(client: openai.OpenAI,
     else:
         raise RuntimeError(
             f"finish_reason {finish_reason} not in [length, stop]")
+=======
+    logprobs = chat_completion.choices[0].logprobs.content
+>>>>>>> upstream/main
     for logprob in logprobs:
         assert logprob.token is not None
         assert logprob.logprob is not None
@@ -204,10 +212,18 @@ def test_multi_turn_dialogue(client: openai.OpenAI, model_name: str):
     assert message.content is not None and len(message.content) >= 0
 
 
+<<<<<<< HEAD
 def test_multiple_response(client: openai.OpenAI, model_name: str,
                            backend: str):
     if backend == "pytorch":
         pytest.skip("Beam search is not supported in PyTorch backend yet")
+=======
+def test_multiple_responses(client: openai.OpenAI, model_name: str,
+                            backend: str):
+    if backend == "pytorch":
+        pytest.skip(
+            "Multiple responses are not supported in PyTorch backend yet")
+>>>>>>> upstream/main
 
     messages = [{
         "role": "system",
@@ -257,6 +273,7 @@ async def test_chat_streaming(async_client: openai.AsyncOpenAI,
         messages=messages,
         max_completion_tokens=10,
         temperature=0.0,
+<<<<<<< HEAD
         logprobs=False,
     )
     output = chat_completion.choices[0].message.content
@@ -321,6 +338,8 @@ async def test_chat_streaming_with_logprobs(async_client: openai.AsyncOpenAI,
         messages=messages,
         max_completion_tokens=10,
         temperature=0.0,
+=======
+>>>>>>> upstream/main
         logprobs=True,
     )
 

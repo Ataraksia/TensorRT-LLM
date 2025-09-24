@@ -7,12 +7,22 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+<<<<<<< HEAD
 from _graph_test_helpers import count_buffers, run_test
 from _torch_test_utils import all_close, fp8_compatible, reset_parameters
 
 from tensorrt_llm._torch.auto_deploy.custom_ops.quant import FP8Linear
 from tensorrt_llm._torch.auto_deploy.transformations.library import fuse_gemms
 from tensorrt_llm._torch.auto_deploy.utils.node_utils import is_linear_op
+=======
+from _graph_test_helpers import count_buffers, run_test_transformed_gm
+from _model_test_utils import FakeFP8Linear
+from _torch_test_utils import all_close, fp8_compatible, reset_parameters
+
+from tensorrt_llm._torch.auto_deploy.export import torch_export_to_gm
+from tensorrt_llm._torch.auto_deploy.transform.optimizer import InferenceOptimizer
+from tensorrt_llm._torch.auto_deploy.utils.node_utils import is_linear_op, is_op
+>>>>>>> upstream/main
 
 torch.manual_seed(0)
 
@@ -73,7 +83,11 @@ class FusableModel1_M(FusableModel1):
 
 class FusableModel1_M_FP8(FusableModel1_M):
     def __init__(self, **kwargs):
+<<<<<<< HEAD
         super().__init__(**{"cls": FP8Linear, **kwargs})
+=======
+        super().__init__(**{"cls": FakeFP8Linear, **kwargs})
+>>>>>>> upstream/main
 
 
 class FusableModel1_L(FusableModel1):
@@ -88,7 +102,11 @@ class FusableModel1_XL(FusableModel1):
 
 class FusableModel1_XL_FP8(FusableModel1_XL):
     def __init__(self, **kwargs):
+<<<<<<< HEAD
         super().__init__(**{"cls": FP8Linear, **kwargs})
+=======
+        super().__init__(**{"cls": FakeFP8Linear, **kwargs})
+>>>>>>> upstream/main
 
 
 class FusableModel2(FusableModel):
@@ -111,7 +129,11 @@ class FusableModel2(FusableModel):
 
 class FusableModel2_FP8(FusableModel2):
     def __init__(self, **kwargs):
+<<<<<<< HEAD
         super().__init__(**{"cls": FP8Linear, **kwargs})
+=======
+        super().__init__(**{"cls": FakeFP8Linear, **kwargs})
+>>>>>>> upstream/main
 
 
 class FusableModel3(FusableModel):
@@ -136,7 +158,11 @@ class FusableModel3(FusableModel):
 
 class FusableModel3_FP8(FusableModel3):
     def __init__(self, **kwargs):
+<<<<<<< HEAD
         super().__init__(**{"cls": FP8Linear, **kwargs})
+=======
+        super().__init__(**{"cls": FakeFP8Linear, **kwargs})
+>>>>>>> upstream/main
 
 
 class FusableModel4(FusableModel):
@@ -167,7 +193,11 @@ class FusableModel4(FusableModel):
 
 class FusableModel4_FP8(FusableModel4):
     def __init__(self, **kwargs):
+<<<<<<< HEAD
         super().__init__(**{"cls": FP8Linear, **kwargs})
+=======
+        super().__init__(**{"cls": FakeFP8Linear, **kwargs})
+>>>>>>> upstream/main
 
 
 # TODO: consider adding test cases for classic GQA and MLP layers
@@ -254,11 +284,35 @@ def test_fusion(get_model: Callable[[], TestModel], dtype: str):
 
     buffer_size_before = count_buffers(model)
 
+<<<<<<< HEAD
     gm_transformed = run_test(
         model,
         x,
         fuse_gemms,
         lambda gm: sum(is_linear_op(n, include_quantization=True) for n in gm.graph.nodes)
+=======
+    gm = torch_export_to_gm(model, args=(x,), clone=True)
+    gm_transformed = InferenceOptimizer(
+        None,
+        {
+            "fuse_gemms": {
+                "stage": "post_load_fusion",
+            },
+            "fuse_fp8_gemms": {
+                "stage": "post_load_fusion",
+            },
+        },
+    )(None, gm)
+
+    run_test_transformed_gm(
+        model,
+        x,
+        gm_transformed,
+        lambda gm: sum(
+            (is_linear_op(n) or is_op(n, torch.ops.auto_deploy.torch_fake_quant_fp8_linear))
+            for n in gm.graph.nodes
+        )
+>>>>>>> upstream/main
         == model.num_gemms_after_fusion,
         lambda num_p_og: num_p_og,  # unchanged since fusing doesn't change param count
         atol=tol,

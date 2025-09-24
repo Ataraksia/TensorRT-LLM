@@ -32,9 +32,15 @@ from tensorrt_llm.layers import (MLP, Attention, AttentionMaskParams,
                                  ColumnLinear, Embedding, FusedGatedMLP,
                                  GatedMLP, GroupNorm, KeyValueCacheParams,
                                  LayerNorm, LoraParams, RmsNorm)
+<<<<<<< HEAD
 from tensorrt_llm.lora_manager import (LoraConfig,
                                        get_default_trtllm_modules_to_hf_modules,
                                        use_lora)
+=======
+from tensorrt_llm.lora_helper import (LoraConfig,
+                                      get_default_trtllm_modules_to_hf_modules,
+                                      use_lora)
+>>>>>>> upstream/main
 from tensorrt_llm.mapping import Mapping
 from tensorrt_llm.models.model_weights_loader import ModelWeightsLoader
 from tensorrt_llm.models.modeling_utils import PretrainedModel, QuantConfig

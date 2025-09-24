@@ -342,6 +342,29 @@ class JsonModeEval(AccuracyTask):
                             apply_chat_template=True)
 
 
+<<<<<<< HEAD
+=======
+class MMMU(AccuracyTask):
+    DATASET = "mmmu"
+    DATASET_DIR = f"{llm_models_root()}/datasets/MMMU"
+
+    ALPHA = 0.05
+    BETA = 0.2
+    SIGMA = 50
+    NUM_SAMPLES = 900
+
+    MAX_BATCH_SIZE = 128
+    MAX_INPUT_LEN = 8192
+    MAX_OUTPUT_LEN = 512
+
+    EVALUATOR_CLS = tensorrt_llm.evaluate.MMMU
+    EVALUATOR_KWARGS = dict(dataset_path=DATASET_DIR,
+                            random_seed=0,
+                            is_multimodal=True,
+                            apply_chat_template=True)
+
+
+>>>>>>> upstream/main
 class PassKeyRetrieval64k(AccuracyTask):
     DATASET = "passkey_retrieval_64k"
     LEVEL = 3
@@ -397,7 +420,16 @@ class CliFlowAccuracyTestHarness:
     def install_requirements(self):
         requirements = f"{self.llm_root}/examples/{self.EXAMPLE_FOLDER}/requirements.txt"
         if exists(requirements):
+<<<<<<< HEAD
             self.llm_venv.run_cmd(["-m", "pip", "install", "-r", requirements])
+=======
+            self.llm_venv.run_cmd(
+                ["-m", "pip", "install", "-r", requirements],
+                env={
+                    "CMAKE_POLICY_VERSION_MINIMUM":
+                    "3.5"  # https://github.com/google/sentencepiece/issues/1111
+                })
+>>>>>>> upstream/main
 
     def initialize_case(self,
                         tasks: Optional[List[AccuracyTask]] = None,

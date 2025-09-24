@@ -93,16 +93,41 @@ if is_linux():
             time.sleep(5)
 
             lines = []
+<<<<<<< HEAD
+=======
+            torch_inductors = []
+
+>>>>>>> upstream/main
             for pid in sorted(target_pids):
                 try:
                     sp = psutil.Process(pid)
                     if verbose_message:
                         cmdline = sp.cmdline()
+<<<<<<< HEAD
+=======
+
+                        # Detect repetitive torch inductor worker processes
+                        if len(cmdline) > 3 and \
+                            'python' in cmdline[0] and \
+                            'torch/_inductor/compile_worker/__main__.py' in cmdline[1] and \
+                            '--pickler=torch._inductor.compile_worker.subproc_pool.SubprocPickler' == cmdline[2]:
+                            torch_inductors.append(pid)
+                            continue
+
+>>>>>>> upstream/main
                         lines.append(f"{pid}: {cmdline}")
                     persist_pids.append(pid)
                 except psutil.Error:
                     pass
 
+<<<<<<< HEAD
+=======
+            if torch_inductors:
+                lines.append(
+                    f"{len(torch_inductors)}*torch inductor workers: {torch_inductors}"
+                )
+
+>>>>>>> upstream/main
             if persist_pids:
                 msg = f"Found leftover subprocesses: {persist_pids} launched by {p.args}"
                 if verbose_message:

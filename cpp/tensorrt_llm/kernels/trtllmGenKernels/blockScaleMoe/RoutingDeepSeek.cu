@@ -94,6 +94,7 @@ __global__ void routingMainKernel(KernelParams params)
     }
 #endif
 
+<<<<<<< HEAD
     // get our assigned thread score; each warp represents one expert group
     float score = expertSelected ? static_cast<float>(params.mPtrScores[scoreIdx]) : invalidScoreFloat;
     // get the sigmoid score
@@ -213,6 +214,131 @@ __global__ void routingMainKernel(KernelParams params)
         if (laneIdx < params.mTopK && params.mPtrExpertWeights != nullptr)
         {
             params.mPtrExpertWeights[idxTopK] = finalScore;
+=======
+    if (params.mPtrScores != nullptr)
+    {
+        // get our assigned thread score; each warp represents one expert group
+        float score = expertSelected ? static_cast<float>(params.mPtrScores[scoreIdx]) : invalidScoreFloat;
+        // get the sigmoid score
+        // note that for invalid values, we simply use a negative value:
+        // sigmoig scores are always strictly positive
+        auto scoreSigmoid = sigmoid_accurate(score);
+        // write the sigmoid score to shared for later use
+        if (expertSelected)
+        {
+            smemScoreSigmoid[threadExpert] = scoreSigmoid;
+        }
+        // get the score with bias
+        // note that with invalid values, because sigmoid is < 1 and bias is -1,
+        // we must get a negative value, which is smaller than any valid value
+        auto scoreBias = float{scoreSigmoid + float{biasVal}};
+
+        if (expertSelected)
+        {
+            smemScoreBias[threadExpert] = scoreBias;
+        }
+
+        // registers for top group score reduction
+        float topExpGroupScores[NumTopGroupScores];
+        [[maybe_unused]] int32_t topExpGroupIdx[NumTopGroupScores];
+        float topGroups[MaxNumTopGroups]; // bound of params.mNumLimitedGroups
+        int32_t topGroupIdx[MaxNumTopGroups];
+        float expertScoreGroup[MaxNumTopGroups];
+        int32_t expertIdxGroup[MaxNumTopGroups];
+        float topScores[MaxNumTopExperts]; // bound of params.mTopK
+        int32_t topExperts[MaxNumTopExperts];
+
+        if constexpr (KernelParams::UseGroups)
+        {
+            topk::reduceTopK(warp, topExpGroupScores, topExpGroupIdx, scoreBias, threadExpert,
+                /* minValue */ invalidScoreFloat);
+
+            // get the final group score and write it to shared
+            if (cute::elect_one_sync())
+            {
+                auto groupScore = topExpGroupScores[0] + topExpGroupScores[1];
+                smemGroupScores[warpIdx] = groupScore;
+            }
+        }
+
+        // make group scores available to all warps
+        __syncthreads();
+
+        auto localExpertExtent = params.mNumLocalExperts << params.mLocalExpertsStrideLog2;
+        if (warpIdx == 0)
+        {
+            // a single warp performs the selection of top groups, and goes on to select the final experts
+            if constexpr (KernelParams::UseGroups)
+            {
+                float groupScore = laneIdx < params.mNumExpertGroups ? smemGroupScores[laneIdx] : invalidScoreFloat;
+
+                topk::reduceTopK(warp, topGroups, topGroupIdx, groupScore, laneIdx,
+                    /* minValue */ invalidScoreFloat);
+
+                // final expert selection: get relevant indexes and scores from shared
+
+#pragma unroll
+                for (int ii = 0; ii < MaxNumTopGroups; ++ii)
+                { // bound of params.mNumLimitedGroups
+                    auto groupIdx = topGroupIdx[ii];
+                    expertIdxGroup[ii] = groupIdx * params.mNumExpertsPerGroup + laneIdx;
+                    // note: expertSelected implies laneIdx < params.mNumExpertsPerGroup.
+                    // we have params.mNumExpertsPerGroup == params.mNumExperts / params.mNumExpertGroups,
+                    // thus groupIdx <= params.mNumExpertGroups - 1 =>
+                    // groupIdx * params.mNumExpertsPerGroup <= params.mNumExperts - params.mNumExpertsPerGroup
+                    // => expertIdxGroup[ii] < params.mNumExperts <= NumThreads,
+                    // so the access is safe here
+                    expertScoreGroup[ii] = groupIdx < params.mNumExpertGroups && expertSelected
+                        ? smemScoreBias[expertIdxGroup[ii]]
+                        : invalidScoreFloat;
+                }
+            }
+            else
+            {
+                // without groups, each thread just takes `MaxNumTopGroups` experts
+
+#pragma unroll
+                for (int ii = 0; ii < MaxNumTopGroups; ++ii)
+                {
+                    auto expertIdx = ii * WarpSize + laneIdx;
+                    expertIdxGroup[ii] = expertIdx;
+                    expertScoreGroup[ii]
+                        = expertIdx < params.mNumExperts ? smemScoreBias[expertIdx] : invalidScoreFloat;
+                }
+            }
+
+            topk::reduceTopK(warp, topScores, topExperts, expertScoreGroup, expertIdxGroup,
+                /* minValue */ invalidScoreFloat, params.mTopK);
+
+            // determine our lane's expert index and write to output
+            int32_t expertIdx = 0;
+#pragma unroll
+            for (int ii = 0; ii < params.mTopK; ++ii)
+            { // bound of params.mTopK
+                expertIdx = laneIdx == ii ? topExperts[ii] : expertIdx;
+            }
+            // determine whether our expert is local to this GPU
+            auto localExpertIdx = expertIdx - params.mLocalExpertsStartIdx;
+            auto isLocalExpert = localExpertIdx >= 0 && localExpertIdx < localExpertExtent
+                && (localExpertIdx & params.mLocalExpertsStrideLog2) == 0;
+
+            float scoreNorm = laneIdx < params.mTopK ? smemScoreSigmoid[expertIdx] : 0.F;
+            auto redNorm = cg::reduce(warp, scoreNorm, cg::plus<float>{});
+            auto finalScore = OutputT{scoreNorm * params.mRouteScale / redNorm};
+
+            // write expert idx out already
+            auto idxTopK = blockIdx.x * params.mTopK + laneIdx;
+            if (laneIdx < params.mTopK && params.mPtrTopKPacked != nullptr)
+            {
+                PackedScoreIdx<OutputT> packedScore{static_cast<OutputT>(finalScore), static_cast<int16_t>(expertIdx)};
+                params.mPtrTopKPacked[idxTopK] = packedScore;
+            }
+
+            if (laneIdx < params.mTopK && params.mPtrTopKWeights != nullptr && params.mPtrTopKIds == nullptr)
+            {
+                params.mPtrTopKWeights[idxTopK] = finalScore;
+            }
+>>>>>>> upstream/main
         }
     }
 }
@@ -296,7 +422,12 @@ __global__ void __launch_bounds__(NumThreads) routingIndicesCoopKernel(KernelPar
     // Define a lambda to avoid code duplication in both branches.
     auto loopBody = [&](int ii, int expandedIdx)
     {
+<<<<<<< HEAD
         int32_t expertIdx = params.mPtrExpertIdx[expandedIdx].idx;
+=======
+        int32_t expertIdx
+            = params.mPtrTopKIds != nullptr ? params.mPtrTopKIds[expandedIdx] : params.mPtrTopKPacked[expandedIdx].idx;
+>>>>>>> upstream/main
         expertIndexes[ii] = expertIdx;
         // check whether this expert is local to our GPU at all and ignore if not
         auto localExpertIdx = expertIdx - params.mLocalExpertsStartIdx;
@@ -447,12 +578,26 @@ __global__ void routingIndicesCoopKernel(KernelParams params)
 
 void run(Data& data, void* stream)
 {
+<<<<<<< HEAD
     TLLM_CHECK_WITH_INFO(
         data.mPtrExpertIdx != nullptr || data.mPtrPermutedIdxSize != nullptr || data.mPtrExpertWeights != nullptr,
         "Routing kernel requires at least one output parameter");
     if (data.mPtrExpandedIdxToPermutedIdx != nullptr || data.mPtrPermutedIdxToTokenIdx != nullptr)
         TLLM_CHECK_WITH_INFO(data.mPtrExpertIdx != nullptr && data.mPtrPermutedIdxSize,
             "If permuted index is required, `mPtrExpertIdx` is also required");
+=======
+    TLLM_CHECK_WITH_INFO(data.mPtrTopKPacked != nullptr || data.mPtrScores != nullptr || data.mPtrTopKIds != nullptr,
+        "Routing kernel requires at least one input parameter");
+    if (data.mPtrTopKIds != nullptr)
+    {
+        TLLM_CHECK_WITH_INFO(data.mPtrTopKWeights != nullptr,
+            "When mPtrTopKIds is provided, mPtrTopKWeights must also be provided for DeepSeek routing.");
+    }
+    if (data.mPtrExpandedIdxToPermutedIdx != nullptr || data.mPtrPermutedIdxToTokenIdx != nullptr)
+        TLLM_CHECK_WITH_INFO(
+            (data.mPtrTopKPacked != nullptr || data.mPtrTopKIds != nullptr) && data.mPtrPermutedIdxSize,
+            "If permuted index is required, `mPtrTopKPacked` or `mPtrTopKIds` is also required");
+>>>>>>> upstream/main
     TLLM_CHECK_WITH_INFO(!data.mUseRoutingSoftmax, "Routing with softmax not implemented yet");
     TLLM_CHECK_WITH_INFO(data.mNumLimitedGroups <= MaxNumTopGroups, "Routing kernel expects <= %d top groups, got %d",
         MaxNumTopGroups, data.mNumLimitedGroups);
@@ -519,10 +664,29 @@ void run(Data& data, void* stream)
 
     // Maximum number of tokens supported by the kernel using a cooperative launch.
     int const maxTokensCoop = (numBlocksCoop * NumThreads * 64) / data.mTopK;
+<<<<<<< HEAD
     LAUNCH_ROUTING_WITH_EXTRA_FLAG(data,
         /*coopLaunch=*/false, routingMainKernel, numBlocks, NumThreads,
         /*smemSize=*/0, // No dynamic smem
         stream, data.mNumExpertGroups > 1, /*forceFloatInput=*/true);
+=======
+
+    if (data.mPtrTopKIds == nullptr)
+    {
+        LAUNCH_ROUTING_WITH_EXTRA_FLAG(data,
+            /*coopLaunch=*/false, routingMainKernel, numBlocks, NumThreads,
+            /*smemSize=*/0, // No dynamic smem
+            stream, data.mNumExpertGroups > 1, /*forceFloatInput=*/true);
+    }
+    else
+    {
+        // Reset the global histograms.
+        LAUNCH_ROUTING_WITH_EXTRA_FLAG(data, false, routingInitExpertCounts,
+            (2 * data.mNumExperts - 1) / NumThreadsHist + 1, NumThreadsHist,
+            /*smemSize=*/0, // No dynamic smem
+            stream, data.mNumExpertGroups > 1, /*forceFloatInput=*/false);
+    }
+>>>>>>> upstream/main
 
     if (data.mPtrPermutedIdxSize != nullptr)
     {

@@ -16,6 +16,11 @@
 
 #pragma once
 
+<<<<<<< HEAD
+=======
+#include "tensorrt_llm/common/assert.h"
+#include <cstdint>
+>>>>>>> upstream/main
 #include <cuda_runtime.h>
 
 namespace tensorrt_llm
@@ -143,10 +148,21 @@ enum class TileScheduler
 
 enum class MultiCtasKvMode
 {
+<<<<<<< HEAD
     // No multiCtasKvMode.
     Disabled = 0,
     // Do the reduction through the global memory and atomic counters.
     GmemReduction,
+=======
+    // Disable the multiCtasKvMode.
+    Disabled = 0,
+    // Do the reduction through the global memory and atomic counters.
+    GmemReduction,
+    // Same as GmemReduction, but use a separate kernel for the reduction.
+    // It is only supported/needed for 2-CTA or 1-CTA keepsMmaAbForGeneration MLA kernels with large
+    // reduction tiles.
+    GmemReductionWithSeparateKernel,
+>>>>>>> upstream/main
     // Do the reduction through the CGA remote shared memory.
     CgaSmemReduction
 };
@@ -167,6 +183,10 @@ inline bool isMultiCtasKvEnabled(MultiCtasKvMode multiCtasKvMode)
 
 MULTI_CTAS_KV_MODE_FUNCTION(Disabled)
 MULTI_CTAS_KV_MODE_FUNCTION(GmemReduction)
+<<<<<<< HEAD
+=======
+MULTI_CTAS_KV_MODE_FUNCTION(GmemReductionWithSeparateKernel)
+>>>>>>> upstream/main
 MULTI_CTAS_KV_MODE_FUNCTION(CgaSmemReduction)
 
 #undef MULTI_CTAS_KV_MODE_FUNCTION

@@ -28,7 +28,12 @@ namespace kernels
 
 struct TrtllmGenGemmRunnerOptions
 {
+<<<<<<< HEAD
     gemm::trtllm::gen::Dtype eltType;
+=======
+    gemm::trtllm::gen::Dtype eltTypeA;
+    gemm::trtllm::gen::Dtype eltTypeB{gemm::trtllm::gen::Dtype::Void};
+>>>>>>> upstream/main
     gemm::trtllm::gen::Dtype outputType;
     bool deepSeekFp8{false};
     bool transposeMmaOutput{false};

@@ -111,6 +111,13 @@ public:
         // optional when cross attention
         int32_t const* encoder_input_lengths = nullptr;
         int64_t const* runtime_perf_knobs = nullptr;
+<<<<<<< HEAD
+=======
+        // optional when compute attention stats (MLA chunked prefill or Helix parallelism)
+        // this is a buffer of size [num_tokens, num_heads_q] with each element
+        // representing the max and LSE/denominator of the softmax values
+        float2* softmax_stats = nullptr;
+>>>>>>> upstream/main
     };
 
     template <typename T>
@@ -129,8 +136,11 @@ public:
         int32_t num_encoder_tokens = 0;
         kernels::MlaParams<T>* mla_param = nullptr;
 
+<<<<<<< HEAD
         // For MLA chunked prefill
         void* softmaxStatsPtr = nullptr;
+=======
+>>>>>>> upstream/main
         // optional for separate QKV input, currently only used for context MLA
         T const* k_ptr = nullptr;
         T const* v_ptr = nullptr;
@@ -185,7 +195,11 @@ public:
             ss << "cross_kv_length: " << this->cross_kv_length << std::endl;
             ss << "encoder_input_lengths: " << this->encoder_input_lengths << std::endl;
             ss << "num_encoder_tokens: " << this->num_encoder_tokens << std::endl;
+<<<<<<< HEAD
             ss << "softmaxStatsPtr: " << this->softmaxStatsPtr << std::endl;
+=======
+            ss << "softmaxStatsPtr: " << this->softmax_stats << std::endl;
+>>>>>>> upstream/main
             ss << "k_ptr: " << this->k_ptr << std::endl;
             ss << "v_ptr: " << this->v_ptr << std::endl;
             return ss.str();
@@ -411,8 +425,15 @@ public:
     bool mPosShiftEnabled = false;
     bool mPagedContextFMHA = false;
     bool mFP8ContextFMHA = false;
+<<<<<<< HEAD
     bool mFP8ContextMLA = false;
     bool mFP8GenerationMLA = false;
+=======
+    bool mFP8AttenOutput = false;
+    bool mFP8ContextMLA = false;
+    bool mFP8GenerationMLA = false;
+    size_t mChunkPrefillBufferBatchSize = 1;
+>>>>>>> upstream/main
     bool mDenseContextFMHA = false;
     bool mHasFullAttentionMask = false;
     bool mIsSpecDecodingEnabled = false;
@@ -466,6 +487,7 @@ public:
             (int8_t) mPositionEmbeddingType, mUseLognScaling, mRemovePadding, (int32_t) mMaskType,
             mBlockSparseParams.data(), mPagedKVCache, mTokensPerBlock, mKVCacheQuantMode.value(), mTpSize, mTpRank,
             mUnfuseQkvGemm, (int32_t) mType, mMaxContextLength, mQKVBiasEnabled, mCrossAttention, mMaxDistance,
+<<<<<<< HEAD
             mPosShiftEnabled, mPagedContextFMHA, mFP8ContextFMHA, mDenseContextFMHA, mHasFullAttentionMask,
             mIsSpecDecodingEnabled, mUseSpecDecoding, mIsSpecDecTree, mSpecDecodingIsGenerationLengthVariable,
             mSpecDecodingMaxGenerationLength, mIsMLAEnabled, mIsGenerationMLA, mUseGenFlashMLA, mMLAParams.data(),
@@ -473,6 +495,15 @@ public:
             mAttnCpSize, mAttnCpRank, mUlyssesMQABroadcast, mEnableContextFMHA, mFMHAForceFP32Acc, mMultiBlockMode,
             mEnableXQA, mUseKVCache, mSkipAttn, mFuseFp4Quant, mNbMultiBlockSemaphores,
             mAttentionChunkSize.value_or(-1));
+=======
+            mPosShiftEnabled, mPagedContextFMHA, mFP8ContextFMHA, mFP8AttenOutput, mFP8ContextMLA, mFP8GenerationMLA,
+            mChunkPrefillBufferBatchSize, mDenseContextFMHA, mHasFullAttentionMask, mIsSpecDecodingEnabled,
+            mUseSpecDecoding, mIsSpecDecTree, mSpecDecodingIsGenerationLengthVariable, mSpecDecodingMaxGenerationLength,
+            mIsMLAEnabled, mIsGenerationMLA, mUseGenFlashMLA, mMLAParams.data(), mCpSize, mCpRank, mCpGroup,
+            mNumAttnHeads, mNumAttnKVHeads, mNumKVHeadsOrigin, mAttnTpSize, mAttnTpRank, mAttnCpSize, mAttnCpRank,
+            mUlyssesMQABroadcast, mEnableContextFMHA, mFMHAForceFP32Acc, mMultiBlockMode, mEnableXQA, mUseKVCache,
+            mSkipAttn, mFuseFp4Quant, mNbMultiBlockSemaphores, mAttentionChunkSize.value_or(-1));
+>>>>>>> upstream/main
     };
 
 private:

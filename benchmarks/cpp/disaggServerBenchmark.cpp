@@ -542,7 +542,12 @@ texec::Request makeExecutorContextRequest(Sample const& sample, SizeType32 const
             std::nullopt,    // kvCacheRetentionConfig
             std::nullopt,    // logitsPostProcessorName
             std::nullopt,    // logitsPostProcessor
+<<<<<<< HEAD
             encoderInputTokenIds.has_value() ? encoderInputTokenIds : std::nullopt);
+=======
+            encoderInputTokenIds.has_value() ? encoderInputTokenIds : std::nullopt,
+            std::nullopt);   // cacheSaltID
+>>>>>>> upstream/main
     request.setRequestType(tensorrt_llm::executor::RequestType::REQUEST_TYPE_CONTEXT_ONLY);
     return request;
 }

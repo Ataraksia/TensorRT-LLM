@@ -80,9 +80,51 @@ using namespace tensorrt_llm::runtime;
 namespace tc = tensorrt_llm::common;
 namespace tk = tensorrt_llm::kernels;
 
+<<<<<<< HEAD
 namespace tensorrt_llm::batch_manager
 {
 
+=======
+using tensorrt_llm::batch_manager::CacheTransceiverFactory;
+
+namespace tensorrt_llm::batch_manager
+{
+
+std::map<SizeType32, SizeType32> TrtGptModelInflightBatching::calculateCacheSizePerTokenForDisagg(
+    ModelConfig const& modelConfig, WorldConfig const& worldConfig,
+    std::vector<SizeType32> const& maxAttentionWindowVec, bool isCrossAttention, SizeType32 kvFactor)
+{
+    // These are the number of attention layers on this PP rank.
+    auto const numLocalAttnLayers
+        = modelConfig.getNbAttentionLayers(worldConfig.getPipelineParallelism(), worldConfig.getPipelineParallelRank());
+    // These are the number of attention layers on all previous PP ranks.
+    auto const numLowerRankAttnLayers = modelConfig.countLowerRankLayers(ModelConfig::LayerType::kATTENTION,
+        worldConfig.getPipelineParallelism(), worldConfig.getPipelineParallelRank());
+    // Use global ranks of attention layers to lookup from maxAttentionWindowVec.
+    auto const startAttnLayerId = numLowerRankAttnLayers;
+    auto const endAttnLayerId = numLowerRankAttnLayers + numLocalAttnLayers;
+    auto const numNonUniqueWindowSizes = static_cast<SizeType32>(maxAttentionWindowVec.size());
+    std::map<SizeType32, std::vector<SizeType32>> uniqueWindowSizeToLayers;
+    for (SizeType32 layerIdx = startAttnLayerId; layerIdx < endAttnLayerId; layerIdx++)
+    {
+        // maxAttentionWindowVec may or may not be stretched to the length of numLayers yet.
+        // If not stretched yet, we cycle through the window sizes.
+        auto const windowSize = maxAttentionWindowVec.at(layerIdx % numNonUniqueWindowSizes);
+        uniqueWindowSizeToLayers[windowSize].push_back(layerIdx);
+    }
+    std::map<SizeType32, SizeType32> cacheSizeBytesPerTokenPerWindow;
+    for (auto const& [windowSize, globalLayerIds] : uniqueWindowSizeToLayers)
+    {
+        auto const cacheSizePerToken = BaseKVCacheManager::calculateCacheSizePerTokenForSingleWindowSize(
+            modelConfig, globalLayerIds, isCrossAttention, kvFactor);
+        auto const cacheSizeBytesPerToken = cacheSizePerToken * BufferDataType(modelConfig.getKvDataType()).getSize();
+        cacheSizeBytesPerTokenPerWindow[windowSize] = cacheSizeBytesPerToken;
+    }
+
+    return cacheSizeBytesPerTokenPerWindow;
+};
+
+>>>>>>> upstream/main
 bool TrtGptModelInflightBatching::executorConfigIsValid(
     ModelConfig const& modelConfig, executor::ExecutorConfig const& executorConfig)
 {
@@ -264,6 +306,7 @@ TrtGptModelInflightBatching::TrtGptModelInflightBatching(std::shared_ptr<nvinfer
     }
     if (mModelConfig.isTransformerBased() && modelConfig.isKVCacheEnabled())
     {
+<<<<<<< HEAD
 
         auto calculateCacheSizePerToken
             = [](ModelConfig const& modelConfig, WorldConfig const& worldConfig,
@@ -290,6 +333,12 @@ TrtGptModelInflightBatching::TrtGptModelInflightBatching(std::shared_ptr<nvinfer
             = executorConfig.getCacheTransceiverConfig().value_or(executor::CacheTransceiverConfig());
 
         auto const cacheSizeBytesPerTokenPerWindow = calculateCacheSizePerToken(
+=======
+        auto cacheTransceiverConfig
+            = executorConfig.getCacheTransceiverConfig().value_or(executor::CacheTransceiverConfig());
+
+        auto const cacheSizeBytesPerTokenPerWindow = calculateCacheSizePerTokenForDisagg(
+>>>>>>> upstream/main
             mModelConfig, mWorldConfig, getMaxAttentionWindowVec(), mModelConfig.useCrossAttention(), 2);
         auto cacheTransPreAllocaSize = kv_cache_manager::CacheTransBufferManager::preAllocBufferSize(
             cacheSizeBytesPerTokenPerWindow, cacheTransceiverConfig);

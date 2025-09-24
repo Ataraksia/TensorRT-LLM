@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div align="center">
 
 # 🔥🚀⚡ AutoDeploy
@@ -31,6 +32,17 @@ ______________________________________________________________________
 1. **Install AutoDeploy:**
 
 AutoDeploy is accessible through TRT-LLM installation.
+=======
+# 🔥🚀⚡ AutoDeploy Examples
+
+This folder contains runnable examples for **AutoDeploy**. For general AutoDeploy documentation, motivation, support matrix, and feature overview, please see the [official docs](https://nvidia.github.io/TensorRT-LLM/torch/auto_deploy/auto-deploy.html).
+
+______________________________________________________________________
+
+## Quick Start
+
+AutoDeploy is included with the TRT-LLM installation.
+>>>>>>> upstream/main
 
 ```bash
 sudo apt-get -y install libopenmpi-dev && pip3 install --upgrade pip setuptools && pip3 install tensorrt_llm
@@ -38,11 +50,15 @@ sudo apt-get -y install libopenmpi-dev && pip3 install --upgrade pip setuptools 
 
 You can refer to [TRT-LLM installation guide](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/installation/linux.md) for more information.
 
+<<<<<<< HEAD
 2. **Run Llama Example:**
 
 You are ready to run an in-framework LLama Demo now.
 
 The general entrypoint to run the auto-deploy demo is the `build_and_run_ad.py` script, Checkpoints are loaded directly from Huggingface (HF) or a local HF-like directory:
+=======
+Run a simple example with a Hugging Face model:
+>>>>>>> upstream/main
 
 ```bash
 cd examples/auto_deploy
@@ -51,6 +67,7 @@ python build_and_run_ad.py --model "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
 ______________________________________________________________________
 
+<<<<<<< HEAD
 ## Support Matrix
 
 AutoDeploy streamlines the model deployment process through an automated workflow designed for efficiency and performance. The workflow begins with a PyTorch model, which is exported using `torch.export` to generate a standard Torch graph. This graph contains core PyTorch ATen operations alongside custom attention operations, determined by the attention backend specified in the configuration.
@@ -132,12 +149,23 @@ python build_and_run_ad.py --model "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 ```
 
 You can arbitrarily configure your experiment. Use the `-h/--help` flag to see available options:
+=======
+## Example Run Script ([`build_and_run_ad.py`](./build_and_run_ad.py))
+
+This script demonstrates end-to-end deployment of HuggingFace checkpoints using AutoDeploy’s graph-transformation pipeline.
+
+You can configure your experiment with various options. Use the `-h/--help` flag to see available options:
+>>>>>>> upstream/main
 
 ```bash
 python build_and_run_ad.py --help
 ```
 
+<<<<<<< HEAD
 Below is a non-exhaustive list of common config options:
+=======
+Below is a non-exhaustive list of common configuration options:
+>>>>>>> upstream/main
 
 | Configuration Key | Description |
 |-------------------|-------------|
@@ -159,7 +187,11 @@ Below is a non-exhaustive list of common config options:
 
 For default values and additional configuration options, refer to the [`ExperimentConfig`](./build_and_run_ad.py) class in [build_and_run_ad.py](./build_and_run_ad.py) file.
 
+<<<<<<< HEAD
 Here is a more complete example of using the script:
+=======
+The following is a more complete example of using the script:
+>>>>>>> upstream/main
 
 ```bash
 cd examples/auto_deploy
@@ -172,6 +204,7 @@ python build_and_run_ad.py \
 --benchmark.enabled True
 ```
 
+<<<<<<< HEAD
 ### Logging Level
 
 Use the following env variable to specify the logging level of our built-in logger ordered by
@@ -451,3 +484,18 @@ the current progress in AutoDeploy and where you can help.
 ## Disclaimer
 
 This project is in active development and is currently in an early (beta) stage. The code is in prototype, subject to change, and may include backward-incompatible updates. While we strive for correctness, we provide no guarantees regarding functionality, stability, or reliability. Use at your own risk.
+=======
+### Advanced Configuration
+
+The script supports flexible configs:
+
+- CLI dot notation for nested fields
+- YAML configs with deep merge
+- Precedence: CLI > YAML > defaults
+
+Please refer to [Expert Configuration of LLM API](https://nvidia.github.io/TensorRT-LLM/torch/auto_deploy/advanced/expert_configurations.html) for details.
+
+## Disclaimer
+
+This project is under active development and is currently in a prototype stage. The code is experimental, subject to change, and may include backward-incompatible updates. While we strive for correctness, there are no guarantees regarding functionality, stability, or reliability.
+>>>>>>> upstream/main

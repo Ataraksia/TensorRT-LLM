@@ -47,7 +47,11 @@ public:
 
     bool operator()(DecoderInputBuffers& inputBuffers, bool replicateLogitsPostProcessor,
         runtime::WorldConfig const& worldConfig, CudaStreamPtr const& stream,
+<<<<<<< HEAD
         std::optional<LogitsPostProcessorBatched> logitsPostProcessorBatched = std::nullopt) const;
+=======
+        std::optional<LogitsPostProcessorBatched> const& logitsPostProcessorBatched = std::nullopt) const;
+>>>>>>> upstream/main
 };
 
 } // namespace tensorrt_llm::batch_manager

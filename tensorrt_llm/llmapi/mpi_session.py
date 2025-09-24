@@ -274,6 +274,10 @@ class RemoteMpiCommSessionClient(MpiSession):
             f"RemoteMpiCommSessionClient connecting to {addr}\n", "yellow")
         self.queue = ZeroMqQueue((addr, hmac_key),
                                  is_server=False,
+<<<<<<< HEAD
+=======
+                                 socket_type=zmq.PAIR,
+>>>>>>> upstream/main
                                  use_hmac_encryption=bool(hmac_key))
         self._is_shutdown = False
 
@@ -329,6 +333,7 @@ class RemoteMpiCommSessionClient(MpiSession):
         self.shutdown()
 
     def shutdown(self, wait=True):
+<<<<<<< HEAD
         if self._is_shutdown:
             return
 
@@ -346,6 +351,12 @@ class RemoteMpiCommSessionClient(MpiSession):
 
     def shutdown_abort(self, grace: float = 60, reason=None):
         self.shutdown()
+=======
+        pass
+
+    def shutdown_abort(self, grace: float = 60, reason=None):
+        pass
+>>>>>>> upstream/main
 
 
 class RemoteMpiCommSessionServer():
@@ -364,6 +375,10 @@ class RemoteMpiCommSessionServer():
         self.addr = addr
         self.queue = ZeroMqQueue((addr, hmac_key),
                                  is_server=True,
+<<<<<<< HEAD
+=======
+                                 socket_type=zmq.PAIR,
+>>>>>>> upstream/main
                                  use_hmac_encryption=bool(hmac_key))
         self.comm = comm
         self.results = []  # the results may arrive in any order
@@ -445,7 +460,19 @@ class RemoteMpiCommSessionServer():
             print_colored_debug(
                 f"RemoteMpiCommSessionServer received all results, sending to client\n",
                 "green")
+<<<<<<< HEAD
             self.queue.put(self.results)
+=======
+            try:
+                self.queue.put_noblock(self.results, retry=2)
+            except zmq.ZMQError as e:
+                # The client could be shutdown first.
+                if e.errno == zmq.EAGAIN:
+                    pass
+                else:
+                    raise e
+
+>>>>>>> upstream/main
             print_colored_debug(
                 f"RemoteMpiCommSessionServer sent results to client\n", "green")
             self.results.clear()

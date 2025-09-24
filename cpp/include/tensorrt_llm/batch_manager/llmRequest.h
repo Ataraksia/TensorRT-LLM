@@ -63,6 +63,12 @@ enum class LlmRequestState : int32_t
     kDISAGG_CONTEXT_TRANS_IN_PROGRESS = 21, ///< Waiting context-only request transmitting the kv cache,
                                             /// after computation finished
     kDISAGG_CONTEXT_COMPLETE = 22,          ///< Context-only request finished kv cache transmission.
+<<<<<<< HEAD
+=======
+
+    // error states
+    kDISAGG_TRANS_ERROR = -1, ///< Error occurred during kv cache transmission
+>>>>>>> upstream/main
 };
 
 enum LlmRequestType
@@ -97,8 +103,14 @@ public:
         RequestIdType, TensorPtr&, BeamTokens const&, TStream const&, std::optional<RequestIdType>)>;
     using RequestPtr = std::shared_ptr<GenericLlmRequest>;
     using MillisecondsType = std::chrono::milliseconds;
+<<<<<<< HEAD
 
     // 49 parameters, 56 items in initialization list
+=======
+    using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
+    using CacheSaltIDType = runtime::CacheSaltIDType;
+
+>>>>>>> upstream/main
     GenericLlmRequest(RequestIdType requestId, SizeType32 maxNewTokens, std::shared_ptr<VecTokens> const& inputTokens,
         runtime::SamplingConfig const& samplingConfig, bool isStreaming, std::optional<SizeType32> endId = std::nullopt,
         std::optional<SizeType32> padId = std::nullopt, std::optional<TensorPtr> embeddingBias = std::nullopt,
@@ -134,7 +146,12 @@ public:
         std::optional<executor::GuidedDecodingParams> guidedDecodingParams = std::nullopt,
         std::optional<SizeType32> languageAdapterUid = std::nullopt,
         std::optional<MillisecondsType> allottedTimeMs = std::nullopt,
+<<<<<<< HEAD
         std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt)
+=======
+        std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt,
+        std::optional<CacheSaltIDType> cacheSaltID = std::nullopt, std::optional<TimePoint> arrivalTime = std::nullopt)
+>>>>>>> upstream/main
         : mRequestId(requestId)
         , mPromptLen(inputTokens->size())
         , mMaxNewTokens(maxNewTokens)
@@ -191,16 +208,26 @@ public:
         , mGuidedDecodingParams(std::move(guidedDecodingParams))
         , mLanguageAdapterUid(languageAdapterUid)
         , mAllottedTimeMs(allottedTimeMs)
+<<<<<<< HEAD
+=======
+        , mCacheSaltID(cacheSaltID)
+>>>>>>> upstream/main
     {
         if (mEncoderTokens.has_value() || encoderInputFeatures.has_value())
         {
             mState = LlmRequestState::kENCODER_INIT;
         }
 
+<<<<<<< HEAD
         initialize(*inputTokens, returnLogProbs);
     }
 
     // 32 parameters, 39 items in initialization list
+=======
+        initialize(*inputTokens, returnLogProbs, arrivalTime);
+    }
+
+>>>>>>> upstream/main
     GenericLlmRequest(RequestIdType requestId, SizeType32 maxNewTokens, VecTokens const& inputTokens,
         runtime::SamplingConfig const& samplingConfig, bool isStreaming, std::optional<SizeType32> endId = std::nullopt,
         std::optional<SizeType32> padId = std::nullopt, std::optional<TensorPtr> embeddingBias = std::nullopt,
@@ -218,7 +245,12 @@ public:
         bool returnEncoderOutput = false, std::optional<RequestIdType> clientId = std::nullopt,
         executor::PriorityType priority = executor::Request::kDefaultPriority, SizeType32 numReturnSequences = 1,
         std::optional<SizeType32> languageAdapterUid = std::nullopt,
+<<<<<<< HEAD
         std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt)
+=======
+        std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt,
+        std::optional<CacheSaltIDType> cacheSaltID = std::nullopt)
+>>>>>>> upstream/main
         : mRequestId(requestId)
         , mPromptLen(inputTokens.size())
         , mMaxNewTokens(maxNewTokens)
@@ -258,6 +290,10 @@ public:
         , mContextPhaseParams(contextPhaseParams)
         , mNumReturnSequences(numReturnSequences)
         , mLanguageAdapterUid(languageAdapterUid)
+<<<<<<< HEAD
+=======
+        , mCacheSaltID(cacheSaltID)
+>>>>>>> upstream/main
     {
         if (mEncoderTokens.has_value())
         {
@@ -266,7 +302,10 @@ public:
         initialize(inputTokens, returnLogProbs);
     }
 
+<<<<<<< HEAD
     // 29 items in initialization list
+=======
+>>>>>>> upstream/main
     GenericLlmRequest(RequestIdType requestId, executor::Request const& req)
         : mRequestId(requestId)
         , mPromptLen(req.getInputTokenIds().size())
@@ -297,6 +336,10 @@ public:
         , mGuidedDecodingParams(req.getGuidedDecodingParams())
         , mLanguageAdapterUid(req.getLanguageAdapterUid())
         , mAllottedTimeMs(req.getAllottedTimeMs())
+<<<<<<< HEAD
+=======
+        , mCacheSaltID(req.getCacheSaltID())
+>>>>>>> upstream/main
     {
         if (req.getRequestType() == executor::RequestType::REQUEST_TYPE_GENERATION_ONLY)
         {
@@ -1761,6 +1804,14 @@ public:
         return mLanguageAdapterUid;
     }
 
+<<<<<<< HEAD
+=======
+    [[nodiscard]] std::optional<CacheSaltIDType> getCacheSaltID() const
+    {
+        return mCacheSaltID;
+    }
+
+>>>>>>> upstream/main
     std::vector<SizeType32> getLanguageAdapterRouting(
         SizeType32 const reqNumLanguages, SizeType32 const inputLength) const
     {
@@ -2039,8 +2090,17 @@ protected:
 
     bool mUseDraftModel{false};
 
+<<<<<<< HEAD
 private:
     void initialize(VecTokens const& inputTokens, bool outputLogProbs)
+=======
+    // Cache salt id for each request.
+    std::optional<CacheSaltIDType> mCacheSaltID{std::nullopt};
+
+private:
+    void initialize(
+        VecTokens const& inputTokens, bool outputLogProbs, std::optional<TimePoint> arrivalTime = std::nullopt)
+>>>>>>> upstream/main
     {
         if (mLlmRequestType == LlmRequestType::LLMREQUEST_TYPE_GENERATION_ONLY)
         {
@@ -2134,7 +2194,11 @@ private:
 
         if (mReturnPerfMetrics)
         {
+<<<<<<< HEAD
             mPerfMetrics.timingMetrics.arrivalTime = std::chrono::steady_clock::now();
+=======
+            mPerfMetrics.timingMetrics.arrivalTime = arrivalTime.value_or(std::chrono::steady_clock::now());
+>>>>>>> upstream/main
         }
         mStartTime = std::chrono::steady_clock::now();
     }
@@ -2183,6 +2247,7 @@ public:
     using TokenExtraIdType = Base::TokenExtraIdType;
     using VecTokenExtraIds = Base::VecTokenExtraIds;
 
+<<<<<<< HEAD
     // 49 parameters, 49 parameters in Base class constructor
     LlmRequest(RequestIdType requestId, SizeType32 maxNewTokens, std::shared_ptr<VecTokens> inputTokens,
         runtime::SamplingConfig const& samplingConfig, bool isStreaming, std::optional<SizeType32> endId = std::nullopt,
@@ -2236,6 +2301,11 @@ public:
     }
 
     // 49 parameters, 49 parameters in Base class constructor
+=======
+    // inherit constructors
+    using Base::Base;
+
+>>>>>>> upstream/main
     LlmRequest(RequestIdType requestId, SizeType32 maxNewTokens, std::vector<TokenIdType> inputTokens,
         runtime::SamplingConfig const& samplingConfig, bool isStreaming, std::optional<SizeType32> endId = std::nullopt,
         std::optional<SizeType32> padId = std::nullopt, std::optional<TensorPtr> embeddingBias = std::nullopt,
@@ -2269,7 +2339,12 @@ public:
         std::optional<executor::GuidedDecodingParams> guidedDecodingParams = std::nullopt,
         std::optional<SizeType32> languageAdapterUid = std::nullopt,
         std::optional<MillisecondsType> allottedTimeMs = std::nullopt,
+<<<<<<< HEAD
         std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt)
+=======
+        std::optional<executor::ContextPhaseParams> const& contextPhaseParams = std::nullopt,
+        std::optional<CacheSaltIDType> cacheSaltID = std::nullopt, std::optional<TimePoint> arrivalTime = std::nullopt)
+>>>>>>> upstream/main
         : Base(requestId, maxNewTokens, std::make_shared<std::vector<TokenIdType>>(std::move(inputTokens)),
             samplingConfig, isStreaming, endId, padId, std::move(embeddingBias), std::move(badWordsList),
             std::move(stopWordsList),
@@ -2299,6 +2374,7 @@ public:
             inputTokenExtraIds ? std::make_optional(std::make_shared<VecTokenExtraIds>(std::move(*inputTokenExtraIds)))
                                : std::optional<std::shared_ptr<VecTokenExtraIds>>(std::nullopt),
             numReturnSequences, std::move(eagleConfig), skipCrossAttnBlocks, returnPerfMetrics,
+<<<<<<< HEAD
             std::move(guidedDecodingParams), languageAdapterUid, allottedTimeMs, contextPhaseParams)
     {
     }
@@ -2329,6 +2405,10 @@ public:
             std::move(draftLogits), excludeInputFromOutput, std::move(logitsPostProcessor),
             applyLogitsPostProcessorBatched, std::move(encoderInputTokens), returnEncoderOutput, clientId, priority,
             numReturnSequences, languageAdapterUid, contextPhaseParams)
+=======
+            std::move(guidedDecodingParams), languageAdapterUid, allottedTimeMs, contextPhaseParams, cacheSaltID,
+            arrivalTime)
+>>>>>>> upstream/main
     {
     }
 

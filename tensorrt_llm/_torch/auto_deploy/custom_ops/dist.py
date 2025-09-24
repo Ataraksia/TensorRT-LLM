@@ -8,7 +8,11 @@ from ..distributed import common as dist
 from ..distributed import trtllm as trtllm_dist
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("dist::all_gather", mutates_args=(), device_types="cuda")
+=======
+@torch.library.custom_op("auto_deploy::torch_dist_all_gather", mutates_args=(), device_types="cuda")
+>>>>>>> upstream/main
 def all_gather(
     tensor: torch.Tensor, dim: int = 0, sizes: Optional[List[int]] = None
 ) -> torch.Tensor:
@@ -25,7 +29,11 @@ def all_gather_fake(tensor, dim=0):
     return torch.cat([torch.empty_like(tensor) for _ in range(dist.get_world_size())], dim=dim)
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("dist::all_reduce", mutates_args=(), device_types="cuda")
+=======
+@torch.library.custom_op("auto_deploy::torch_dist_all_reduce", mutates_args=(), device_types="cuda")
+>>>>>>> upstream/main
 def all_reduce(t: torch.Tensor) -> torch.Tensor:
     """All_reduce across the ranks. Reduction op is SUM.
 

@@ -11,7 +11,11 @@ def rotate_half(x):
     return torch.cat((-x2, x1), dim=-1)
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("rope::torch_apply_rope_with_explicit_cos_sin", mutates_args=())
+=======
+@torch.library.custom_op("auto_deploy::torch_rope_with_explicit_cos_sin", mutates_args=())
+>>>>>>> upstream/main
 def torch_apply_rope_with_explicit_cos_sin(
     q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor, unsqueeze_dim: int = 1
 ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -38,7 +42,11 @@ def torch_apply_rope_with_explicit_cos_sin_fake(
     return torch.empty_like(q), torch.empty_like(k)
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("rope::torch_apply_rope_with_complex_freqs", mutates_args=())
+=======
+@torch.library.custom_op("auto_deploy::torch_rope_with_complex_freqs", mutates_args=())
+>>>>>>> upstream/main
 def torch_apply_rope_with_complex_freqs(
     xq: torch.Tensor,
     xk: torch.Tensor,
@@ -69,7 +77,11 @@ def torch_apply_rope_with_complex_freqs_fake(
     return torch.empty_like(xq), torch.empty_like(xk)
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("rope::torch_apply_rope_with_qk_interleaving", mutates_args=())
+=======
+@torch.library.custom_op("auto_deploy::torch_rope_with_qk_interleaving", mutates_args=())
+>>>>>>> upstream/main
 def torch_apply_rope_with_qk_interleaving(
     q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor, unsqueeze_dim: int = 1
 ) -> Tuple[torch.Tensor, torch.Tensor]:

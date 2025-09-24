@@ -182,7 +182,11 @@ torch::Tensor fp8_block_scale_gemm_blackwell(torch::Tensor const& mat1, torch::T
     float* outScalePtr = nullptr;
 
     // transposeMmaOutput is hardcoded for now
+<<<<<<< HEAD
     tensorrt_llm::kernels::TrtllmGenGemmRunnerOptions options = {.eltType = gemm::trtllm::gen::Dtype::E4m3,
+=======
+    tensorrt_llm::kernels::TrtllmGenGemmRunnerOptions options = {.eltTypeA = gemm::trtllm::gen::Dtype::E4m3,
+>>>>>>> upstream/main
         .outputType = gemm::trtllm::gen::Dtype::Bfloat16,
         .deepSeekFp8 = true,
         .transposeMmaOutput = true};
@@ -205,6 +209,10 @@ extern torch::Tensor fp8_block_scaling_gemm(torch::Tensor const& mat1, torch::Te
     auto const sm = tensorrt_llm::common::getSMVersion();
     switch (sm)
     {
+<<<<<<< HEAD
+=======
+    case 103: return fp8_block_scale_gemm_blackwell(mat1, mat2, mat1Scale, mat2Scale);
+>>>>>>> upstream/main
     case 100: return fp8_block_scale_gemm_blackwell(mat1, mat2, mat1Scale, mat2Scale);
     case 90: return fp8_block_scaling_gemm_hopper(mat1, mat2, mat1Scale, mat2Scale);
     case 89: return fp8_block_scaling_gemm_ada(mat1, mat2, mat1Scale, mat2Scale);

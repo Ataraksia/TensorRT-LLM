@@ -2,9 +2,15 @@
 
 In Transformer-based models, the KV (Key-Value) Cache is a mechanism used to optimize decoding efficiency, particularly during autoregressive generation tasks.
 Since KV Cache requires memory to store, it is also an important resource.
+<<<<<<< HEAD
 In TensorRT-LLM, KV Cache is managed by the `KVCacheManager`.
 
 For details of the TensorRT-LLM `KVCacheManager` implementation see [KV Cache Management](../advanced/kv-cache-management.md).
+=======
+In TensorRT LLM, KV Cache is managed by the `KVCacheManager`.
+
+For details of the TensorRT LLM `KVCacheManager` implementation see [KV Cache Management](../advanced/kv-cache-management.md).
+>>>>>>> upstream/main
 
 ## KV Cache Manager Introduction
 

@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 from collections.abc import Mapping
 from typing import Optional
 
+=======
+>>>>>>> upstream/main
 import torch
 import triton  # type: ignore[import]
 import triton.language as tl  # type: ignore[import]
@@ -51,6 +54,7 @@ def silu_and_mul_kernel(o_ptr, o_stride, o_scale_ptr, x_ptr, x_stride, d,
     tl.store(o_row_ptr + offsets, result, mask=mask)
 
 
+<<<<<<< HEAD
 def silu_and_mul(x: torch.Tensor,
                  scale: Optional[torch.Tensor] = None,
                  dtype: Optional[torch.dtype] = None) -> torch.Tensor:
@@ -85,3 +89,15 @@ def swiglu(x, quant_scale: torch.Tensor = None, quant_type=None):
         return silu_and_mul(x, scale=quant_scale, dtype=quant_type)
 
     return silu_and_mul(x)
+=======
+def swiglu(x, quant_scale: torch.Tensor = None, quant_type=None):
+    if quant_scale is not None:
+        assert quant_type is not None
+        return torch.ops.trtllm.silu_and_mul(
+            x,
+            scale=quant_scale,
+            dtype=quant_type,
+        )
+
+    return torch.ops.trtllm.silu_and_mul(x)
+>>>>>>> upstream/main

@@ -357,7 +357,11 @@ def test_llm_with_kv_cache_retention_config():
     kv_cache_retention_config = KvCacheRetentionConfig([
         KvCacheRetentionConfig.TokenRangeRetentionConfig(
             0, 2, 30, datetime.timedelta(seconds=30))
+<<<<<<< HEAD
     ], 80)
+=======
+    ], 80, None, tllm.KvCacheTransferMode.DRAM, "test_dir")
+>>>>>>> upstream/main
 
     llm = LLM(model=llama_model_path,
               kv_cache_config=global_kvcache_config,
@@ -594,6 +598,10 @@ def llm_for_sampling_params():
     llm.shutdown()
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5504095")
+>>>>>>> upstream/main
 @pytest.mark.part0
 def test_user_specify_workspace():
     user_specified_ws_path = '/tmp/specified_workspace'
@@ -1876,6 +1884,10 @@ def llm_return_logprobs_test_harness(prompt_logprobs: Optional[int],
         asyncio.run(main())
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5516660")
+>>>>>>> upstream/main
 @force_ampere
 @pytest.mark.parametrize(
     "prompt_logprobs, logprobs, return_context_logits, return_generation_logits",
@@ -1889,6 +1901,10 @@ def test_llm_return_logprobs(prompt_logprobs: Optional[int],
                                      return_generation_logits)
 
 
+<<<<<<< HEAD
+=======
+@pytest.mark.skip(reason="https://nvbugs/5516660")
+>>>>>>> upstream/main
 @force_ampere
 def test_llm_return_logprobs_streaming():
     llm_return_logprobs_test_harness(2, 2, False, True, streaming=True)

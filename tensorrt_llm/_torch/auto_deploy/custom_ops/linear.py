@@ -8,7 +8,11 @@ from ..distributed import common as dist
 from ..distributed import trtllm as trtllm_dist
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("linear::simple", mutates_args=())
+=======
+@torch.library.custom_op("auto_deploy::torch_linear_simple", mutates_args=())
+>>>>>>> upstream/main
 def simple(input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor]) -> torch.Tensor:
     """A wrapper for the linear functional to control how it is exposed.
 
@@ -30,7 +34,13 @@ def simple_fake(input, weight, bias):
     return torch.ops.aten.linear(input, weight, bias)
 
 
+<<<<<<< HEAD
 @torch.library.custom_op("linear::fused_linear_all_reduce", mutates_args=(), device_types="cuda")
+=======
+@torch.library.custom_op(
+    "auto_deploy::trtllm_dist_fused_linear_all_reduce", mutates_args=(), device_types="cuda"
+)
+>>>>>>> upstream/main
 def fused_linear_all_reduce(
     input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor]
 ) -> torch.Tensor:

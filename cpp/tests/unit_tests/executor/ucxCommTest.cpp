@@ -26,7 +26,11 @@
 
 #include "tensorrt_llm/batch_manager/cacheFormatter.h"
 #include "tensorrt_llm/batch_manager/cacheTransceiver.h"
+<<<<<<< HEAD
 #include "tensorrt_llm/batch_manager/dataTransceiverImpl.h"
+=======
+#include "tensorrt_llm/batch_manager/dataTransceiver.h"
+>>>>>>> upstream/main
 #include "tensorrt_llm/batch_manager/kvCacheManager.h"
 #include "tensorrt_llm/common/assert.h"
 #include "tensorrt_llm/common/cudaUtils.h"
@@ -45,7 +49,10 @@
 #include <gmock/gmock.h>
 #include <memory>
 #include <random>
+<<<<<<< HEAD
 #include <tensorrt_llm/batch_manager/dataTransceiverImpl.h>
+=======
+>>>>>>> upstream/main
 #include <tensorrt_llm/batch_manager/mlaCacheFormatter.h>
 #include <tensorrt_llm/executor/cache_transmission/cacheSplitConcat.h>
 
@@ -84,6 +91,10 @@ class UcxCommTest : public ::testing::Test
 };
 
 using DataContext = tensorrt_llm::executor::kv_cache::DataContext;
+<<<<<<< HEAD
+=======
+using TransceiverTag = tensorrt_llm::batch_manager::TransceiverTag;
+>>>>>>> upstream/main
 
 TEST_F(UcxCommTest, Basic)
 {

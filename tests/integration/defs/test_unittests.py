@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+<<<<<<< HEAD
+=======
+import warnings
+>>>>>>> upstream/main
 from subprocess import CalledProcessError
 
 from defs.conftest import tests_path
@@ -100,8 +104,13 @@ def test_unittests_v2(llm_root, llm_venv, case: str, output_dir, request):
         num_workers = parallel_dict[cur_key]
         num_workers = min(num_workers, 8)
     else:
+<<<<<<< HEAD
         print(
             f'unittest {case} on "{gpu_name}" is not recorded in parallel config. Need to profile.'
+=======
+        warnings.warn(
+            f'Cannot find parallel config entry for unittest {case} on "{gpu_name}". Fallback to serial test. Please add config entry to agg_unit_mem_df.csv.'
+>>>>>>> upstream/main
         )
 
     num_workers = max(1, num_workers)
@@ -135,9 +144,23 @@ def test_unittests_v2(llm_root, llm_venv, case: str, output_dir, request):
 
     print(f"Running unit test:'{command}'")
 
+<<<<<<< HEAD
     def run_command(cmd):
         try:
             llm_venv.run_cmd(cmd, cwd=test_root)
+=======
+    def run_command(cmd, num_workers=1):
+        try:
+            pythonpath = os.environ.get("PYTHONPATH", "")
+            env = {'PYTHONPATH': f"{llm_root}/tests/unittest:{pythonpath}"}
+            if num_workers > 1:
+                env['TORCHINDUCTOR_COMPILE_THREADS'] = '1'
+            llm_venv.run_cmd(
+                cmd,
+                cwd=test_root,
+                env=env,
+            )
+>>>>>>> upstream/main
         except CalledProcessError:
             return False
         return True
@@ -154,7 +177,11 @@ def test_unittests_v2(llm_root, llm_venv, case: str, output_dir, request):
         parallel_command = command + [
             "-n", f"{num_workers}", f"--junitxml={parallel_output_xml}"
         ]
+<<<<<<< HEAD
         passed = run_command(parallel_command)
+=======
+        passed = run_command(parallel_command, num_workers)
+>>>>>>> upstream/main
 
         assert os.path.exists(
             parallel_output_xml
