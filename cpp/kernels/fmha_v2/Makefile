@@ -108,6 +108,11 @@ else
 GENCODE_SM120 = -gencode=arch=compute_120,code=\"sm_120\"
 endif
 
+# Allow a higher-level CMake option to force exclusion of SM120
+ifdef TLLM_EXCLUDE_SM120
+GENCODE_SM120 =
+endif
+
 
 NVCC_FLAGS += --keep --keep-dir $(TMP_DIR)
 

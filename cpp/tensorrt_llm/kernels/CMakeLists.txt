@@ -15,6 +15,8 @@
 # the License.
 #
 
+
+
 file(GLOB_RECURSE SRC_CPP *.cpp)
 file(GLOB_RECURSE SRC_CU *.cu)
 
@@ -35,6 +37,54 @@ list(FILTER SRC_CU EXCLUDE REGEX "selectiveScan/.*")
 list(FILTER SRC_CPP EXCLUDE REGEX "userbuffers/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "userbuffers/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "fusedLayernormKernels/.*")
+
+# When explicitly excluding SM120, also drop communicationKernels entirely to avoid
+# generating compute_120 PTX from those very large all-reduce fusion kernels which
+# currently ignore per-target architecture filtering and always pick up the global
+# architecture list (leading to ptxas errors on unsupported instructions).
+if(TLLM_EXCLUDE_SM120)
+  list(LENGTH SRC_CPP _SRC_CPP_LEN_BEFORE)
+  list(LENGTH SRC_CU _SRC_CU_LEN_BEFORE)
+  list(FILTER SRC_CPP EXCLUDE REGEX "communicationKernels/.*")
+  list(FILTER SRC_CU EXCLUDE REGEX "communicationKernels/.*")
+  # Extra defensive removal in case some paths did not match regex
+  set(_TMP_CPP)
+  foreach(_f IN LISTS SRC_CPP)
+    if(_f MATCHES "communicationKernels")
+      continue()
+    endif()
+    list(APPEND _TMP_CPP ${_f})
+  endforeach()
+  set(SRC_CPP ${_TMP_CPP})
+  set(_TMP_CU)
+  foreach(_f IN LISTS SRC_CU)
+    # Exclude files that use SM120+ features (FP8, FP4, advanced communication, etc.)
+    if(_f MATCHES "communicationKernels" OR
+       _f MATCHES "fusedMoeCommKernels" OR
+       _f MATCHES "quantization" OR
+       _f MATCHES "unfusedAttentionKernels.*fp4" OR
+       _f MATCHES ".*fp8.*" OR
+       _f MATCHES ".*fp4.*")
+      continue()
+    endif()
+    list(APPEND _TMP_CU ${_f})
+  endforeach()
+  set(SRC_CU ${_TMP_CU})
+  list(LENGTH SRC_CPP _SRC_CPP_LEN_AFTER)
+  list(LENGTH SRC_CU _SRC_CU_LEN_AFTER)
+  math(EXPR _CPP_REMOVED "${_SRC_CPP_LEN_BEFORE} - ${_SRC_CPP_LEN_AFTER}")
+  math(EXPR _CU_REMOVED "${_SRC_CU_LEN_BEFORE} - ${_SRC_CU_LEN_AFTER}")
+  message(STATUS "TLLM_EXCLUDE_SM120: removed ${_CPP_REMOVED} C++ and ${_CU_REMOVED} CUDA communicationKernels sources from kernels_src build")
+
+  # Fatal check: verify no SM120-related sources remain
+  foreach(_f IN LISTS SRC_CU)
+    if(_f MATCHES "communicationKernels" OR
+       _f MATCHES "fusedMoeCommKernels" OR
+       _f MATCHES "quantization")
+      message(FATAL_ERROR "TLLM_EXCLUDE_SM120 enabled but SM120-related source still present: ${_f}")
+    endif()
+  endforeach()
+endif()
 
 function(filter_cuda_archs ARCH SOURCES_VAR)
   if(NOT "${ARCH}" IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG)
@@ -72,7 +122,32 @@ target_include_directories(
   PUBLIC
     $<TARGET_PROPERTY:${INTERNAL_CUTLASS_KERNELS_TARGET},INTERFACE_INCLUDE_DIRECTORIES>
 )
-add_cuda_architectures(kernels_src 89)
+if(TLLM_EXCLUDE_SM120)
+  # Restrict kernels_src to architectures explicitly excluding 120 to prevent compute_120 PTX generation
+  # Keep existing minimum arch (89) unless user supplied others via CMAKE_CUDA_ARCHITECTURES
+  # Build explicit architecture list from the original numeric set, omitting 120 and avoiding *f family entries.
+  set(_KERNELS_NUMERIC_ARCHS)
+  foreach(ORIG IN LISTS CMAKE_CUDA_ARCHITECTURES_ORIG)
+    if(ORIG STREQUAL "120")
+      continue()
+    endif()
+    list(APPEND _KERNELS_NUMERIC_ARCHS ${ORIG})
+  endforeach()
+  if(_KERNELS_NUMERIC_ARCHS)
+    set_cuda_architectures(kernels_src ${_KERNELS_NUMERIC_ARCHS})
+  else()
+    add_cuda_architectures(kernels_src 89)
+  endif()
+else()
+  add_cuda_architectures(kernels_src 89)
+endif()
+
+# Provide arch specific compilation for Hopper (90) to satisfy archCondition.h which enforces
+# __CUDA_ARCH_SPECIFIC__ or family specific for SM90+ when using CUDA 12.9 toolchain.
+if("90" IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG)
+  # Force arch specific 90 build for this aggregate target.
+  set_cuda_architectures(kernels_src 90a)
+endif()
 
 add_subdirectory(cutlass_kernels)
 add_subdirectory(flashMLA)

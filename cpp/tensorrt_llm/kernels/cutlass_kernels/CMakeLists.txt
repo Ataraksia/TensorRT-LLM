@@ -138,12 +138,18 @@ function(add_instantiations library base_dir)
     endif()
   endmacro()
 
-  glob_src_create_target(80 "80;86;90;100f;120f") # we use sm80 kernels to
-                                                  # support fp16 of all archs
+  if(TLLM_EXCLUDE_SM120)
+    # Replace 100f family with explicit 100;103 to avoid generating SM120 code objects
+    glob_src_create_target(80 "80;86;90;100;103")
+  else()
+    glob_src_create_target(80 "80;86;90;100f;120f") # we use sm80 kernels to support fp16 of all archs
+  endif()
   glob_src_create_target(90 90)
   glob_src_create_target(100 100f)
   glob_src_create_target(103 103)
-  glob_src_create_target(120 120f)
+  if(NOT TLLM_EXCLUDE_SM120)
+    glob_src_create_target(120 120f)
+  endif()
 endfunction()
 
 # Get the sources for Mixed Input GEMM launchers
@@ -200,12 +206,20 @@ add_cuda_architectures(fpA_intB_gemm_src 89)
 add_instantiations(fpA_intB_gemm_src ${INSTANTIATION_GENERATION_DIR}/gemm)
 
 add_library(fb_gemm_src STATIC ${FBGEMM_SRC_CU} ${FBGEMM_CU_INSTANTIATIONS})
-set_cuda_architectures(fb_gemm_src 89 90 120f)
+if(TLLM_EXCLUDE_SM120)
+  set_cuda_architectures(fb_gemm_src 89 90)
+else()
+  set_cuda_architectures(fb_gemm_src 89 90 120f)
+endif()
 # add_instantiations(fb_gemm_src
 # ${INSTANTIATION_GENERATION_DIR}/fp8_rowwise_gemm)
 
 add_library(fp8_blockscale_gemm_src STATIC ${FP8_BLOCKSCALE_GEMM_SRC_CU})
-set_cuda_architectures(fp8_blockscale_gemm_src 89 90 100f)
+if(TLLM_EXCLUDE_SM120)
+  set_cuda_architectures(fp8_blockscale_gemm_src 89 90 100 103)
+else()
+  set_cuda_architectures(fp8_blockscale_gemm_src 89 90 100f)
+endif()
 
 set(GEMM_SWIGLU_SM90_SRC_CU
     ${CMAKE_CURRENT_SOURCE_DIR}/fused_gated_gemm/gemm_swiglu_e4m3.cu)
@@ -219,12 +233,30 @@ if(USING_OSS_CUTLASS_LOW_LATENCY_GEMM)
   set_cuda_architectures(low_latency_gemm_src 90)
   target_include_directories(low_latency_gemm_src
                              PRIVATE ${3RDPARTY_DIR}/cutlass/examples)
+  # CUTLASS low latency GEMM examples use C++20 NTTP class types; restrict upgrade to this target only
+  if (CMAKE_CXX_STANDARD LESS 20)
+    target_compile_features(low_latency_gemm_src PUBLIC cxx_std_20)
+  endif()
+  # Explicitly request C++20 for both host and CUDA device compilation to silence NTTP errors
+  set_target_properties(low_latency_gemm_src PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+  set_target_properties(low_latency_gemm_src PROPERTIES CUDA_STANDARD 20 CUDA_STANDARD_REQUIRED ON)
+  # Fallback for some NVCC versions: enforce via compile options as well
+  target_compile_options(low_latency_gemm_src PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-std=c++20> $<$<COMPILE_LANGUAGE:CXX>:-std=c++20>)
 endif()
 
 if(USING_OSS_CUTLASS_FP4_GEMM)
   file(GLOB FP4_SRC_CU "${CMAKE_CURRENT_SOURCE_DIR}/fp4_gemm/*.cu")
   add_library(fp4_gemm_src STATIC ${FP4_SRC_CU})
-  set_cuda_architectures(fp4_gemm_src 100f 120f)
+  if(TLLM_EXCLUDE_SM120)
+    # Use explicit 100 103 instead of 100f family to exclude SM120
+    if(103 IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG)
+      set_cuda_architectures(fp4_gemm_src 100 103)
+    else()
+      set_cuda_architectures(fp4_gemm_src 100)
+    endif()
+  else()
+    set_cuda_architectures(fp4_gemm_src 100f 120f)
+  endif()
   # add_instantiations(fp4_gemm_src ${INSTANTIATION_GENERATION_DIR}/fp4_gemm)
 endif()
 
@@ -247,19 +279,36 @@ if(USING_OSS_CUTLASS_MOE_GEMM)
 
   add_library(moe_gemm_src STATIC ${MOE_GEMM_SRC_CU} ${GROUPED_SRC_CPP})
 
-  add_library(_moe_gemm_launcher OBJECT ${MOE_GEMM_SRC_CU_LAUNCHER})
-  add_cuda_architectures(_moe_gemm_launcher 89)
+  # Skip MOE launcher entirely when SM120 is excluded to avoid kernel compilation errors
+  if(TLLM_EXCLUDE_SM120)
+    # Create empty object library to maintain build structure
+    add_library(_moe_gemm_launcher OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/dummy_empty.cpp)
+    # Set target property to avoid linking errors
+    set_property(TARGET _moe_gemm_launcher PROPERTY CUDA_ARCHITECTURES "")
+  else()
+    add_library(_moe_gemm_launcher OBJECT ${MOE_GEMM_SRC_CU_LAUNCHER})
+    add_cuda_architectures(_moe_gemm_launcher 89)
+  endif()
 
   add_library(_moe_gemm_hopper_fp4 OBJECT ${MOE_GEMM_SRC_CU_HOPPER_FP4})
   set_cuda_architectures(_moe_gemm_hopper_fp4 90)
   process_target(_moe_gemm_hopper_fp4 true false)
 
   add_library(_moe_gemm_fp4 OBJECT ${MOE_GEMM_SRC_CU_FP4})
-  set_cuda_architectures(_moe_gemm_fp4 100f 103 120f)
+  if(TLLM_EXCLUDE_SM120)
+    # Explicit 100;103 to avoid family target including SM120
+    set_cuda_architectures(_moe_gemm_fp4 100 103)
+  else()
+    set_cuda_architectures(_moe_gemm_fp4 100f 103 120f)
+  endif()
   process_target(_moe_gemm_fp4 false true)
 
   add_library(_moe_gemm_fp8 OBJECT ${MOE_GEMM_SRC_CU_FP8})
-  set_cuda_architectures(_moe_gemm_fp8 89 90 100f 120f)
+  if(TLLM_EXCLUDE_SM120)
+    set_cuda_architectures(_moe_gemm_fp8 89 90 100 103)
+  else()
+    set_cuda_architectures(_moe_gemm_fp8 89 90 100f 120f)
+  endif()
   process_target(_moe_gemm_fp8 true true)
 
   add_instantiations(moe_gemm_src ${INSTANTIATION_GENERATION_DIR}/gemm_grouped)
@@ -282,7 +331,16 @@ if(USING_OSS_CUTLASS_ALLREDUCE_GEMM)
     target_link_libraries(ar_gemm_src PRIVATE nvshmem::nvshmem_host
                                               nvshmem::nvshmem_device)
   endif()
-  set_cuda_architectures(ar_gemm_src 90 100f)
+  if(TLLM_EXCLUDE_SM120)
+    # Explicit 100;103 instead of 100f
+    if(103 IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG)
+      set_cuda_architectures(ar_gemm_src 90 100 103)
+    else()
+      set_cuda_architectures(ar_gemm_src 90 100)
+    endif()
+  else()
+    set_cuda_architectures(ar_gemm_src 90 100f)
+  endif()
 endif()
 
 set(ALL_KERNELS_LIB)

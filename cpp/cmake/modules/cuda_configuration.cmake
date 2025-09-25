@@ -151,11 +151,25 @@ function(setup_cuda_architectures)
       list(APPEND CMAKE_CUDA_ARCHITECTURES_RAW 89 90)
     endif()
     if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "12.7")
-      list(APPEND CMAKE_CUDA_ARCHITECTURES_RAW 100 120)
+      # MODIFIED: Remove 120 to avoid SM120 PTX generation issues
+      list(APPEND CMAKE_CUDA_ARCHITECTURES_RAW 100)
     endif()
     if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "12.9")
       list(APPEND CMAKE_CUDA_ARCHITECTURES_RAW 103)
     endif()
+  endif()
+
+  # Allow user to exclude SM120 explicitly even if defaults would add it.
+  # Set default value only if not already set via command line
+  if(NOT DEFINED TLLM_EXCLUDE_SM120)
+    set(TLLM_EXCLUDE_SM120 OFF CACHE BOOL "Exclude building kernels for SM120 even if supported by toolkit")
+  endif()
+
+
+
+  if(TLLM_EXCLUDE_SM120)
+    list(REMOVE_ITEM CMAKE_CUDA_ARCHITECTURES_RAW 120)
+    message(STATUS "SM120 excluded: TLLM_EXCLUDE_SM120=${TLLM_EXCLUDE_SM120}")
   endif()
 
   # CMAKE_CUDA_ARCHITECTURES_ORIG contains all architectures enabled, without
@@ -200,7 +214,11 @@ function(setup_cuda_architectures)
   endif()
   # Compatibility low bounds: Always compile kernels for these architectures. 86
   # is enabled to avoid perf regression when using 80 kernels.
-  set(ARCHITECTURES_COMPATIBILITY_BASE 80 86 90 100 120)
+  # If SM120 was excluded earlier, do not keep it in compatibility base list.
+  set(ARCHITECTURES_COMPATIBILITY_BASE 80 86 90 100)
+  if(120 IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG AND NOT TLLM_EXCLUDE_SM120)
+    list(APPEND ARCHITECTURES_COMPATIBILITY_BASE 120)
+  endif()
   # Exclude Tegra architectures
   set(ARCHITECTURES_NO_COMPATIBILITY 87 101)
 
@@ -263,6 +281,43 @@ function(setup_cuda_architectures)
     endif()
   endforeach()
 
+  # If SM120 is excluded we must guarantee that no family targets that implicitly
+  # include SM120 (e.g. 100f-real or 103f-real) remain, because those trigger
+  # nvcc to still generate compute_120 PTX variants. Replace any *f-real entries
+  # with explicit accel targets and filter out any accidental 120 entries.
+  if(TLLM_EXCLUDE_SM120)
+    set(CUDA_ARCH_TMP)
+    foreach(ARCH IN LISTS CMAKE_CUDA_ARCHITECTURES_NORMALIZED)
+      if(ARCH MATCHES "^120")
+        # Skip entirely
+        continue()
+      elseif(ARCH MATCHES "^(100|103)f-real")
+        string(REGEX REPLACE "f-real$" "a-real" ARCH_FIXED "${ARCH}")
+        list(APPEND CUDA_ARCH_TMP "${ARCH_FIXED}")
+      else()
+        list(APPEND CUDA_ARCH_TMP "${ARCH}")
+      endif()
+    endforeach()
+    # Remove duplicates after transformation
+    list(REMOVE_DUPLICATES CUDA_ARCH_TMP)
+    set(CMAKE_CUDA_ARCHITECTURES_NORMALIZED ${CUDA_ARCH_TMP})
+    # Families list must also drop any 100f / 103f so downstream logic does not rely on them
+    if(CMAKE_CUDA_ARCHITECTURES_FAMILIES)
+      set(CUDA_ARCH_FAMILIES_TMP)
+      foreach(FARCH IN LISTS CMAKE_CUDA_ARCHITECTURES_FAMILIES)
+        if(FARCH MATCHES "^100f|^103f")
+          # skip – we do not expose family when SM120 excluded
+          continue()
+        elseif(FARCH MATCHES "^120f")
+          continue()
+        else()
+          list(APPEND CUDA_ARCH_FAMILIES_TMP "${FARCH}")
+        endif()
+      endforeach()
+      set(CMAKE_CUDA_ARCHITECTURES_FAMILIES ${CUDA_ARCH_FAMILIES_TMP})
+    endif()
+  endif()
+
   set(CMAKE_CUDA_ARCHITECTURES
       ${CMAKE_CUDA_ARCHITECTURES_NORMALIZED}
       PARENT_SCOPE)
@@ -280,6 +335,10 @@ function(add_cuda_architectures target)
   set(MIN_ARCHITECTURE_HAS_ACCEL 90)
 
   foreach(CUDA_ARCH IN LISTS ARGN)
+    # Skip SM120 if explicitly excluded
+    if(TLLM_EXCLUDE_SM120 AND ${CUDA_ARCH} EQUAL 120)
+      continue()
+    endif()
     if(${CUDA_ARCH} IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG)
       if(${CUDA_ARCH} GREATER_EQUAL ${MIN_ARCHITECTURE_HAS_ACCEL})
         set(REAL_CUDA_ARCH "${CUDA_ARCH}a-real")
@@ -309,6 +368,19 @@ function(set_cuda_architectures target)
   set(CUDA_ARCHITECTURES "")
   foreach(CUDA_ARCH IN LISTS ARGN)
     if(${CUDA_ARCH} MATCHES "[0-9]+f")
+      # When explicitly excluding SM120, never allow family targets whose full set would
+      # include 120; treat them as their numeric base to avoid generation of compute_120 PTX.
+      if(TLLM_EXCLUDE_SM120 AND (${CUDA_ARCH} MATCHES "^100f" OR ${CUDA_ARCH} MATCHES "^103f"))
+        string(REGEX REPLACE "f$" "" CUDA_ARCH_NUMERIC "${CUDA_ARCH}")
+        if(${CUDA_ARCH_NUMERIC} IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG)
+          if(${CUDA_ARCH_NUMERIC} GREATER_EQUAL ${MIN_ARCHITECTURE_HAS_ACCEL})
+            list(APPEND CUDA_ARCHITECTURES "${CUDA_ARCH_NUMERIC}a-real")
+          else()
+            list(APPEND CUDA_ARCHITECTURES "${CUDA_ARCH_NUMERIC}-real")
+          endif()
+        endif()
+        continue()
+      endif()
       if(CMAKE_CUDA_ARCHITECTURES_HAS_FAMILIES)
         if(${CUDA_ARCH} IN_LIST CMAKE_CUDA_ARCHITECTURES_FAMILIES)
           list(APPEND CUDA_ARCHITECTURES "${CUDA_ARCH}-real")
