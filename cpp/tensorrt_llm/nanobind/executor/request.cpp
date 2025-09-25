@@ -77,11 +77,11 @@ void initRequestBindings(nb::module_& m)
             self.getTopPResetIds(), self.getTopPDecay(), self.getSeed(), self.getTemperature(), self.getMinTokens(),
             self.getBeamSearchDiversityRate(), self.getRepetitionPenalty(), self.getPresencePenalty(),
             self.getFrequencyPenalty(), self.getLengthPenalty(), self.getEarlyStopping(), self.getNoRepeatNgramSize(),
-            self.getNumReturnSequences(), self.getMinP(), self.getBeamWidthArray());
+            self.getNumReturnSequences(), self.getMinP(), self.getBeamWidthArray(), self.getTokensPerStep());
     };
     auto samplingConfigSetstate = [](tle::SamplingConfig& samplingConfig, nb::tuple const& state)
     {
-        if (state.size() != 19)
+        if (state.size() != 20)
         {
             throw std::runtime_error("Invalid SamplingConfig state!");
         }
@@ -103,7 +103,8 @@ void initRequestBindings(nb::module_& m)
             nb::cast<std::optional<SizeType32>>(state[15]),                       // NoRepeatNgramSize
             nb::cast<std::optional<SizeType32>>(state[16]),                       // NumReturnSequences
             nb::cast<std::optional<FloatType>>(state[17]),                        // MinP
-            nb::cast<std::optional<std::vector<SizeType32>>>(state[18])           // BeamWidthArray
+            nb::cast<std::optional<std::vector<SizeType32>>>(state[18]),          // BeamWidthArray
+            nb::cast<std::optional<SizeType32>>(state[19])                        // TokensPerStep
         );
     };
     nb::class_<tle::SamplingConfig>(m, "SamplingConfig")
@@ -174,6 +175,7 @@ void initRequestBindings(nb::module_& m)
         .def_prop_rw("min_p", &tle::SamplingConfig::getMinP, &tle::SamplingConfig::setMinP)
         .def_prop_rw(
             "beam_width_array", &tle::SamplingConfig::getBeamWidthArray, &tle::SamplingConfig::setBeamWidthArray)
+        .def_prop_rw("tokens_per_step", &tle::SamplingConfig::getTokensPerStep, &tle::SamplingConfig::setTokensPerStep)
         .def("__getstate__", samplingConfigGetstate)
         .def("__setstate__", samplingConfigSetstate);
 

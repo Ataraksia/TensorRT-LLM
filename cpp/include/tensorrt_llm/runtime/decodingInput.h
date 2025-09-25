@@ -166,6 +166,10 @@ public:
     std::optional<ExternalDraftTokensInputs> externalDraftTokensInputs;
 
     std::optional<EagleInputs> eagleInputs;
+
+    // MultiToken decoding support (non-speculative). Current tokens per step for each batch request.
+    // When present and >1, indicates decoder should attempt to sample that many tokens in a single pass.
+    TensorConstPtr curTokensPerStep; // [batchSize] on gpu
 };
 
 } // namespace tensorrt_llm::runtime
