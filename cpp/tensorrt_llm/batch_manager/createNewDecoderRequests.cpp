@@ -724,7 +724,7 @@ CreateNewDecoderRequests::createDecoderRequests(RequestVector const& finishedCon
                 dJointInput, dJointOutput, batchSlot, endId, beamWidth, maxSequenceLength, decoderBufferManager);
         }
 
-        // Speculative execution
+        // Speculative execution and MultiToken mode
         if (!decoderState.getSpeculativeDecodingMode().isNone())
         {
             TLLM_CHECK(beamWidth == 1);
@@ -742,6 +742,21 @@ CreateNewDecoderRequests::createDecoderRequests(RequestVector const& finishedCon
                 batchSlot, *llmReq, decoderState.getSpeculativeDecodingMode(), numDecodingEngineTokens,
                 decoderState.getMaxDecodingEngineTokens(), medusaBuffers, modelConfig, worldConfig, decodingConfig,
                 mSpeculativeDecodingFastLogits, mIsLeaderInOrchMode, runtimeStream, decoderStream);
+        }
+        // Handle MultiToken mode - populate curTokensPerStep tensor from sampling config
+        else if (samplingConfig.tokensPerStep.has_value() && samplingConfig.tokensPerStep.value().size() > 0)
+        {
+            TLLM_CHECK(beamWidth == 1);
+            auto const tokensPerStep = samplingConfig.tokensPerStep.value().front();
+            if (tokensPerStep > 1)
+            {
+                // Ensure curTokensPerStep tensor exists and populate it
+                if (dJointInput.curTokensPerStep)
+                {
+                    TensorPtr curTokensPerStepSlice = ITensor::slice(constPointerCast(dJointInput.curTokensPerStep), batchSlot, 1);
+                    runtime::kernels::invokeFill(*curTokensPerStepSlice, tokensPerStep, runtimeStream);
+                }
+            }
         }
 
         inputOffset += promptLen;

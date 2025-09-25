@@ -585,6 +585,11 @@ public:
         return DecodingMode{kEagle | kUseStandardStopCriteria | kUseExplicitEosStop};
     }
 
+    static auto constexpr MultiToken()
+    {
+        return DecodingMode{kMultiToken | kUsePenalties | kUseBanTokens | kUseStandardStopCriteria | kUseMinP};
+    }
+
     auto constexpr useTemperature(bool useTemp)
     {
         mState = setBitTo(kUseTemperature, useTemp);
@@ -724,6 +729,11 @@ public:
         return anyBitSet(kEagle);
     }
 
+    [[nodiscard]] bool constexpr isMultiToken() const
+    {
+        return anyBitSet(kMultiToken);
+    }
+
     [[nodiscard]] bool constexpr isUseTemperature() const
     {
         return anyBitSet(kUseTemperature);
@@ -851,6 +861,10 @@ public:
         {
             return "Eagle";
         }
+        if (isMultiToken())
+        {
+            return "MultiToken";
+        }
         return "Unknown";
     }
 
@@ -886,6 +900,7 @@ private:
     static UnderlyingType constexpr kExplicitDraftTokens{1u << (kNumFlags + 6)};
     static UnderlyingType constexpr kExternalDraftTokens{1u << (kNumFlags + 7)};
     static UnderlyingType constexpr kEagle{1u << (kNumFlags + 8)};
+        static UnderlyingType constexpr kMultiToken{1u << (kNumFlags + 9)};
 
     static UnderlyingType constexpr kTopKTopP{kTopK | kTopP};
 
@@ -1043,4 +1058,16 @@ static_assert(!DecodingMode::Eagle().isLookahead());
 static_assert(!DecodingMode::Eagle().isExplicitDraftTokens());
 static_assert(!DecodingMode::Eagle().isExternalDraftTokens());
 static_assert(DecodingMode::Eagle().isEagle());
+static_assert(DecodingMode::MultiToken().isUseBanWords());
+static_assert(DecodingMode::MultiToken().isUseOccurrencePenalty());
+static_assert(DecodingMode::MultiToken().isUseStopCriteria());
+static_assert(!DecodingMode::MultiToken().isAuto());
+static_assert(!DecodingMode::MultiToken().isTopKorTopP());
+static_assert(!DecodingMode::MultiToken().isBeamSearch());
+static_assert(!DecodingMode::MultiToken().isMedusa());
+static_assert(!DecodingMode::MultiToken().isLookahead());
+static_assert(!DecodingMode::MultiToken().isExplicitDraftTokens());
+static_assert(!DecodingMode::MultiToken().isExternalDraftTokens());
+static_assert(!DecodingMode::MultiToken().isEagle());
+static_assert(DecodingMode::MultiToken().isMultiToken());
 } // namespace tensorrt_llm::executor

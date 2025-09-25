@@ -36,7 +36,7 @@ SamplingConfig::SamplingConfig(SizeType32 beamWidth, OptSize32 const& topK, OptF
     OptFloat const& beamSearchDiversityRate, OptFloat const& repetitionPenalty, OptFloat const& presencePenalty,
     OptFloat const& frequencyPenalty, OptFloat const& lengthPenalty, OptSize32 const& earlyStopping,
     OptSize32 const& noRepeatNgramSize, OptSize32 const& numReturnSequences, OptFloat const& minP,
-    OptVec<SizeType32> const& beamWidthArray)
+    OptVec<SizeType32> const& beamWidthArray, OptSize32 const& tokensPerStep)
     : mBeamWidth(checkBeamWidth(beamWidth))
     , mTopK(checkTopK(topK))
     , mTopP(checkTopP(topP))
@@ -55,6 +55,7 @@ SamplingConfig::SamplingConfig(SizeType32 beamWidth, OptSize32 const& topK, OptF
     , mNoRepeatNgramSize(checkNoRepeatNgramSize(noRepeatNgramSize))
     , mNumReturnSequences(checkNumReturnSequences(numReturnSequences, beamWidth))
     , mMinP(checkMinP(minP))
+    , mTokensPerStep(checkTokensPerStep(tokensPerStep))
 {
     updateNumReturnBeams();
     std::tie(mBeamWidthArray, mBeamWidth) = checkBeamWidthArray(beamWidthArray, mBeamWidth);
@@ -69,7 +70,7 @@ bool SamplingConfig::operator==(SamplingConfig const& other) const
         && mPresencePenalty == other.mPresencePenalty && mFrequencyPenalty == other.mFrequencyPenalty
         && mLengthPenalty == other.mLengthPenalty && mEarlyStopping == other.mEarlyStopping
         && mNoRepeatNgramSize == other.mNoRepeatNgramSize && mNumReturnSequences == other.mNumReturnSequences
-        && mMinP == other.mMinP && mBeamWidthArray == other.mBeamWidthArray;
+        && mMinP == other.mMinP && mBeamWidthArray == other.mBeamWidthArray && mTokensPerStep == other.mTokensPerStep;
 }
 
 // Getters
@@ -173,6 +174,11 @@ OptVec<SizeType32> SamplingConfig::getBeamWidthArray() const
     return mBeamWidthArray;
 }
 
+OptSize32 SamplingConfig::getTokensPerStep() const
+{
+    return mTokensPerStep;
+}
+
 // Setters
 void SamplingConfig::setBeamWidth(SizeType32 beamWidth)
 {
@@ -269,6 +275,11 @@ void SamplingConfig::setMinP(std::optional<FloatType> const& minP)
 void SamplingConfig::setBeamWidthArray(OptVec<SizeType32> const& beamWidthArray)
 {
     std::tie(mBeamWidthArray, mBeamWidth) = checkBeamWidthArray(beamWidthArray, mBeamWidth);
+}
+
+void SamplingConfig::setTokensPerStep(OptSize32 const& tokensPerStep)
+{
+    mTokensPerStep = checkTokensPerStep(tokensPerStep);
 }
 
 // Checkers
@@ -406,6 +417,15 @@ OptFloat const& SamplingConfig::checkMinP(OptFloat const& minP)
         TLLM_CHECK(minP.value() >= 0.f && minP.value() <= 1.0f);
     }
     return minP;
+}
+
+OptSize32 const& SamplingConfig::checkTokensPerStep(OptSize32 const& tokensPerStep)
+{
+    if (tokensPerStep.has_value())
+    {
+        TLLM_CHECK(tokensPerStep.value() > 0);
+    }
+    return tokensPerStep;
 }
 
 std::pair<OptVec<SizeType32> const&, SizeType32 const> const SamplingConfig::checkBeamWidthArray(

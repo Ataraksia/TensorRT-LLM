@@ -53,6 +53,8 @@ protected:
     TensorPtr mSkipDecodeDevice;
     TensorPtr mRuntimeTopKHost;
     TensorPtr mSkipDecodeHost;
+    runtime::SizeType32 mTokensPerStep{1};
+
 
     using Base::mDecoderDomain;
 

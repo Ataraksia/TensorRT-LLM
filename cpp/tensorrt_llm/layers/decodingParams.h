@@ -165,6 +165,9 @@ public:
     OptVec<float> topPMin;                     // [setupBatchSize], between [0, 1]
     OptVec<runtime::TokenIdType> topPResetIds; // [setupBatchSize]
     std::optional<bool> normalizeLogProbs;
+
+    // multitoken sampling
+    OptVec<runtime::SizeType32> tokensPerStep; // [1] or [setupBatchSize]
 };
 
 class BeamSearchSetupParams : public DecodingSetupParams

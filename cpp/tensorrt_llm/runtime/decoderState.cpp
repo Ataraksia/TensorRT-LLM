@@ -105,6 +105,8 @@ void DecoderState::setupBuffers(nvinfer1::DataType dtype, BufferManager const& b
     dInput->badWordsPtrs = bufferManager.emptyTensor(MemoryType::kPINNEDPOOL, TRTDataType<int32_t*>::value);
     dInput->badWordsLens = bufferManager.emptyTensor(MemoryType::kPINNEDPOOL, nvSizeType);
     dInput->embeddingBias = bufferManager.emptyTensor(MemoryType::kGPU, dtype);
+    // MultiToken: allocate curTokensPerStep (always allocated; left zero unless user sets tokensPerStep>1)
+    dInput->curTokensPerStep = bufferManager.emptyTensor(MemoryType::kGPU, nvSizeType);
 
     mBeamSearchBuffers = std::make_unique<BeamSearchBuffers>(bufferManager);
 
@@ -292,6 +294,9 @@ void DecoderState::reshapeBuffers(SizeType32 maxNumSequences, SizeType32 maxBeam
     const_cast<ITensor&>(*dInput.badWordsLens).reshape(maxNumSequencesShape);
     const_cast<ITensor&>(*dInput.stopWordsPtrs).reshape(maxNumSequencesShape);
     const_cast<ITensor&>(*dInput.stopWordsLens).reshape(maxNumSequencesShape);
+    // MultiToken: reshape curTokensPerStep to batch size and zero
+    const_cast<ITensor&>(*dInput.curTokensPerStep).reshape(maxNumSequencesShape);
+    bufferManager.setZero(const_cast<ITensor&>(*dInput.curTokensPerStep));
 
     TLLM_LOG_TRACE("%s stop", __PRETTY_FUNCTION__);
 }

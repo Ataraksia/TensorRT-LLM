@@ -189,7 +189,9 @@ public:
         draftAcceptanceThreshold = fuseValues<FloatType>(
             configs, [&configs](size_t ci) { return configs[ci].draftAcceptanceThreshold; }, 0);
         minP = fuseValues<FloatType>(
-            configs, [&configs](size_t ci) { return configs[ci].minP; }, layers::DefaultDecodingParams::getMinP());
+            configs, [&configs](size_t ci) { return configs[c
+        tokensPerStep = fuseValues<SizeType32>(
+            configs, [&configs](size_t ci) { return configs[ci].tokensPerStep; }, 1);
     }
 
     explicit SamplingConfig(executor::SamplingConfig const& samplingConfig,
@@ -229,6 +231,7 @@ public:
         SET_FROM_OPTIONAL(noRepeatNgramSize, NoRepeatNgramSize, SizeType32)
         SET_FROM_OPTIONAL(minP, MinP, FloatType)
         SET_FROM_OPTIONAL(beamWidthArray, BeamWidthArray, std::vector<SizeType32>)
+        SET_FROM_OPTIONAL(tokensPerStep, TokensPerStep, SizeType32)
 #undef SET_FROM_OPTIONAL
     }
 
@@ -369,6 +372,9 @@ public:
     // medusa params
     OptVec<std::vector<SizeType32>> topKMedusaHeads; // [batchSize, maxMedusaHeads]
 
+    // multitoken params
+    OptVec<SizeType32> tokensPerStep; // [1] or [batchSize]
+
     std::optional<bool> normalizeLogProbs;
 
     bool operator==(SamplingConfig const& other) const
@@ -383,7 +389,8 @@ public:
             && lengthPenalty == other.lengthPenalty && earlyStopping == other.earlyStopping
             && draftAcceptanceThreshold == other.draftAcceptanceThreshold && topKMedusaHeads == other.topKMedusaHeads
             && normalizeLogProbs == other.normalizeLogProbs && outputLogProbs == other.outputLogProbs
-            && cumLogProbs == other.cumLogProbs && minP == other.minP && beamWidthArray == other.beamWidthArray;
+            && cumLogProbs == other.cumLogProbs && minP == other.minP && beamWidthArray == other.beamWidthArray
+            && tokensPerStep == other.tokensPerStep;
     }
 
     SizeType32 getNumReturnBeams() const

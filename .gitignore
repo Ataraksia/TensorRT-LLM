@@ -79,3 +79,15 @@ compile_commands.json
 
 # Enroot sqsh files
 enroot/tensorrt_llm.devel.sqsh
+*.wav
+*.png
+higgs-audio-v2-generation-3B-base-tokenizer/
+higgs-audio-v2-generation-3B-base/
+.roo/
+.kilocode/mcp.json
+*.env
+*.txt
+.kilocode/
+test_multitoken_comprehensive.py
+cutlass
+3rdparty/cutlass
