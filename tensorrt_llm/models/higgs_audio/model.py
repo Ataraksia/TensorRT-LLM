@@ -324,6 +324,7 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         num_eos_tokens = self.num_eos_tokens
 
         num_codebooks = self.config.num_codebooks
+        codebook_size = self.config.codebook_size
         audio_eos_id = self.config.audio_stream_eos_id
         audio_bos_id = self.config.audio_stream_bos_id
         token_ids = token_ids.view(num_codebooks, -1)
@@ -332,18 +333,29 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
 
         if num_bos_tokens < num_codebooks:
             num_bos_tokens += 1
-            slice(audio_logits, [0, 0], [num_bos_tokens, 0]) = -math.inf
-            index_select(audio_logits, 1, audio_bos_id) = 0
-            audio_logits[num_bos_tokens:, audio_bos_id] = 0
+            #audio_logits[num_bos_tokens:, :] = -math.inf
+            #audio_logits[num_bos_tokens:, audio_bos_id] = 0
+            #The below slice and index_select are meant to do the same thing as the above indexing since indexing TensorRT tensors isn't possible. I'm not sure if my thinking was correct here so change it as needed.
+            bos_delayed_logits = slice(audio_logits, [num_bos_tokens, 0], [num_codebooks-num_bos_tokens, codebook_size])
+            bos_delayed_logits = -math.inf
+            index_select(bos_delayed_logits, 1, audio_bos_id) = 0
         if num_eos_tokens > 0:
-            audio_logits[:num_eos_tokens, ...] = -math.inf
-            audio_logits[:num_eos_tokens, audio_eos_id] = 0
+            # audio_logits[:num_eos_tokens, ...] = -math.inf
+            # audio_logits[:num_eos_tokens, audio_eos_id] = 0
+            #Same sort of thing here as above
+            eos_delayed_logits = slice(audio_logits, [0, 0], [num_eos_tokens, codebook_size])
+            eos_delayed_logits = -math.inf
+            index_select(eos_delayed_logits, 1, audio_eos_id) = 0
             if num_eos_tokens and num_eos_tokens >= num_codebooks:
-                audio_logits[:, :] = -math.inf
-                audio_logits[:, 0] = 0.0
+                #audio_logits[:, :] = -math.inf
+                #audio_logits[:, 0] = 0.0
+                #and again
+                eos_delayed_logits = slice(audio_logits, [0, 0], [num_codebooks, codebook_size])
+                eos_delayed_logits = -math.inf
+                index_select(eos_delayed_logits, 1, 0) = 0
 
-        for i in range(num_codebooks):
-            print(audio_logits[i].argmax(-1).item())
+        # for i in range(num_codebooks):
+        #     print(audio_logits[i].argmax(-1).item())
 
         return audio_logits, hidden_states, all_hidden_states
 

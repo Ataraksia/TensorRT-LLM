@@ -36,7 +36,6 @@ from tensorrt_llm.models.higgs_audio.config import HiggsAudioConfig
 
 import logging
 
-from tensorrt_llm.runtime import LogitsProcessor, SamplingConfig
 from tensorrt_llm.runtime import ModelRunnerCpp, ModelRunner
 
 load_dotenv()
