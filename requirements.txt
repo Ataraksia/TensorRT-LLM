@@ -6,6 +6,7 @@ colored
 cuda-python>=13
 diffusers>=0.27.0
 lark
+impi-rt
 mpi4py
 numpy
 onnx>=1.18.0
