@@ -637,7 +637,7 @@ def main(*,
             build_run(cmake_configure_command)
 
         cmake_build_command = (
-            f'cmake --build . --config {build_type} --parallel 4 '
+            f'cmake --build . --config {build_type} --parallel 24 '
             f'--target build_wheel_targets {" ".join(extra_make_targets)}')
         print("CMake Build command: ")
         print(cmake_build_command)
