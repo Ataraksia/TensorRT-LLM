@@ -371,7 +371,7 @@ def check_missing_libs(lib_name: str) -> list[str]:
 
 
 def generate_python_stubs_linux(
-    binding_type: str, venv_python: Path, deep_ep: bool, binding_lib_name: str
+    binding_type: str, venv_python: Path, binding_lib_name: str
 ):
     is_nanobind = binding_type == "nanobind"
     if is_nanobind:
@@ -412,11 +412,6 @@ def generate_python_stubs_linux(
             f'"{venv_python}" -m pybind11_stubgen -o . deep_gemm_cpp_tllm --exit-code',
             env=env_stub_gen,
         )
-        if deep_ep:
-            build_run(
-                f'"{venv_python}" -m pybind11_stubgen -o . deep_ep_cpp_tllm --exit-code',
-                env=env_stub_gen,
-            )
     finally:
         if link_dir:
             rmtree(link_dir)
@@ -537,7 +532,9 @@ def main(
     cmake_def_args = []
     cmake_generator = ""
 
-    extra_cmake_vars = list(extra_cmake_vars) + ["ENABLE_MULTI_DEVICE=0"]
+    extra_cmake_vars = (
+        list(extra_cmake_vars) + ["ENABLE_MULTI_DEVICE=0"] + ["-DBUILD_DEEP_EP=OFF"]
+    )
 
     if generator:
         cmake_generator = "-G" + generator
@@ -623,9 +620,9 @@ def main(
         build_deep_ep = "OFF"
         build_deep_gemm = "OFF"
     else:
-        targets.extend(["th_common", "bindings", "deep_ep", "deep_gemm"])
+        targets.extend(["th_common", "bindings", "deep_gemm"])
         build_pyt = "ON"
-        build_deep_ep = "ON"
+        build_deep_ep = "OFF"
         build_deep_gemm = "ON"
 
     if benchmarks:
@@ -847,13 +844,6 @@ def main(
             lib_dir / "libdecoder_attention_1.so",
         )
 
-    deep_ep_dir = pkg_dir / "deep_ep"
-    if deep_ep_dir.is_symlink():
-        deep_ep_dir.unlink()
-    elif deep_ep_dir.is_dir():
-        clear_folder(deep_ep_dir)
-        deep_ep_dir.rmdir()
-
     # Handle deep_gemm installation
     deep_gemm_dir = pkg_dir / "deep_gemm"
     if deep_gemm_dir.is_symlink():
@@ -891,33 +881,6 @@ def main(
         binding_lib_file_name = binding_lib_dir.name
         install_file(binding_lib_dir, pkg_dir)
 
-        with (
-            build_dir / "tensorrt_llm" / "deep_ep" / "cuda_architectures.txt"
-        ).open() as f:
-            deep_ep_cuda_architectures = f.read().strip().strip(";")
-        if deep_ep_cuda_architectures:
-            install_file(get_binding_lib("deep_ep", "deep_ep_cpp_tllm"), pkg_dir)
-            install_tree(
-                build_dir / "tensorrt_llm" / "deep_ep" / "python" / "deep_ep",
-                deep_ep_dir,
-                dirs_exist_ok=True,
-            )
-            (lib_dir / "nvshmem").mkdir(exist_ok=True)
-            install_file(
-                build_dir / "tensorrt_llm/deep_ep/nvshmem-build/License.txt",
-                lib_dir / "nvshmem",
-            )
-            install_file(
-                build_dir
-                / "tensorrt_llm/deep_ep/nvshmem-build/src/lib/nvshmem_bootstrap_uid.so.3",
-                lib_dir / "nvshmem",
-            )
-            install_file(
-                build_dir
-                / "tensorrt_llm/deep_ep/nvshmem-build/src/lib/nvshmem_transport_ibgda.so.103",
-                lib_dir / "nvshmem",
-            )
-
         install_file(get_binding_lib("deep_gemm", "deep_gemm_cpp_tllm"), pkg_dir)
         install_tree(
             build_dir / "tensorrt_llm" / "deep_gemm" / "python" / "deep_gemm",
@@ -935,7 +898,6 @@ def main(
                     generate_python_stubs_linux(
                         binding_type,
                         venv_python,
-                        bool(deep_ep_cuda_architectures),
                         binding_lib_file_name,
                     )
 

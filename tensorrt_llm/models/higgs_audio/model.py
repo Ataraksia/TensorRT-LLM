@@ -336,9 +336,6 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
             index_select(audio_logits, 1, audio_bos_id) = 0
             audio_logits[num_bos_tokens:, audio_bos_id] = 0
         if num_eos_tokens > 0:
-            #all_eos_indices = torch.where(token_ids[-1] == audio_eos_id)[0]
-            #if all_eos_indices.shape[0] > 0:
-            #last_eos_index = all_eos_indices[-1]
             audio_logits[:num_eos_tokens, ...] = -math.inf
             audio_logits[:num_eos_tokens, audio_eos_id] = 0
             if num_eos_tokens and num_eos_tokens >= num_codebooks:

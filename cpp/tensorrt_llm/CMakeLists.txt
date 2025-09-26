@@ -309,9 +309,6 @@ if(BINDING_TYPE STREQUAL "nanobind")
   add_subdirectory(nanobind)
 endif()
 
-if(BUILD_DEEP_EP)
-  add_subdirectory(deep_ep)
-endif()
 
 if(BUILD_DEEP_GEMM)
   add_subdirectory(deep_gemm)
