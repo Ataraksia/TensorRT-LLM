@@ -515,12 +515,7 @@ def main(*,
     cmake_def_args = []
     cmake_generator = ""
 
-    if on_windows:
-        # Windows does not support multi-device currently.
-        extra_cmake_vars = list(extra_cmake_vars) + ["ENABLE_MULTI_DEVICE=0"]
-
-        # The Ninja CMake generator is used for our Windows build
-        # (Easier than MSBuild to make compatible with our Docker image)
+    extra_cmake_vars = list(extra_cmake_vars) + ["ENABLE_MULTI_DEVICE=0"])
 
     if generator:
         cmake_generator = "-G" + generator
