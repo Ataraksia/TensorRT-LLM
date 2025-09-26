@@ -301,7 +301,7 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         )
 
         self.num_bos_tokens = 0
-        self.num_eos_tokens = None
+        self.num_eos_tokens = 0
 
         super().__init__(config, transformer, self.audio_lm_head)
 
@@ -315,13 +315,17 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
             input_ids, *args, **kwargs
         )
         text_logits = self.text_lm_head(input_ids)
+        text_eos_id = self.config.audio_eos_id
+        next_text_token = text_logits.argmax(-1).item()
+        if self.num_eos_tokens == 0 and next_text_token == text_eos_id:
+            self.num_eos_tokens = 1
 
         num_bos_tokens = self.num_bos_tokens
-        num_eos_tokens = self.num_eos_tokens = None
+        num_eos_tokens = self.num_eos_tokens
 
         num_codebooks = self.config.num_codebooks
-        eos_id = self.config.audio_stream_eos_id
-        bos_id = self.config.audio_stream_bos_id
+        audio_eos_id = self.config.audio_stream_eos_id
+        audio_bos_id = self.config.audio_stream_bos_id
         token_ids = token_ids.view(num_codebooks, -1)
 
         audio_logits = audio_logits.view(num_codebooks, -1)
@@ -329,17 +333,17 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         if num_bos_tokens < num_codebooks:
             num_bos_tokens += 1
             slice(audio_logits, [0, 0], [num_bos_tokens, 0]) = -math.inf
-            index_select(audio_logits, 1, bos_id) = 0
-            audio_logits[num_bos_tokens:, bos_id] = 0
-        if num_eos_tokens and num_eos_tokens < num_codebooks:
-            all_eos_indices = torch.where(token_ids[-1] == eos_id)[0]
-            if all_eos_indices.shape[0] > 0:
-                last_eos_index = all_eos_indices[-1]
-                audio_logits[:last_eos_index, ...] = -math.inf
-                audio_logits[:last_eos_index, eos_id] = 0
-        elif num_eos_tokens and num_eos_tokens >= num_codebooks:
-            audio_logits[:, :] = -math.inf
-            audio_logits[:, 0] = 0.0
+            index_select(audio_logits, 1, audio_bos_id) = 0
+            audio_logits[num_bos_tokens:, audio_bos_id] = 0
+        if num_eos_tokens > 0:
+            #all_eos_indices = torch.where(token_ids[-1] == audio_eos_id)[0]
+            #if all_eos_indices.shape[0] > 0:
+            #last_eos_index = all_eos_indices[-1]
+            audio_logits[:num_eos_tokens, ...] = -math.inf
+            audio_logits[:num_eos_tokens, audio_eos_id] = 0
+            if num_eos_tokens and num_eos_tokens >= num_codebooks:
+                audio_logits[:, :] = -math.inf
+                audio_logits[:, 0] = 0.0
 
         for i in range(num_codebooks):
             print(audio_logits[i].argmax(-1).item())
