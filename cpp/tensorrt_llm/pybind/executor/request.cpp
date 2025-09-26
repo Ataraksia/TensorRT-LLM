@@ -81,49 +81,49 @@ void initRequestBindings(pybind11::module_& m)
         {
             throw std::runtime_error("Invalid SamplingConfig state!");
         }
-        return tle::SamplingConfig(state[0].cast<SizeType32>(),      // BeamWidth
-            state[1].cast<std::optional<SizeType32>>(),              // TopK
-            state[2].cast<std::optional<FloatType>>(),               // TopP
-            state[3].cast<std::optional<FloatType>>(),               // TopPMin
-            state[4].cast<std::optional<tle::TokenIdType>>(),        // TopPResetIds
-            state[5].cast<std::optional<FloatType>>(),               // TopPDecay
-            state[6].cast<std::optional<tle::RandomSeedType>>(),     // Seed
-            state[7].cast<std::optional<FloatType>>(),               // Temperature
-            state[8].cast<std::optional<SizeType32>>(),              // MinTokens
-            state[9].cast<std::optional<FloatType>>(),               // BeamSearchDiversityRate
-            state[10].cast<std::optional<FloatType>>(),              // RepetitionPenalty
-            state[11].cast<std::optional<FloatType>>(),              // PresencePenalty
-            state[12].cast<std::optional<FloatType>>(),              // FrequencyPenalty
-            state[13].cast<std::optional<FloatType>>(),              // LengthPenalty
-            state[14].cast<std::optional<SizeType32>>(),             // EarlyStopping
-            state[15].cast<std::optional<SizeType32>>(),             // NoRepeatNgramSize
-            state[16].cast<std::optional<SizeType32>>(),             // NumReturnSequences
-            state[17].cast<std::optional<FloatType>>(),              // MinP
-            state[18].cast<std::optional<std::vector<SizeType32>>>(),// BeamWidthArray
-            state[19].cast<std::optional<SizeType32>>()              // TokensPerStep
+        return tle::SamplingConfig(state[0].cast<SizeType32>(),       // BeamWidth
+            state[1].cast<std::optional<SizeType32>>(),               // TopK
+            state[2].cast<std::optional<FloatType>>(),                // TopP
+            state[3].cast<std::optional<FloatType>>(),                // TopPMin
+            state[4].cast<std::optional<tle::TokenIdType>>(),         // TopPResetIds
+            state[5].cast<std::optional<FloatType>>(),                // TopPDecay
+            state[6].cast<std::optional<tle::RandomSeedType>>(),      // Seed
+            state[7].cast<std::optional<FloatType>>(),                // Temperature
+            state[8].cast<std::optional<SizeType32>>(),               // MinTokens
+            state[9].cast<std::optional<FloatType>>(),                // BeamSearchDiversityRate
+            state[10].cast<std::optional<FloatType>>(),               // RepetitionPenalty
+            state[11].cast<std::optional<FloatType>>(),               // PresencePenalty
+            state[12].cast<std::optional<FloatType>>(),               // FrequencyPenalty
+            state[13].cast<std::optional<FloatType>>(),               // LengthPenalty
+            state[14].cast<std::optional<SizeType32>>(),              // EarlyStopping
+            state[15].cast<std::optional<SizeType32>>(),              // NoRepeatNgramSize
+            state[16].cast<std::optional<SizeType32>>(),              // NumReturnSequences
+            state[17].cast<std::optional<FloatType>>(),               // MinP
+            state[18].cast<std::optional<std::vector<SizeType32>>>(), // BeamWidthArray
+            state[19].cast<std::optional<SizeType32>>()               // TokensPerStep
         );
     };
     py::class_<tle::SamplingConfig>(m, "SamplingConfig")
         .def(py::init<tle::SizeType32,
-                 std::optional<tle::SizeType32> const&,             // beamWidth
-                 std::optional<tle::FloatType> const&,              // topP
-                 std::optional<tle::FloatType> const&,              // topPMin
-                 std::optional<tle::TokenIdType> const&,            // topPResetIds
-                 std::optional<tle::FloatType> const&,              // topPDecay
-                 std::optional<tle::RandomSeedType> const&,         // seed
-                 std::optional<tle::FloatType> const&,              // temperature
-                 std::optional<tle::SizeType32> const&,             // minTokens
-                 std::optional<tle::FloatType> const&,              // beamSearchDiversityRate
-                 std::optional<tle::FloatType> const&,              // repetitionPenalty
-                 std::optional<tle::FloatType> const&,              // presencePenalty
-                 std::optional<tle::FloatType> const&,              // frequencyPenalty
-                 std::optional<tle::FloatType> const&,              // lengthPenalty
-                 std::optional<tle::SizeType32> const&,             // earlyStopping
-                 std::optional<tle::SizeType32> const&,             // noRepeatNgramSize
-                 std::optional<tle::SizeType32> const&,             // numReturnSequences
-                 std::optional<tle::FloatType> const&,              // minP
-                 std::optional<std::vector<tle::SizeType32>> const&,// beamWidthArray
-                 std::optional<tle::SizeType32> const&
+                 std::optional<tle::SizeType32> const&,              // beamWidth
+                 std::optional<tle::FloatType> const&,               // topP
+                 std::optional<tle::FloatType> const&,               // topPMin
+                 std::optional<tle::TokenIdType> const&,             // topPResetIds
+                 std::optional<tle::FloatType> const&,               // topPDecay
+                 std::optional<tle::RandomSeedType> const&,          // seed
+                 std::optional<tle::FloatType> const&,               // temperature
+                 std::optional<tle::SizeType32> const&,              // minTokens
+                 std::optional<tle::FloatType> const&,               // beamSearchDiversityRate
+                 std::optional<tle::FloatType> const&,               // repetitionPenalty
+                 std::optional<tle::FloatType> const&,               // presencePenalty
+                 std::optional<tle::FloatType> const&,               // frequencyPenalty
+                 std::optional<tle::FloatType> const&,               // lengthPenalty
+                 std::optional<tle::SizeType32> const&,              // earlyStopping
+                 std::optional<tle::SizeType32> const&,              // noRepeatNgramSize
+                 std::optional<tle::SizeType32> const&,              // numReturnSequences
+                 std::optional<tle::FloatType> const&,               // minP
+                 std::optional<std::vector<tle::SizeType32>> const&, // beamWidthArray
+                 std::optional<tle::SizeType32> const&               // TokensPerStep
                  >(),
             // clang-format off
             py::arg("beam_width") = 1,
@@ -146,7 +146,7 @@ void initRequestBindings(pybind11::module_& m)
             py::arg("num_return_sequences") = py::none(),
             py::arg("min_p") = py::none(),
             py::arg("beam_width_array") = py::none(),
-            py::arg("tokens_per_step") = py::none())                // clang-format on
+            py::arg("tokens_per_step") = py::none()) // clang-format on
         .def_property("beam_width", &tle::SamplingConfig::getBeamWidth, &tle::SamplingConfig::setBeamWidth)
         .def_property("top_k", &tle::SamplingConfig::getTopK, &tle::SamplingConfig::setTopK)
         .def_property("top_p", &tle::SamplingConfig::getTopP, &tle::SamplingConfig::setTopP)
@@ -173,8 +173,7 @@ void initRequestBindings(pybind11::module_& m)
         .def_property("min_p", &tle::SamplingConfig::getMinP, &tle::SamplingConfig::setMinP)
         .def_property(
             "beam_width_array", &tle::SamplingConfig::getBeamWidthArray, &tle::SamplingConfig::setBeamWidthArray)
-        .def_property(
-            "tokens_per_step", &tle::SamplingConfig::getTokensPerStep, &tle::SamplingConfig::setTokensPerStep)
+        .def_property("tokens_per_step", &tle::SamplingConfig::getTokensPerStep, &tle::SamplingConfig::setTokensPerStep)
         .def(py::pickle(samplingConfigGetstate, samplingConfigSetstate));
 
     auto additionalModelOutputGetstate
@@ -639,7 +638,7 @@ void initRequestBindings(pybind11::module_& m)
         py::arg("language_adapter_uid") = py::none(),
         py::arg("allotted_time_ms") = py::none(),
         py::arg("cache_salt_id") = py::none()
-    )             // clang-format on
+    ) // clang-format on
         .def_property_readonly("input_token_ids", &tle::Request::getInputTokenIds)
         .def_property_readonly("max_tokens", &tle::Request::getMaxTokens)
         .def_property("streaming", &tle::Request::getStreaming, &tle::Request::setStreaming)

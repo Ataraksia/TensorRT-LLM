@@ -1011,8 +1011,11 @@ void TrtGptModelInflightBatching::forwardAsync(RequestList const& activeRequests
         // The scheduler will not include any requests that are (i) still in encoder state if encoder-decoder models OR
         // (ii) already in flight for decoder models
         TLLM_LOG_DEBUG("Running DECODER request scheduler");
+        TLLM_LOG_INFO("[MULTITOKEN_DEBUG] Capacity scheduler called with %zu active requests", activeRequests.size());
         auto [fittingRequests, fittingDisaggGenInitRequests, requestsToPause]
             = (*mCapacityScheduler)(activeRequests, mKvCacheManager, mPeftCacheManager, mCrossKvCacheManager);
+        TLLM_LOG_INFO("[MULTITOKEN_DEBUG] Capacity scheduler returned: fitting=%zu, disagg=%zu, pause=%zu",
+            fittingRequests.size(), fittingDisaggGenInitRequests.size(), requestsToPause.size());
         // Remove from fitting requests the requests that cannot be scheduled due to disagg KV cache transfer
         if (mModelConfig.isTransformerBased() && getKVCacheManager() && mCacheTransceiver)
         {
@@ -1031,8 +1034,12 @@ void TrtGptModelInflightBatching::forwardAsync(RequestList const& activeRequests
                 // will free kvCache in next iteration.
             }
         }
+        TLLM_LOG_INFO(
+            "[MULTITOKEN_DEBUG] Calling micro batch scheduler with %zu fitting requests", fittingRequests.size());
         std::tie(currRequests.contextRequests, currRequests.generationRequests)
             = (*mMicroBatchScheduler)(fittingRequests, mInflightReqIds, mMaxBatchSizeRuntime, mMaxNumTokensRuntime);
+        TLLM_LOG_INFO("[MULTITOKEN_DEBUG] Micro batch scheduler returned: context=%zu, generation=%zu",
+            currRequests.contextRequests.size(), currRequests.generationRequests.size());
         TLLM_CHECK(currRequests.size() <= static_cast<size_t>(getMaxBatchSize()));
 
         (*mPauseRequests)(requestsToPause, mInflightReqIds, mReqIdsToPause, false, *mSeqSlotManager, mKvCacheManager,
@@ -1413,7 +1420,6 @@ executor::DecodingMode getDecodingMode(SpeculativeDecodingMode specDecodingMode,
     if (decodingModeOpt.has_value() && decodingModeOpt->isMultiToken())
     {
         TLLM_CHECK_WITH_INFO(beamWidth == 1, "MultiToken decoding mode requires beam width == 1, got %d", beamWidth);
-        TLLM_LOG_INFO("Using MultiToken decoding mode");
         decodingMode = executor::DecodingMode::MultiToken();
     }
     // Overwrite decoding mode when Medusa is used.
@@ -2045,6 +2051,8 @@ bool batchReturnLogProbs(ScheduledRequests const& scheduledRequests)
 runtime::CudaEvent TrtGptModelInflightBatching::decoderStepAsync(ScheduledRequests const& scheduledRequests)
 {
     TLLM_LOG_TRACE("%s start", __PRETTY_FUNCTION__);
+    TLLM_LOG_INFO("[MULTITOKEN_DEBUG] decoderStepAsync: context=%zu, generation=%zu requests",
+        scheduledRequests.contextRequests.size(), scheduledRequests.generationRequests.size());
     NVTX3_SCOPED_RANGE(decoderStepAsync);
 
     auto& decoderInputBuffers = mDecoderInputBuffers.at(getFusedBufferId());
@@ -2526,6 +2534,9 @@ void TrtGptModelInflightBatching::changeSpecDecMode(ScheduledRequests const& sch
 {
     TLLM_LOG_TRACE("%s start", __PRETTY_FUNCTION__);
 
+    // Declare useMultiToken at function scope so it's accessible throughout
+    bool useMultiToken = false;
+
     if ((!mModelConfig.getSpeculativeDecodingMode().isLookaheadDecoding()
             && !mModelConfig.getSpeculativeDecodingMode().isNone())
         || scheduledRequests.empty() || mSeamlessLADMaxDraftLen == 0 || getGatherGenerationLogits()
@@ -2553,6 +2564,8 @@ void TrtGptModelInflightBatching::changeSpecDecMode(ScheduledRequests const& sch
         bool useBanWords = false;
         bool useTempAccVocabPenalties = false; // use temperature and penalties that need to accumulate #vocab.
         SizeType32 beamWidth = 1;
+        TLLM_LOG_INFO("[MULTITOKEN_DEBUG] determineDecodingConfig: analyzing %zu context + %zu generation requests",
+            scheduledRequests.contextRequests.size(), scheduledRequests.generationRequests.size());
         for (auto const& requests : {scheduledRequests.contextRequests, scheduledRequests.generationRequests})
         {
             for (auto const& llmReq : requests)
@@ -2573,14 +2586,41 @@ void TrtGptModelInflightBatching::changeSpecDecMode(ScheduledRequests const& sch
                     llmReq->mSamplingConfig.presencePenalty, layers::DefaultDecodingParams::getPresencePenalty());
                 useTempAccVocabPenalties |= !llmReq->mSamplingConfig.useDefaultValues(
                     llmReq->mSamplingConfig.frequencyPenalty, layers::DefaultDecodingParams::getFrequencyPenalty());
+
+                // Check for multi-token generation requirement
+                if (llmReq->mSamplingConfig.tokensPerStep.has_value()
+                    && !llmReq->mSamplingConfig.tokensPerStep->empty())
+                {
+                    auto tokensPerStep = llmReq->mSamplingConfig.tokensPerStep->front();
+                    if (tokensPerStep > 1)
+                    {
+                        useMultiToken = true;
+                                      llmReq->mRequestId, tokensPerStep);
+                    }
+                }
+
                 beamWidth = llmReq->mSamplingConfig.beamWidth;
-                if (useTopKTopP || useBanWords || useTempAccVocabPenalties || beamWidth > 1)
+                if (useTopKTopP || useBanWords || useTempAccVocabPenalties || beamWidth > 1 || useMultiToken)
                 {
                     break;
                 }
             }
-            canUseLookahead = !(useTopKTopP || useBanWords || useTempAccVocabPenalties || beamWidth > 1);
+            canUseLookahead
+                = !(useTopKTopP || useBanWords || useTempAccVocabPenalties || beamWidth > 1 || useMultiToken);
         }
+    }
+
+    // Enable MultiToken mode if required
+    auto currentDecodingMode = mDecodingConfig.getDecodingMode();
+    if (useMultiToken && (!currentDecodingMode.has_value() || !currentDecodingMode->isMultiToken()))
+    {
+        mDecodingConfig.setDecodingMode(executor::DecodingMode::MultiToken());
+        createDecoder(mDecodingConfig.getDecodingMode());
+    }
+    else if (!useMultiToken && currentDecodingMode.has_value() && currentDecodingMode->isMultiToken())
+    {
+        mDecodingConfig.setDecodingMode(executor::DecodingMode::Auto());
+        createDecoder(mDecodingConfig.getDecodingMode());
     }
 
     // Change speculative decoding mode

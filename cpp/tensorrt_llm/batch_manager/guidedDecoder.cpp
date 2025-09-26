@@ -117,19 +117,16 @@ void GuidedDecoder::build(ScheduledRequests const& scheduledRequests)
                     {
                         // Build Grammar from EBNF string then compile
                         auto grammar = xgrammar::Grammar::FromEBNF(guide.value());
-                        mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
-                            mXGrammarCompiler->CompileGrammar(grammar));
+                        mXGrammarMatchers.at(seqSlot)
+                            = std::make_shared<xgrammar::GrammarMatcher>(mXGrammarCompiler->CompileGrammar(grammar));
                         break;
                     }
                     case executor::GuidedDecodingParams::GuideType::kSTRUCTURAL_TAG:
                     {
-                        // Structural tag expects a vector of StructuralTagItem plus tag names
-                        std::vector<xgrammar::StructuralTagItem> items;
-                        std::vector<std::string> tagNames;
-                        // Current implementation treats the provided string as a single tag name pattern
-                        tagNames.push_back(guide.value());
+                        // Structural tag now expects a JSON string according to new XGrammar API
+                        std::string structuralTagJson = guide.value();
                         mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
-                            mXGrammarCompiler->CompileStructuralTag(items, tagNames));
+                            mXGrammarCompiler->CompileStructuralTag(structuralTagJson));
                         break;
                     }
                     default:

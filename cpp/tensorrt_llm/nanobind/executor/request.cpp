@@ -103,8 +103,8 @@ void initRequestBindings(nb::module_& m)
             nb::cast<std::optional<SizeType32>>(state[15]),                       // NoRepeatNgramSize
             nb::cast<std::optional<SizeType32>>(state[16]),                       // NumReturnSequences
             nb::cast<std::optional<FloatType>>(state[17]),                        // MinP
-            nb::cast<std::optional<std::vector<SizeType32>>>(state[18])           // BeamWidthArray,
-            nb::cast<std::optional<SizeType32>>(state[19])
+            nb::cast<std::optional<std::vector<SizeType32>>>(state[18]),          // BeamWidthArray,
+            nb::cast<std::optional<SizeType32>>(state[19])                        // TokensPerStep
         );
     };
     nb::class_<tle::SamplingConfig>(m, "SamplingConfig")
@@ -148,7 +148,7 @@ void initRequestBindings(nb::module_& m)
             nb::arg("no_repeat_ngram_size") = nb::none(),
             nb::arg("num_return_sequences") = nb::none(),
             nb::arg("min_p") = nb::none(),
-            nb::arg("beam_width_array") = nb::none())               // clang-format on
+            nb::arg("beam_width_array") = nb::none()) // clang-format on
         .def_prop_rw("beam_width", &tle::SamplingConfig::getBeamWidth, &tle::SamplingConfig::setBeamWidth)
         .def_prop_rw("top_k", &tle::SamplingConfig::getTopK, &tle::SamplingConfig::setTopK)
         .def_prop_rw("top_p", &tle::SamplingConfig::getTopP, &tle::SamplingConfig::setTopP)
@@ -686,7 +686,7 @@ void initRequestBindings(nb::module_& m)
         nb::arg("language_adapter_uid") = nb::none(),
         nb::arg("allotted_time_ms") = nb::none(),
         nb::arg("cache_salt_id") = nb::none()
-    )             // clang-format on
+    ) // clang-format on
         .def_prop_ro("input_token_ids", &tle::Request::getInputTokenIds)
         .def_prop_ro("max_tokens", &tle::Request::getMaxTokens)
         .def_prop_rw("streaming", &tle::Request::getStreaming, &tle::Request::setStreaming)

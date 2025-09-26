@@ -80,8 +80,7 @@ private:
         bool valid{true};
         if (vec)
         {
-            valid = std::all_of(vec->begin(), vec->end(),
-                [min, max](T elem)
+            valid = std::all_of(vec->begin(), vec->end(), [min, max](T elem)
                 { return min < elem && ((max.has_value() && elem <= max.value()) || (!max.has_value())); });
             if (!valid)
             {
@@ -178,20 +177,17 @@ public:
         topKMedusaHeads = fuseValues<std::vector<SizeType32>>(
             configs, [&configs](size_t ci) { return configs[ci].topKMedusaHeads; },
             layers::DefaultDecodingParams::getTopKMedusaHeads());
-        outputLogProbs = fuseValues<bool>(
-            configs, [&configs](size_t ci) { return configs[ci].outputLogProbs; }, false);
-        cumLogProbs = fuseValues<bool>(
-            configs, [&configs](size_t ci) { return configs[ci].cumLogProbs; }, false);
+        outputLogProbs = fuseValues<bool>(configs, [&configs](size_t ci) { return configs[ci].outputLogProbs; }, false);
+        cumLogProbs = fuseValues<bool>(configs, [&configs](size_t ci) { return configs[ci].cumLogProbs; }, false);
         beamWidthArray = fuseValues<std::vector<SizeType32>>(
             configs, [&configs](size_t ci) { return configs[ci].beamWidthArray; },
             layers::DefaultDecodingParams::getBeamWidthArray());
         // Only used for tests.
-        draftAcceptanceThreshold = fuseValues<FloatType>(
-            configs, [&configs](size_t ci) { return configs[ci].draftAcceptanceThreshold; }, 0);
+        draftAcceptanceThreshold
+            = fuseValues<FloatType>(configs, [&configs](size_t ci) { return configs[ci].draftAcceptanceThreshold; }, 0);
         minP = fuseValues<FloatType>(
-            configs, [&configs](size_t ci) { return configs[c
-        tokensPerStep = fuseValues<SizeType32>(
-            configs, [&configs](size_t ci) { return configs[ci].tokensPerStep; }, 1);
+            configs, [&configs](size_t ci) { return configs[ci].minP; }, layers::DefaultDecodingParams::getMinP());
+        tokensPerStep = fuseValues<SizeType32>(configs, [&configs](size_t ci) { return configs[ci].tokensPerStep; }, 1);
     }
 
     explicit SamplingConfig(executor::SamplingConfig const& samplingConfig,
@@ -199,7 +195,6 @@ public:
         : beamWidth{samplingConfig.getBeamWidth()}
         , numReturnSequences(samplingConfig.getNumReturnSequences())
     {
-
         if (externalDraftTokensConfig && externalDraftTokensConfig.value().getAcceptanceThreshold())
         {
             draftAcceptanceThreshold
@@ -245,7 +240,8 @@ public:
         if (!valid)
         {
             TLLM_LOG_WARNING(
-                "Requested beam width %d is incorrect. Must be > 0. To de-activate beam searching set beamWidth to 1.",
+                "Requested beam width %d is incorrect. Must be > 0. To de-activate beam searching set beamWidth to "
+                "1.",
                 beamWidth);
         }
 
@@ -420,4 +416,4 @@ public:
     }
 };
 
-} // namespace tensorrt_llm::runtime
+}; // namespace tensorrt_llm::runtime
