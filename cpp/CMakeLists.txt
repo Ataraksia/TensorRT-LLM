@@ -28,22 +28,22 @@ project(tensorrt_llm LANGUAGES CXX)
 
 # Build options
 option(BUILD_PYT "Build in PyTorch TorchScript class mode" ON)
-option(BUILD_TESTS "Build Google tests" ON)
-option(BUILD_BENCHMARKS "Build benchmarks" ON)
-option(BUILD_DEEP_EP "Build the Deep EP module" ON)
+option(BUILD_TESTS "Build Google tests" OFF)
+option(BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(BUILD_DEEP_EP "Build the Deep EP module" OFF)
 option(BUILD_DEEP_GEMM "Build the DeepGEMM module" ON)
 option(BUILD_MICRO_BENCHMARKS "Build C++ micro benchmarks" OFF)
 option(NVTX_DISABLE "Disable all NVTX features" ON)
 option(WARNING_IS_ERROR "Treat all warnings as errors" OFF)
 option(FAST_BUILD "Skip compiling some kernels to accelerate compiling" OFF)
-option(FAST_MATH "Compiling in fast math mode" OFF)
+option(FAST_MATH "Compiling in fast math mode" ON)
 option(INDEX_RANGE_CHECK "Compiling with index range checks" OFF)
 option(COMPRESS_FATBIN "Compress everything in fatbin" ON)
 option(TIMING_NVCC "Enable nvcc build timing report" OFF)
 option(ENABLE_MULTI_DEVICE
-       "Enable building with multi device support (requires NCCL, MPI,...)" ON)
+       "Enable building with multi device support (requires NCCL, MPI,...)" OFF)
 option(ENABLE_UCX "Enable building with UCX (Uniform Communication X) support"
-       ON)
+       OFF)
 option(NVRTC_DYNAMIC_LINKING "Link against the dynamic NVRTC libraries" OFF)
 option(CUBLAS_DYNAMIC_LINKING
        "Link against the dynamic cublas/cublasLt libraries" ON)

@@ -2595,7 +2595,9 @@ void TrtGptModelInflightBatching::changeSpecDecMode(ScheduledRequests const& sch
                     if (tokensPerStep > 1)
                     {
                         useMultiToken = true;
-                                      llmReq->mRequestId, tokensPerStep);
+                        // TODO - I have no idea what this was meant (tokensPerStep =
+                        // llmReq->mRequestId, tokensPerStep) to be so I made a guess:
+                        mKvCacheManager->rewindKVCache(llmReq->mRequestId, tokensPerStep);
                     }
                 }
 

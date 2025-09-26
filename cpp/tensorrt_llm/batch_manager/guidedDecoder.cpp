@@ -123,10 +123,20 @@ void GuidedDecoder::build(ScheduledRequests const& scheduledRequests)
                     }
                     case executor::GuidedDecodingParams::GuideType::kSTRUCTURAL_TAG:
                     {
-                        // Structural tag now expects a JSON string according to new XGrammar API
-                        std::string structuralTagJson = guide.value();
+                        auto const& structuralTagParametersJson = nlohmann::json::parse(guide.value());
+                        auto const& structuralTagItemsJson
+                            = structuralTagParametersJson.at("structures").template get<std::vector<nlohmann::json>>();
+                        std::vector<xgrammar::StructuralTagItem> structuralTagItems;
+                        for (auto const& s : structuralTagItemsJson)
+                        {
+                            structuralTagItems.emplace_back(
+                                xgrammar::StructuralTagItem{s.at("begin").template get<std::string>(),
+                                    s.at("schema").dump(), s.at("end").template get<std::string>()});
+                        }
+                        auto const& triggers
+                            = structuralTagParametersJson.at("triggers").template get<std::vector<std::string>>();
                         mXGrammarMatchers.at(seqSlot) = std::make_shared<xgrammar::GrammarMatcher>(
-                            mXGrammarCompiler->CompileStructuralTag(structuralTagJson));
+                            mXGrammarCompiler->CompileStructuralTag(structuralTagItems, triggers));
                         break;
                     }
                     default:

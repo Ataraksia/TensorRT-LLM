@@ -39,6 +39,7 @@ from packaging import version
 # isort: off
 import torch
 import tensorrt as trt
+
 # isort: on
 
 from tensorrt_llm.bindings import DataType, GptJsonConfig
@@ -46,13 +47,14 @@ from tensorrt_llm.bindings.BuildInfo import ENABLE_MULTI_DEVICE
 from tensorrt_llm.logger import logger
 
 # numpy doesn't know bfloat16, define abstract binary type instead
-np_bfloat16 = np.dtype('V2', metadata={"dtype": "bfloat16"})
-np_float8 = np.dtype('V1', metadata={"dtype": "float8"})
+np_bfloat16 = np.dtype("V2", metadata={"dtype": "bfloat16"})
+np_float8 = np.dtype("V1", metadata={"dtype": "float8"})
 
 
 def torch_to_numpy(x: torch.Tensor):
-    assert isinstance(x, torch.Tensor), \
-        f'x must be a torch.Tensor object, but got {type(x)}.'
+    assert isinstance(
+        x, torch.Tensor
+    ), f"x must be a torch.Tensor object, but got {type(x)}."
     if x.dtype == torch.bfloat16:
         return x.view(torch.int16).detach().cpu().numpy().view(np_bfloat16)
     elif x.dtype == torch.float8_e4m3fn:
@@ -73,8 +75,7 @@ def numpy_to_torch(x):
 def numpy_to_dtype(x, dtype: str):
     if str_dtype_to_np(dtype) == x.dtype:
         return x
-    if x.dtype not in [np_bfloat16, np_float8
-                       ] and dtype not in ['bfloat16', 'fp8']:
+    if x.dtype not in [np_bfloat16, np_float8] and dtype not in ["bfloat16", "fp8"]:
         return x.astype(str_dtype_to_np(dtype))
     else:
         return torch_to_numpy(numpy_to_torch(x).to(str_dtype_to_torch(dtype)))
@@ -149,7 +150,7 @@ _str_to_np_dict = dict(
 
 def str_dtype_to_np(dtype):
     ret = _str_to_np_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -167,7 +168,7 @@ _str_to_torch_dtype_dict = dict(
 
 def str_dtype_to_torch(dtype):
     ret = _str_to_torch_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -199,7 +200,7 @@ _binding_dtype_bits = {
 
 def binding_to_str_dtype(binding_dtype) -> str:
     ret = _binding_to_str_dtype.get(binding_dtype)
-    assert ret is not None, f'Unsupported binding dtype: {binding_dtype}'
+    assert ret is not None, f"Unsupported binding dtype: {binding_dtype}"
     return ret
 
 
@@ -209,13 +210,15 @@ def binding_dtype_size(dtype: DataType):
 
 def get_size_in_bytes(num_elements: int, dtype: DataType):
     total_num_bits = _binding_dtype_bits[dtype] * num_elements
-    assert total_num_bits % 8 == 0, f"Total number of bits {total_num_bits} must be divisible by 8"
+    assert (
+        total_num_bits % 8 == 0
+    ), f"Total number of bits {total_num_bits} must be divisible by 8"
     return total_num_bits // 8
 
 
 def str_dtype_to_binding(dtype):
     ret = _str_to_binding_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -226,27 +229,28 @@ def torch_dtype_to_str(dtype):
     return _torch_dtype_to_str_dict[dtype]
 
 
-_str_to_trt_dtype_dict = dict(float16=trt.float16,
-                              float32=trt.float32,
-                              int64=trt.int64,
-                              int32=trt.int32,
-                              int8=trt.int8,
-                              bool=trt.bool,
-                              bfloat16=trt.bfloat16,
-                              fp8=trt.fp8,
-                              nvfp4=trt.fp4)
+_str_to_trt_dtype_dict = dict(
+    float16=trt.float16,
+    float32=trt.float32,
+    int64=trt.int64,
+    int32=trt.int32,
+    int8=trt.int8,
+    bool=trt.bool,
+    bfloat16=trt.bfloat16,
+    fp8=trt.fp8,
+    nvfp4=trt.fp4,
+)
 
 
 def str_dtype_to_trt(dtype):
     if dtype == "fp4":
         # Special handling for FP4 since CI's trt version is not recent enough.
-        if not hasattr(trt, 'fp4'):
-            raise ValueError(
-                "fp4 unsupported, trt version needs to be upgraded.")
+        if not hasattr(trt, "fp4"):
+            raise ValueError("fp4 unsupported, trt version needs to be upgraded.")
         return trt.fp4
 
     ret = _str_to_trt_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -265,14 +269,13 @@ _np_to_trt_dtype_dict = {
     np.float16: trt.float16,
     np.float32: trt.float32,
     np.bool_: trt.bool,
-
     # hash of np.dtype('int32') != np.int32
-    np.dtype('int8'): trt.int8,
-    np.dtype('int32'): trt.int32,
-    np.dtype('int64'): trt.int64,
-    np.dtype('float16'): trt.float16,
-    np.dtype('float32'): trt.float32,
-    np.dtype('bool'): trt.bool,
+    np.dtype("int8"): trt.int8,
+    np.dtype("int32"): trt.int32,
+    np.dtype("int64"): trt.int64,
+    np.dtype("float16"): trt.float16,
+    np.dtype("float32"): trt.float32,
+    np.dtype("bool"): trt.bool,
     np_bfloat16: trt.bfloat16,
     np_float8: trt.fp8,
 }
@@ -280,7 +283,7 @@ _np_to_trt_dtype_dict = {
 
 def np_dtype_to_trt(dtype):
     ret = _np_to_trt_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -298,7 +301,7 @@ _trt_to_np_dtype_dict = {
 
 def trt_dtype_to_np(dtype):
     ret = _trt_to_np_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -321,7 +324,7 @@ _torch_to_np_dtype_dict = {
 
 def torch_dtype_to_np(dtype):
     ret = _torch_to_np_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -344,7 +347,7 @@ _np_to_torch_dtype_dict = {
 
 def np_dtype_to_torch(dtype):
     ret = _np_to_torch_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -362,12 +365,13 @@ _trt_to_torch_dtype_dict = {
 
 def trt_dtype_to_torch(dtype):
     ret = _trt_to_torch_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
-def is_same_dtype(type_a: Union[str, trt.DataType],
-                  type_b: Union[str, trt.DataType]) -> bool:
+def is_same_dtype(
+    type_a: Union[str, trt.DataType], type_b: Union[str, trt.DataType]
+) -> bool:
     if isinstance(type_a, str):
         type_a = str_dtype_to_trt(type_a)
 
@@ -386,13 +390,13 @@ _torch_to_trt_dtype_dict = {
     torch.float8_e4m3fn: trt.fp8,
     torch.qint8: trt.int8,
     torch.bool: trt.bool,
-    torch.bfloat16: trt.bfloat16
+    torch.bfloat16: trt.bfloat16,
 }
 
 
 def torch_dtype_to_trt(dtype):
     ret = _torch_to_trt_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -405,13 +409,13 @@ _torch_to_binding_dtype_dict = {
     torch.float8_e4m3fn: DataType.FP8,
     torch.qint8: DataType.INT8,
     torch.bool: DataType.BOOL,
-    torch.bfloat16: DataType.BF16
+    torch.bfloat16: DataType.BF16,
 }
 
 
 def torch_dtype_to_binding(dtype):
     ret = _torch_to_binding_dtype_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
@@ -430,14 +434,14 @@ _torch_dtype_to_np_typestr_dict = {
 
 def torch_dtype_to_np_typestr(dtype):
     ret = _torch_dtype_to_np_typestr_dict.get(dtype)
-    assert ret is not None, f'Unsupported dtype: {dtype}'
+    assert ret is not None, f"Unsupported dtype: {dtype}"
     return ret
 
 
 def dim_to_trt_axes(dim):
     """Converts torch dim, or tuple of dims to a tensorrt axes bitmask"""
     if not isinstance(dim, tuple):
-        dim = (dim, )
+        dim = (dim,)
 
     # create axes bitmask for reduce layer
     axes = 0
@@ -459,7 +463,7 @@ def trt_axes_to_dim(axes: int) -> List[int]:
 
 def dim_resolve_negative(dim, ndim):
     if not isinstance(dim, tuple):
-        dim = (dim, )
+        dim = (dim,)
     pos = []
     for d in dim:
         if d < 0:
@@ -534,7 +538,7 @@ def local_mpi_barrier():
 
 
 def mpi_broadcast(obj, root=0):
-    return mpi_comm().bcast(obj, root) if is_multi_device_enable() else obj
+    return mpi_comm().bcast(obj, root) if global_mpi_size() > 1 else obj
 
 
 def mpi_allgather(obj):
@@ -610,8 +614,8 @@ def numpy_fp32_to_bf16(src):
     assert src.dtype == np.float32
     dst = np.empty_like(src, dtype=np.uint16)
     for i in range(len(dst)):
-        bytes = struct.pack('<f', src[i])
-        dst[i] = struct.unpack('<H', struct.pack('BB', bytes[2], bytes[3]))[0]
+        bytes = struct.pack("<f", src[i])
+        dst[i] = struct.unpack("<H", struct.pack("BB", bytes[2], bytes[3]))[0]
     return dst.reshape(original_shape).view(np_bfloat16)
 
 
@@ -655,8 +659,7 @@ def set_obj_attrs(
     if ojb_attrs is None:
         return
     for key, value in ojb_attrs.items():
-        assert not hasattr(
-            obj, key), (f"Overwriting existing tensor attribute: {key}")
+        assert not hasattr(obj, key), f"Overwriting existing tensor attribute: {key}"
         setattr(obj, key, value)
 
 
@@ -670,15 +673,15 @@ def get_init_params(obj, cls=None):
         names = set(list(inspect.signature(cls.__init__).parameters)[1:])
     return {
         name: getattr(obj, name)
-        for name in list(inspect.signature(obj.__class__.__init__).parameters)
-        [1:] if names is None or name in names
+        for name in list(inspect.signature(obj.__class__.__init__).parameters)[1:]
+        if names is None or name in names
     }
 
 
 def release_gc():
-    ''' Release memory allocated by PyTorch and Python garbage collector explicitly and immediately.
+    """Release memory allocated by PyTorch and Python garbage collector explicitly and immediately.
     This could be used when some states might be kept in memory even after the variables are deleted.
-    '''
+    """
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -716,7 +719,7 @@ def trace_func(func):
         def globaltrace(frame, why, arg):
             if why == "call":
                 code = frame.f_code
-                filename = frame.f_globals.get('__file__', None)
+                filename = frame.f_globals.get("__file__", None)
                 if filename:
                     modulename = trace._modname(filename)
                     if modulename is not None:
@@ -736,7 +739,8 @@ def trace_func(func):
                 bname = os.path.basename(filename)
                 print(
                     f"[rank{rank}] {bname}:{lineno}: {linecache.getline(filename, lineno)}",
-                    end="")
+                    end="",
+                )
             return localtrace
 
         ignoredirs = [
@@ -761,9 +765,11 @@ class DictConversion:
         for key, value in config.items():
             assert hasattr(obj, key), f"cannot find {key} in {obj}"
             field_cls = fields[key].type
-            if (isinstance(field_cls, type)
-                    and issubclass(field_cls, DictConversion)
-                    and isinstance(value, dict)):
+            if (
+                isinstance(field_cls, type)
+                and issubclass(field_cls, DictConversion)
+                and isinstance(value, dict)
+            ):
                 value = field_cls.from_dict(value)
             setattr(obj, key, value)
         return obj
@@ -779,8 +785,7 @@ class DictConversion:
     def set_defaults(self, **kwargs):
         for key, default in kwargs.items():
             value = getattr(self, key)
-            if (value is None
-                    or (isinstance(value, (list, dict)) and len(value) == 0)):
+            if value is None or (isinstance(value, (list, dict)) and len(value) == 0):
                 setattr(self, key, default)
 
 
@@ -838,14 +843,14 @@ def customized_gc_thresholds(gen0_threshold: Optional[int] = None):
         if gen0_threshold:
             gc.set_threshold(gen0_threshold)
             logger.debug(
-                f'Set Python GC threshold to customized value: {gen0_threshold}'
+                f"Set Python GC threshold to customized value: {gen0_threshold}"
             )
         yield
     finally:
         if gen0_threshold:
             gc.set_threshold(*PYTHON_DEFAULT_GC_THRESHOLDS)
             logger.debug(
-                f'Reset Python GC thresholds to default value: {PYTHON_DEFAULT_GC_THRESHOLDS}'
+                f"Reset Python GC thresholds to default value: {PYTHON_DEFAULT_GC_THRESHOLDS}"
             )
 
 
@@ -854,10 +859,12 @@ def _null_context_manager():
     yield
 
 
-def nvtx_range(msg: str,
-               color: str = "grey",
-               domain: str = "TensorRT-LLM",
-               category: Optional[str] = None):
+def nvtx_range(
+    msg: str,
+    color: str = "grey",
+    domain: str = "TensorRT-LLM",
+    category: Optional[str] = None,
+):
     """
     Creates an NVTX range annotation for profiling.
 
@@ -876,10 +883,12 @@ def nvtx_range(msg: str,
     return nvtx.annotate(msg, color=color, domain=domain, category=category)
 
 
-def nvtx_range_debug(msg: str,
-                     color: str = "grey",
-                     domain: str = "TensorRT-LLM",
-                     category: Optional[str] = None):
+def nvtx_range_debug(
+    msg: str,
+    color: str = "grey",
+    domain: str = "TensorRT-LLM",
+    category: Optional[str] = None,
+):
     """
     Creates an NVTX range annotation for debugging purposes.
 
@@ -896,17 +905,21 @@ def nvtx_range_debug(msg: str,
         contextmanager: A context manager that either marks the NVTX range if enabled,
                         or a null context manager that does nothing if disabled.
     """
-    if os.getenv("TLLM_LLMAPI_ENABLE_NVTX", "0") == "1" or \
-            os.getenv("TLLM_NVTX_DEBUG", "0") == "1":
+    if (
+        os.getenv("TLLM_LLMAPI_ENABLE_NVTX", "0") == "1"
+        or os.getenv("TLLM_NVTX_DEBUG", "0") == "1"
+    ):
         return nvtx_range(msg, color=color, domain=domain, category=category)
     else:
         return _null_context_manager()
 
 
-def nvtx_mark(msg: str,
-              color: str = "grey",
-              domain: str = "TensorRT-LLM",
-              category: Optional[str] = None):
+def nvtx_mark(
+    msg: str,
+    color: str = "grey",
+    domain: str = "TensorRT-LLM",
+    category: Optional[str] = None,
+):
     """
     Creates an NVTX marker for profiling.
 
@@ -978,17 +991,18 @@ class TensorWrapper:
     @property
     def __cuda_array_interface__(self):
         return {
-            "shape":
-            self.shape,
-            "typestr":
-            torch_dtype_to_np_typestr(self.dtype),
+            "shape": self.shape,
+            "typestr": torch_dtype_to_np_typestr(self.dtype),
             "data": (self.data_ptr() if self.numel() > 0 else 0, False),
-            "strides": [
-                i * torch.tensor([], dtype=self.dtype).element_size()
-                for i in self.strides
-            ] if self.strides is not None else None,
-            "version":
-            3,
+            "strides": (
+                [
+                    i * torch.tensor([], dtype=self.dtype).element_size()
+                    for i in self.strides
+                ]
+                if self.strides is not None
+                else None
+            ),
+            "version": 3,
         }
 
     @staticmethod
@@ -996,8 +1010,7 @@ class TensorWrapper:
         return TensorWrapper(pointer, trt_dtype_to_torch(desc.type), desc.dims)
 
 
-def convert_to_torch_tensor(
-        tensor: Union[TensorWrapper, torch.Tensor]) -> torch.Tensor:
+def convert_to_torch_tensor(tensor: Union[TensorWrapper, torch.Tensor]) -> torch.Tensor:
     """
     This function is to convert the `TensorWrapper` to torch.Tensor.
     """
@@ -1008,8 +1021,7 @@ def convert_to_torch_tensor(
     new_tensor = torch.as_tensor(tensor).view(tensor.dtype)
     new_ptr = new_tensor.data_ptr()
     if old_ptr != new_ptr:
-        raise RuntimeError(
-            "Data pointer mismatch after converting to torch.Tensor")
+        raise RuntimeError("Data pointer mismatch after converting to torch.Tensor")
     return new_tensor
 
 
@@ -1059,38 +1071,32 @@ class KVCacheEventSerializer:
     def _created_to_json(data):
         return {
             "type": "created",
-            "num_blocks_per_cache_level": data.num_blocks_per_cache_level
+            "num_blocks_per_cache_level": data.num_blocks_per_cache_level,
         }
 
     @staticmethod
     def _stored_to_json(data):
         return {
-            "type":
-            "stored",
-            "parent_hash":
-            data.parent_hash,
+            "type": "stored",
+            "parent_hash": data.parent_hash,
             "blocks": [
                 KVCacheEventSerializer._stored_block_to_json(block)
                 for block in data.blocks
-            ]
+            ],
         }
 
     @staticmethod
     def _stored_block_to_json(data):
         return {
-            "type":
-            "stored_block",
-            "block_hash":
-            data.block_hash,
+            "type": "stored_block",
+            "block_hash": data.block_hash,
             "tokens": [
                 KVCacheEventSerializer._unique_tokens_to_json(token)
                 for token in data.tokens
             ],
             # "lora_id": data.lora_id, # TODO (shreyasm): enable serialization of lora_id
-            "cache_level":
-            data.cache_level,
-            "priority":
-            data.priority
+            "cache_level": data.cache_level,
+            "priority": data.priority,
         }
 
     @staticmethod
@@ -1100,14 +1106,10 @@ class KVCacheEventSerializer:
     @staticmethod
     def _updated_to_json(data):
         return {
-            "type":
-            "updated",
-            "block_hash":
-            data.block_hash,
-            "cache_level":
-            KVCacheEventSerializer._event_diff_to_json(data.cache_level),
-            "priority":
-            KVCacheEventSerializer._event_diff_to_json(data.priority)
+            "type": "updated",
+            "block_hash": data.block_hash,
+            "cache_level": KVCacheEventSerializer._event_diff_to_json(data.cache_level),
+            "priority": KVCacheEventSerializer._event_diff_to_json(data.priority),
         }
 
     @staticmethod
@@ -1115,7 +1117,7 @@ class KVCacheEventSerializer:
         return {
             "type": "event_diff",
             "new_value": data.new_value,
-            "old_value": data.old_value
+            "old_value": data.old_value,
         }
 
     @staticmethod
@@ -1123,19 +1125,8 @@ class KVCacheEventSerializer:
         return {
             "type": "unique_token",
             "token_id": data.token_id,
-            "token_extra_id": data.token_extra_id
+            "token_extra_id": data.token_extra_id,
         }
-
-
-def is_multi_device_enable():
-    """
-    This method evaluates if we are running on multiple GPUs and the flag ENABLE_MULTI_DEVICE is set.
-    So we can avoid broadcast calls on single GPU.
-    Issue: https://github.com/NVIDIA/TensorRT-LLM/issues/5927
-    ENABLE_MULTI_DEVICE is true by default when building TensorRT LLM so we need to also check
-    the number of devices
-    """
-    return local_mpi_size() > 1
 
 
 def set_prometheus_multiproc_dir() -> object:
@@ -1144,9 +1135,9 @@ def set_prometheus_multiproc_dir() -> object:
     if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
         logger.info("User set PROMETHEUS_MULTIPROC_DIR detected.")
         prometheus_multiproc_dir = tempfile.TemporaryDirectory(
-            dir=os.environ["PROMETHEUS_MULTIPROC_DIR"])
+            dir=os.environ["PROMETHEUS_MULTIPROC_DIR"]
+        )
     else:
         prometheus_multiproc_dir = tempfile.TemporaryDirectory()
         os.environ["PROMETHEUS_MULTIPROC_DIR"] = prometheus_multiproc_dir.name
-    logger.info(
-        f"PROMETHEUS_MULTIPROC_DIR: {os.environ['PROMETHEUS_MULTIPROC_DIR']}")
+    logger.info(f"PROMETHEUS_MULTIPROC_DIR: {os.environ['PROMETHEUS_MULTIPROC_DIR']}")

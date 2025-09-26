@@ -89,7 +89,7 @@ std::unique_ptr<BaseCacheTransceiver> CacheTransceiverFactory::createCacheTransc
         }
         else
         {
-            backendType = executor::CacheTransceiverConfig::BackendType::UCX;
+            backendType = executor::CacheTransceiverConfig::BackendType::NIXL;
         }
     }
     cacheTransceiverConfig.value().setBackendType(backendType);
@@ -421,7 +421,7 @@ void CacheTransceiver::checkContextTransferStatus(std::optional<int> const& atLe
     // Make sure there are at least atLeastRequestNum requests in toCompleteIdSet.
     // This will preserve the order of insertion for KVCache transfer requests.
     for (auto it = mSenderFutures.begin();
-         atLeastRequestNum.value_or(0) > static_cast<int>(toCompleteIdSet.size()) && it != mSenderFutures.end(); ++it)
+        atLeastRequestNum.value_or(0) > static_cast<int>(toCompleteIdSet.size()) && it != mSenderFutures.end(); ++it)
     {
         auto& [request, future] = *it;
         toCompleteIdSet.insert(request->mRequestId);
