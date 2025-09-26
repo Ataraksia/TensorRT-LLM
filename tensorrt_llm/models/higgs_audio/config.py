@@ -67,6 +67,7 @@ class HiggsAudioConfig(PretrainedConfig):
         pad_token_id: int = 128001,
         max_num_tokens=1024,
         audio_out_start: int = 0,
+        audio_out_end: int = 0,
         audio_in_start: int = -1,
         audio_in_end: int = -1,
         **kwargs,
@@ -78,7 +79,9 @@ class HiggsAudioConfig(PretrainedConfig):
         self.model_type = "higgs_audio"
         # Adapter configuration
         self.audio_adapter_type = audio_adapter_type
-        self.audio_dual_ffn_layers = audio_dual_ffn_layers or list(range(28))  # Default: all layers
+        self.audio_dual_ffn_layers = audio_dual_ffn_layers or list(
+            range(28)
+        )  # Default: all layers
         self.audio_ffn_hidden_size = audio_ffn_hidden_size
         self.audio_ffn_intermediate_size = audio_ffn_intermediate_size
 
@@ -159,7 +162,9 @@ class HiggsAudioConfig(PretrainedConfig):
             if os.path.isdir(hf_path_or_dir):
                 hf_config = json.load(Path(hf_path_or_dir + "/config.json").open("r"))
             elif repo_exists(hf_path_or_dir):
-                config_file = hf_hub_download(repo_id=hf_path_or_dir, filename="config.json")
+                config_file = hf_hub_download(
+                    repo_id=hf_path_or_dir, filename="config.json"
+                )
                 hf_config = json.load(Path(config_file).open("r"))
             hf_config = hf_config["text_config"]
         # Keep the custom architecture name for our model; we'll extend the TRT-LLM
@@ -169,7 +174,9 @@ class HiggsAudioConfig(PretrainedConfig):
         rotary_scaling = getattr(hf_config, "rope_scaling", None)
         seq_length = getattr(hf_config, "seq_length", 2048)
         use_logn_attn = getattr(hf_config, "use_logn_attn", False)
-        disable_weight_only_quant_plugin = kwargs.pop("disable_weight_only_quant_plugin", False)
+        disable_weight_only_quant_plugin = kwargs.pop(
+            "disable_weight_only_quant_plugin", False
+        )
         rotary_base = getattr(hf_config, "rope_theta", 100000.0)
         num_labels = 1
         dtype = infer_dtype(dtype, getattr(hf_config, "torch_dtype", None))

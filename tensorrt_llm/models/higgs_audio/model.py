@@ -229,9 +229,12 @@ class HiggsAudioTransformer(Module):
         """Embeds audio ids for all codebooks."""
         # Expecting shape (num_codebooks, seq_len) local ids; create vector of shifts
         codebook_shift = (
-            arange(0, self.config.num_codebooks, dtype="int32") * self.config.codebook_size
+            arange(0, self.config.num_codebooks, dtype="int32")
+            * self.config.codebook_size
         ).unsqueeze(-1)
-        shifted_ids = audio_ids + codebook_shift  # broadcast to (num_codebooks, seq_len)
+        shifted_ids = (
+            audio_ids + codebook_shift
+        )  # broadcast to (num_codebooks, seq_len)
         audio_embed = sum(self.codebook_embeddings(shifted_ids), dim=0)
 
         return audio_embed
@@ -247,9 +250,9 @@ class HiggsAudioTransformer(Module):
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
         """Forward pass for Higgs Audio transformer with multimodal support."""
-        mask = (self.config.audio_in_end >= position_ids >= self.config.audio_in_start) or (
-            position_ids >= self.config.audio_out_start
-        )
+        mask = (
+            self.config.audio_in_end >= position_ids >= self.config.audio_in_start
+        ) or (position_ids >= self.config.audio_out_start)
         audio_ids = where(mask == 1, input_ids, 0)
         audio_embed = self._embed_audio_ids(audio_ids)
         text_ids = where(mask == 0, input_ids, 0)
@@ -284,29 +287,64 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         transformer = HiggsAudioTransformer(config)
 
         # Main lm_head for the first codebook
-        lm_head = ColumnLinear(
+        self.audio_lm_head = ColumnLinear(
             in_features=config.hidden_size,
-            out_features=config.vocab_size,
+            out_features=config.audio_vocab_size,
+            bias=False,
+            dtype=config.dtype,
+        )
+        self.text_lm_head = ColumnLinear(
+            in_features=config.hidden_size,
+            out_features=config.text_vocab_size,
             bias=False,
             dtype=config.dtype,
         )
 
-        self.first_pass = True
+        self.num_bos_tokens = 0
+        self.num_eos_tokens = None
 
-        super().__init__(config, transformer, lm_head)
+        super().__init__(config, transformer, self.audio_lm_head)
 
     def forward(self, *args, **kwargs):
         # Get transformer outputs
-        # TODO might need to change this later when running server - need to find out if first_pass resets- split real batches up and just run theM?
+
         input_ids = kwargs["input_ids"]
-        # if self.first_pass:
-        #     self.first_pass = False
-        #     input_ids = slice(input_ids, [0], [self.config.audio_out_start + 1])
 
         kwargs = {k: v for k, v in kwargs.items() if k != "input_ids"}
-        lm_logits, hidden_states, all_hidden_states = super().forward(input_ids, *args, **kwargs)
+        audio_lm_logits, hidden_states, all_hidden_states = super().forward(
+            input_ids, *args, **kwargs
+        )
+        text_logits = self.text_lm_head(input_ids)
 
-        return lm_logits, hidden_states, all_hidden_states
+        num_bos_tokens = self.num_bos_tokens
+        num_eos_tokens = self.num_eos_tokens = None
+
+        num_codebooks = self.config.num_codebooks
+        eos_id = self.config.audio_stream_eos_id
+        bos_id = self.config.audio_stream_bos_id
+        token_ids = token_ids.view(num_codebooks, -1)
+
+        audio_logits = audio_logits.view(num_codebooks, -1)
+
+        if num_bos_tokens < num_codebooks:
+            num_bos_tokens += 1
+            slice(audio_logits, [0, 0], [num_bos_tokens, 0]) = -math.inf
+            index_select(audio_logits, 1, bos_id) = 0
+            audio_logits[num_bos_tokens:, bos_id] = 0
+        if num_eos_tokens and num_eos_tokens < num_codebooks:
+            all_eos_indices = torch.where(token_ids[-1] == eos_id)[0]
+            if all_eos_indices.shape[0] > 0:
+                last_eos_index = all_eos_indices[-1]
+                audio_logits[:last_eos_index, ...] = -math.inf
+                audio_logits[:last_eos_index, eos_id] = 0
+        elif num_eos_tokens and num_eos_tokens >= num_codebooks:
+            audio_logits[:, :] = -math.inf
+            audio_logits[:, 0] = 0.0
+
+        for i in range(num_codebooks):
+            print(audio_logits[i].argmax(-1).item())
+
+        return audio_logits, hidden_states, all_hidden_states
 
     @classmethod
     def from_hugging_face(
@@ -335,10 +373,9 @@ class HiggsAudioForCausalLM(DecoderModelForCausalLM):
         config = HiggsAudioConfig.from_hugging_face(hf_config_or_dir, **kwargs)
         custom_dict = {
             "transformer": "",
-            "lm_head": "audio_decoder_proj.audio_lm_head",
-            # "text_lm_head": "audio_decoder_proj.text_lm_head",
+            "audio_lm_head": "audio_decoder_proj.audio_lm_head",
+            "text_lm_head": "audio_decoder_proj.text_lm_head",
             "audio_post_layernorm": "audio_post_attention_layernorm",
-            # Ensure audio codebook embeddings are loaded from HF weights
             "codebook_embeddings": "audio_codebook_embeddings",
         }
         loader = ModelWeightsLoader(hf_config_or_dir, custom_dict)
